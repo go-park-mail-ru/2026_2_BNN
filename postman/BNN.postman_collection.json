@@ -1,0 +1,60 @@
+{
+  "info": {
+    "_postman_id": "78778a44-9a24-41b5-9226-161c7d18faf4",
+    "name": "BNN API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "36366308"
+  },
+  "item": [
+    {
+      "name": "список заметок",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5458/api/notes",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5458",
+          "path": [
+            "api",
+            "notes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Регистрация",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"login\": \"postman_user\",\n  \"password\": \"my-password\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:5458/api/auth/signup",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5458",
+          "path": [
+            "api",
+            "auth",
+            "signup"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

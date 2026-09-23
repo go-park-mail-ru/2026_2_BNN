@@ -8,23 +8,23 @@ import (
 	"sync"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/auth"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
+	uuid "github.com/satori/go.uuid"
 )
+
+var testUserID = uuid.NewV4()
 
 var notes = []models.Note{
 	{
-		ID:        uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		Title:     "Learning Go",
-		CreatedBy: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		ID:        uuid.NewV4(),
+		Title:     "Изучаю Go",
+		CreatedBy: testUserID,
 		BlocksID:  []uuid.UUID{},
 	},
 	{
-		ID:        uuid.MustParse("00000000-0000-0000-0000-000000000002"),
-		Title:     "Learning HTTP in Go",
-		CreatedBy: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		ID:        uuid.NewV4(),
+		Title:     "Изучаю HTTP в Go",
+		CreatedBy: testUserID,
 		BlocksID:  []uuid.UUID{},
 	},
 }
@@ -32,7 +32,7 @@ var notes = []models.Note{
 var notesMu sync.RWMutex
 
 func ListNotes(w http.ResponseWriter, r *http.Request) {
-	slog.Info("listing notes")
+	slog.Info("Processing notes list request")
 
 	limit := 10
 	offset := 0
@@ -42,8 +42,13 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	if query.Has("limit") {
 		value, err := strconv.Atoi(query.Get("limit"))
 		if err != nil || value < 1 || value > 100 {
-			slog.Warn("invalid limit")
-			http.Error(w, "limit must be an integer between 1 and 100", http.StatusBadRequest)
+			slog.Warn("Invalid limit")
+
+			http.Error(
+				w,
+				"limit должен быть целым число от 1 до 100",
+				http.StatusBadRequest,
+			)
 			return
 		}
 		limit = value
@@ -52,8 +57,13 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	if query.Has("offset") {
 		value, err := strconv.Atoi(query.Get("offset"))
 		if err != nil || value < 0 {
-			slog.Warn("invalid offset")
-			http.Error(w, "offset must be a non-negative integer", http.StatusBadRequest)
+			slog.Warn("Invalid offset")
+
+			http.Error(
+				w,
+				"offset должен быть целым неотрицательным числом",
+				http.StatusBadRequest,
+			)
 			return
 		}
 		offset = value
@@ -73,8 +83,13 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	notesMu.RUnlock()
 
 	if err != nil {
-		slog.Error("failed to marshal notes", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		slog.Error("Failed to encode notes response", "error", err)
+
+		http.Error(
+			w,
+			"ошибка сервера",
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -82,7 +97,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(body); err != nil {
-		slog.Error("failed to write response", "error", err)
+		slog.Error("Failed to write notes response", "error", err)
 	}
 }
 

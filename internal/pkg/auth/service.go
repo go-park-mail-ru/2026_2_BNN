@@ -14,8 +14,6 @@ const (
 	tokenTTL   = 12 * time.Hour
 )
 
-// Claims — то, что кладём внутрь токена.
-// Никаких паролей и прочего чувствительного — токен легко декодируется.
 type Claims struct {
 	UserID string `json:"user_id"`
 	jwt.RegisteredClaims
@@ -29,7 +27,6 @@ func jwtSecret() ([]byte, error) {
 	return []byte(secret), nil
 }
 
-// GenerateToken выпускает подписанный JWT для пользователя.
 func GenerateToken(userID string) (string, error) {
 	secret, err := jwtSecret()
 	if err != nil {
@@ -48,7 +45,6 @@ func GenerateToken(userID string) (string, error) {
 	return token.SignedString(secret)
 }
 
-// ParseToken проверяет подпись и срок действия, возвращает claims.
 func ParseToken(tokenString string) (*Claims, error) {
 	secret, err := jwtSecret()
 	if err != nil {
@@ -71,13 +67,12 @@ func ParseToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// setAuthCookie ставит HttpOnly-куку с токеном.
 func setAuthCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		HttpOnly: true,
-		Secure:   false, // true на проде с HTTPS
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(tokenTTL),
 		Path:     "/",

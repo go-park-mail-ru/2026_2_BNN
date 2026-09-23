@@ -34,7 +34,7 @@ func GetUserID(r *http.Request) (string, bool) {
 }
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
-	slog.Info("user sign up")
+	slog.Info("Processing signup request")
 
 	var req models.SignUpRequest
 
@@ -42,14 +42,14 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&req); err != nil {
-		slog.Warn("failed to decode sign up request", "error", err)
-		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
+		slog.Warn("Failed to decode signup request", "error", err)
+		http.Error(w, "некорректный JSON или слишком большой запрос", http.StatusBadRequest)
 		return
 	}
 
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		slog.Warn("extra data in sign up request")
-		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
+		slog.Warn("Unexpected data after signup JSON object")
+		http.Error(w, "ожидается один JSON-объект", http.StatusBadRequest)
 		return
 	}
 
@@ -57,41 +57,48 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	passwordLength := utf8.RuneCountInString(req.Password)
 
 	if loginLength < 3 || loginLength > 32 {
-		slog.Warn("invalid login length")
-		http.Error(w, "login must be between 3 and 32 characters", http.StatusBadRequest)
+		slog.Warn("Invalid login length")
+		http.Error(w, "логин должен содержать от 3 до 32 символов", http.StatusBadRequest)
 		return
 	}
 
 	if passwordLength < 8 || passwordLength > 128 {
-		slog.Warn("invalid password length")
-		http.Error(w, "password must be between 8 and 128 characters", http.StatusBadRequest)
+		slog.Warn("Invalid password length")
+		http.Error(w, "пароль должен содержать от 8 до 128 символов", http.StatusBadRequest)
 		return
 	}
 
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
-		slog.Error("failed to hash password", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		slog.Error("Failed to hash password", "error", err)
+		http.Error(w, "ошибка сервера", http.StatusInternalServerError)
 		return
 	}
 
 	now := time.Now().UTC()
 
 	user := models.User{
-		ID:           uuid.New(),
+		ID:           uuid.NewV4(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
-		Avatar:       "/static/default_avatar",
+		Avatar:       "/static/default_avatar.jpg",
 		CreatedAt:    now,
 		UpdatedAt:    now,
+	}
+
+	body, err := json.Marshal(user)
+	if err != nil {
+		slog.Error("Failed to encode signup response", "error", err)
+		http.Error(w, "ошибка серва", http.StatusInternalServerError)
+		return
 	}
 
 	usersMu.Lock()
 	if _, exists := users[req.Login]; exists {
 		usersMu.Unlock()
 
-		slog.Warn("sign up attempt with taken login")
-		http.Error(w, "login is already taken", http.StatusConflict)
+		slog.Warn("Signup rejected: login already exists")
+		http.Error(w, "логин уже занят", http.StatusConflict)
 		return
 	}
 	users[req.Login] = user
@@ -119,7 +126,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if _, err := w.Write(body); err != nil {
-		slog.Error("failed to write response", "error", err)
+		slog.Error("Failed to write signup response", "error", err)
 	}
 }
 

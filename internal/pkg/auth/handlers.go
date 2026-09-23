@@ -22,7 +22,7 @@ var users = make(map[string]models.User)
 var usersMu sync.RWMutex
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
-	slog.Info("регестрация пользователя")
+	slog.Info("Processing signup request")
 
 	var req models.SignUpRequest
 
@@ -30,13 +30,13 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&req); err != nil {
-		slog.Warn("не удалось прочитать запрос регистрации", "error", err)
+		slog.Warn("Failed to decode signup request", "error", err)
 		http.Error(w, "некорректный JSON или слишком большой запрос", http.StatusBadRequest)
 		return
 	}
 
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		slog.Warn("лишние данные в запросе регистрации")
+		slog.Warn("Unexpected data after signup JSON object")
 		http.Error(w, "ожидается один JSON-объект", http.StatusBadRequest)
 		return
 	}
@@ -45,20 +45,20 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	passwordLength := utf8.RuneCountInString(req.Password)
 
 	if loginLength < 3 || loginLength > 32 {
-		slog.Warn("некорректная длина логина")
+		slog.Warn("Invalid login length")
 		http.Error(w, "логин должен содержать от 3 до 32 символов", http.StatusBadRequest)
 		return
 	}
 
 	if passwordLength < 8 || passwordLength > 128 {
-		slog.Warn("некорректная длина пароля")
+		slog.Warn("Invalid password length")
 		http.Error(w, "пароль должен содержать от 8 до 128 символов", http.StatusBadRequest)
 		return
 	}
 
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
-		slog.Error("ошибка хеширования пароля", "error", err)
+		slog.Error("Failed to hash password", "error", err)
 		http.Error(w, "ошибка сервера", http.StatusInternalServerError)
 		return
 	}
@@ -66,17 +66,17 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	user := models.User{
-		ID:           uuid.NewV4().String(),
+		ID:           uuid.NewV4(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
-		Avatar:       "/static/default_avatar",
+		Avatar:       "/static/default_avatar.jpg",
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 
 	body, err := json.Marshal(user)
 	if err != nil {
-		slog.Error("ошибка формирования JSON", "error", err)
+		slog.Error("Failed to encode signup response", "error", err)
 		http.Error(w, "ошибка серва", http.StatusInternalServerError)
 		return
 	}
@@ -86,7 +86,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	if _, exists := users[req.Login]; exists {
 		usersMu.Unlock()
 
-		slog.Warn("попытка регистрации с занятым логином")
+		slog.Warn("Signup rejected: login already exists")
 		http.Error(w, "логин уже занят", http.StatusConflict)
 		return
 	}
@@ -99,7 +99,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if _, err := w.Write(body); err != nil {
-		slog.Error("ошибка отправки ответа", "error", err)
+		slog.Error("Failed to write signup response", "error", err)
 	}
 }
 

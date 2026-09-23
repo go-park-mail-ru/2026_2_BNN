@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	uuid "github.com/satori/go.uuid"
+)
 
 type SignUpRequest struct {
 	Login    string `json:"login"`
@@ -8,7 +12,7 @@ type SignUpRequest struct {
 }
 
 type User struct {
-	ID           string    `json:"ID"`
+	ID           uuid.UUID `json:"ID"`
 	Login        string    `json:"login"`
 	PasswordHash []byte    `json:"-"`
 	Avatar       string    `json:"avatar"`

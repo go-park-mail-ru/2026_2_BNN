@@ -86,8 +86,6 @@ func TestGetNote(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/api/notes/"+tt.pathID, nil)
 			if tt.authUserID != nil {
-				// Кладём ID пользователя ровно под тем же ключом,
-				// который использует auth.GetUserID.
 				req = req.WithContext(
 					context.WithValue(req.Context(), auth.UserIDKey, tt.authUserID.String()),
 				)

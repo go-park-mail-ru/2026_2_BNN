@@ -22,10 +22,13 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	api.HandleFunc("/auth/signup", auth.SignUp).
+	authRouter := api.PathPrefix("/auth").Subrouter()
+	notesRouter := api.PathPrefix("/notes").Subrouter()
+
+	authRouter.HandleFunc("/signup", auth.SignUp).
 		Methods(http.MethodPost)
 
-	api.HandleFunc("/notes", note.ListNotes).
+	notesRouter.HandleFunc("/getall", note.ListNotes).
 		Methods(http.MethodGet)
 
 	server := http.Server{
@@ -33,9 +36,9 @@ func main() {
 		Handler: router,
 	}
 
-	slog.Info("запуск сервера", "address", "http://localhost:5458")
+	slog.Info("Starting server", "address", "http://localhost:5458")
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("ошибка запуска сервера", "error", err)
+		slog.Error("Server failed", "error", err)
 	}
 }

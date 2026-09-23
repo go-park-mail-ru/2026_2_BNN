@@ -8,27 +8,31 @@ import (
 	"sync"
 
 	"bnn/internal/models"
+
+	uuid "github.com/satori/go.uuid"
 )
+
+var testUserID = uuid.NewV4()
 
 var notes = []models.Note{
 	{
-		ID:        "1",
+		ID:        uuid.NewV4(),
 		Title:     "Изучаю Go",
-		CreatedBy: "1",
-		BlocksID:  []string{},
+		CreatedBy: testUserID,
+		BlocksID:  []uuid.UUID{},
 	},
 	{
-		ID:        "2",
+		ID:        uuid.NewV4(),
 		Title:     "Изучаю HTTP в Go",
-		CreatedBy: "1",
-		BlocksID:  []string{},
+		CreatedBy: testUserID,
+		BlocksID:  []uuid.UUID{},
 	},
 }
 
 var notesMu sync.RWMutex
 
 func ListNotes(w http.ResponseWriter, r *http.Request) {
-	slog.Info("получение спсика заметок")
+	slog.Info("Processing notes list request")
 
 	limit := 10
 	offset := 0
@@ -39,7 +43,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 		value, err := strconv.Atoi(query.Get("limit"))
 
 		if err != nil || value < 1 || value > 100 {
-			slog.Warn("Некорректный limit")
+			slog.Warn("Invalid limit")
 
 			http.Error(
 				w,
@@ -55,7 +59,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 		value, err := strconv.Atoi(query.Get("offset"))
 
 		if err != nil || value < 0 {
-			slog.Warn("Некорректный offset")
+			slog.Warn("Invalid offset")
 
 			http.Error(
 				w,
@@ -81,7 +85,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	notesMu.RUnlock()
 
 	if err != nil {
-		slog.Error("ошибка форматирование JSON", "error", err)
+		slog.Error("Failed to encode notes response", "error", err)
 
 		http.Error(
 			w,
@@ -95,6 +99,6 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(body); err != nil {
-		slog.Error("ошибка отправки ответа", "error", err)
+		slog.Error("Failed to write notes response", "error", err)
 	}
 }

@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 type Note struct {
@@ -12,8 +12,8 @@ type Note struct {
 	BlocksID     []uuid.UUID `json:"blocks_id"`
 	CreatedBy    uuid.UUID   `json:"created_by"`
 	Title        string      `json:"title"`
-	Header       string      `json:"header"`
-	Icon         string      `json:"icon"`
+	Header       string      `json:"header,omitempty"`
+	Icon         string      `json:"icon,omitempty"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }

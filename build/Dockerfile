@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1
-
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -16,11 +14,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 
 FROM alpine:3.20
+
 RUN apk --no-cache add ca-certificates tzdata
+
 RUN adduser -D -g '' appuser
+
 WORKDIR /app
+
 COPY --from=builder /app/bin/bnn /app/bnn
 COPY --from=builder /app/static /app/static
+
 USER appuser
+
 EXPOSE 5458
+
 CMD ["/app/bnn"]

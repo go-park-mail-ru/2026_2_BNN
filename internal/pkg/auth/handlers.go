@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"crypto/pbkdf2"
 	"crypto/rand"
+	"crypto/pbkdf2"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -19,6 +19,8 @@ import (
 	"unicode/utf8"
 
 	"bnn/internal/models"
+
+	"github.com/google/uuid"
 )
 
 var users = make(map[string]models.User)
@@ -43,13 +45,13 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	if err := decoder.Decode(&req); err != nil {
 		slog.Warn("Failed to decode signup request", "error", err)
-		http.Error(w, "некорректный JSON или слишком большой запрос", http.StatusBadRequest)
+		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
 		return
 	}
 
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		slog.Warn("Unexpected data after signup JSON object")
-		http.Error(w, "ожидается один JSON-объект", http.StatusBadRequest)
+		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
 		return
 	}
 
@@ -58,27 +60,27 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	if loginLength < 3 || loginLength > 32 {
 		slog.Warn("Invalid login length")
-		http.Error(w, "логин должен содержать от 3 до 32 символов", http.StatusBadRequest)
+		http.Error(w, "login must be between 3 and 32 characters", http.StatusBadRequest)
 		return
 	}
 
 	if passwordLength < 8 || passwordLength > 128 {
 		slog.Warn("Invalid password length")
-		http.Error(w, "пароль должен содержать от 8 до 128 символов", http.StatusBadRequest)
+		http.Error(w, "password must be between 8 and 128 characters", http.StatusBadRequest)
 		return
 	}
 
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
 		slog.Error("Failed to hash password", "error", err)
-		http.Error(w, "ошибка сервера", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	now := time.Now().UTC()
 
 	user := models.User{
-		ID:           uuid.NewV4(),
+		ID:           uuid.New(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
 		Avatar:       "/static/default_avatar.jpg",
@@ -86,38 +88,28 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
-	body, err := json.Marshal(user)
-	if err != nil {
-		slog.Error("Failed to encode signup response", "error", err)
-		http.Error(w, "ошибка серва", http.StatusInternalServerError)
-		return
-	}
-
 	usersMu.Lock()
 	if _, exists := users[req.Login]; exists {
 		usersMu.Unlock()
 
 		slog.Warn("Signup rejected: login already exists")
-		http.Error(w, "логин уже занят", http.StatusConflict)
+		http.Error(w, "login is already taken", http.StatusConflict)
 		return
 	}
 	users[req.Login] = user
 	usersMu.Unlock()
-	
+
 	token, err := GenerateToken(user.ID.String())
 	if err != nil {
-		slog.Error("failed to generate token", "error", err)
+		slog.Error("Failed to generate token", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	setAuthCookie(w, token)
 
-	safeUser := user
-	safeUser.PasswordHash = nil
-
-	body, err := json.Marshal(safeUser)
+	body, err := json.Marshal(user)
 	if err != nil {
-		slog.Error("failed to marshal user", "error", err)
+		slog.Error("Failed to encode signup response", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -131,7 +123,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func SignIn(w http.ResponseWriter, r *http.Request) {
-	slog.Info("user sign in")
+	slog.Info("Processing sign in request")
 
 	var req models.SignInRequest
 
@@ -139,13 +131,13 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&req); err != nil {
-		slog.Warn("failed to decode sign in request", "error", err)
+		slog.Warn("Failed to decode sign in request", "error", err)
 		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
 		return
 	}
 
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		slog.Warn("extra data in sign in request")
+		slog.Warn("Extra data in sign in request")
 		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
 		return
 	}
@@ -155,26 +147,23 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	usersMu.RUnlock()
 
 	if !exists || !verifyPassword(req.Password, user.PasswordHash) {
-		slog.Warn("invalid login or password")
+		slog.Warn("Invalid login or password")
 		http.Error(w, "invalid login or password", http.StatusUnauthorized)
 		return
 	}
 
 	token, err := GenerateToken(user.ID.String())
 	if err != nil {
-		slog.Error("failed to generate token", "error", err)
+		slog.Error("Failed to generate token", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	setAuthCookie(w, token)
 
-	safeUser := user
-	safeUser.PasswordHash = nil
-
-	body, err := json.Marshal(safeUser)
+	body, err := json.Marshal(user)
 	if err != nil {
-		slog.Error("failed to marshal user", "error", err)
+		slog.Error("Failed to marshal user", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -183,7 +172,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(body); err != nil {
-		slog.Error("failed to write response", "error", err)
+		slog.Error("Failed to write response", "error", err)
 	}
 }
 
@@ -191,14 +180,14 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
-			slog.Warn("auth cookie missing", "error", err)
+			slog.Warn("Auth cookie missing", "error", err)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		claims, err := ParseToken(cookie.Value)
 		if err != nil {
-			slog.Warn("invalid token", "error", err)
+			slog.Warn("Invalid token", "error", err)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -209,7 +198,11 @@ func Middleware(next http.Handler) http.Handler {
 }
 
 func hashPassword(password string) ([]byte, error) {
-	salt := rand.Text()
+	saltBytes := make([]byte, 16)
+	if _, err := rand.Read(saltBytes); err != nil {
+		return nil, err
+	}
+	salt := hex.EncodeToString(saltBytes)
 
 	hash, err := pbkdf2.Key(
 		sha256.New,

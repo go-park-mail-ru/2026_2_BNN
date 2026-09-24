@@ -1,27 +1,37 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
-	"encoding/base64"
-
-	"golang.org/x/crypto/argon2"
-
 	"bnn/internal/models"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
 )
 
 var users = make(map[string]models.User)
 var usersMu sync.RWMutex
+
+type ContextKey string
+
+const UserIDKey ContextKey = "userID"
+
+func GetUserID(r *http.Request) (string, bool) {
+	id, ok := r.Context().Value(UserIDKey).(string)
+	return id, ok
+}
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing signup request")
@@ -33,13 +43,13 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	if err := decoder.Decode(&req); err != nil {
 		slog.Warn("Failed to decode signup request", "error", err)
-		http.Error(w, "некорректный JSON или слишком большой запрос", http.StatusBadRequest)
+		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
 		return
 	}
 
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		slog.Warn("Unexpected data after signup JSON object")
-		http.Error(w, "ожидается один JSON-объект", http.StatusBadRequest)
+		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
 		return
 	}
 
@@ -48,27 +58,27 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	if loginLength < 3 || loginLength > 32 {
 		slog.Warn("Invalid login length")
-		http.Error(w, "логин должен содержать от 3 до 32 символов", http.StatusBadRequest)
+		http.Error(w, "login must be between 3 and 32 characters", http.StatusBadRequest)
 		return
 	}
 
 	if passwordLength < 8 || passwordLength > 128 {
 		slog.Warn("Invalid password length")
-		http.Error(w, "пароль должен содержать от 8 до 128 символов", http.StatusBadRequest)
+		http.Error(w, "password must be between 8 and 128 characters", http.StatusBadRequest)
 		return
 	}
 
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
 		slog.Error("Failed to hash password", "error", err)
-		http.Error(w, "ошибка сервера", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	user := models.User{
-		ID:           uuid.NewV4(),
+		ID:           uuid.New(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
 		Avatar:       "/static/default_avatar.jpg",
@@ -76,26 +86,31 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
-	body, err := json.Marshal(user)
-	if err != nil {
-		slog.Error("Failed to encode signup response", "error", err)
-		http.Error(w, "ошибка серва", http.StatusInternalServerError)
-		return
-	}
-
 	usersMu.Lock()
-
 	if _, exists := users[req.Login]; exists {
 		usersMu.Unlock()
 
 		slog.Warn("Signup rejected: login already exists")
-		http.Error(w, "логин уже занят", http.StatusConflict)
+		http.Error(w, "login is already taken", http.StatusConflict)
 		return
 	}
-
 	users[req.Login] = user
-
 	usersMu.Unlock()
+
+	token, err := GenerateToken(user.ID.String())
+	if err != nil {
+		slog.Error("Failed to generate token", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	setAuthCookie(w, token)
+
+	body, err := json.Marshal(user)
+	if err != nil {
+		slog.Error("Failed to encode signup response", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -103,6 +118,81 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(body); err != nil {
 		slog.Error("Failed to write signup response", "error", err)
 	}
+}
+
+func SignIn(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Processing sign in request")
+
+	var req models.SignInRequest
+
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&req); err != nil {
+		slog.Warn("Failed to decode sign in request", "error", err)
+		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
+		return
+	}
+
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		slog.Warn("Extra data in sign in request")
+		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
+		return
+	}
+
+	usersMu.RLock()
+	user, exists := users[req.Login]
+	usersMu.RUnlock()
+
+	if !exists || !verifyPassword(req.Password, user.PasswordHash) {
+		slog.Warn("Invalid login or password")
+		http.Error(w, "invalid login or password", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := GenerateToken(user.ID.String())
+	if err != nil {
+		slog.Error("Failed to generate token", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	setAuthCookie(w, token)
+
+	body, err := json.Marshal(user)
+	if err != nil {
+		slog.Error("Failed to marshal user", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(body); err != nil {
+		slog.Error("Failed to write response", "error", err)
+	}
+}
+
+func Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(CookieName)
+		if err != nil {
+			slog.Warn("Auth cookie missing", "error", err)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		claims, err := ParseToken(cookie.Value)
+		if err != nil {
+			slog.Warn("Invalid token", "error", err)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func hashPassword(password string) ([]byte, error) {
@@ -143,4 +233,43 @@ func hashPassword(password string) ([]byte, error) {
 	)
 
 	return []byte(encoded), nil
+}
+
+func verifyPassword(password string, encodedHash []byte) bool {
+	parts := strings.Split(string(encodedHash), "$")
+
+	if len(parts) != 6 || parts[0] != "" || parts[1] != "argon2id" {
+		return false
+	}
+
+	expectedVersion := fmt.Sprintf("v=%d", argon2.Version)
+
+	if parts[2] != expectedVersion {
+		return false
+	}
+
+	if parts[3] != "m=19456,t=2,p=1" {
+		return false
+	}
+
+	salt, err := base64.RawStdEncoding.Strict().DecodeString(parts[4])
+	if err != nil || len(salt) != 16 {
+		return false
+	}
+
+	expectedHash, err := base64.RawStdEncoding.Strict().DecodeString(parts[5])
+	if err != nil || len(expectedHash) != 32 {
+		return false
+	}
+
+	actualHash := argon2.IDKey(
+		[]byte(password),
+		salt,
+		2,
+		19*1024,
+		1,
+		32,
+	)
+
+	return subtle.ConstantTimeCompare(expectedHash, actualHash) == 1
 }

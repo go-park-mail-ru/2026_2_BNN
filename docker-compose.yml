@@ -1,0 +1,17 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+    container_name: bnn-backend
+    ports:
+      - "5458:5458"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5458/api/notes"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

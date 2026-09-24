@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"log/slog"
 	"net/http"
 
@@ -11,6 +12,14 @@ import (
 )
 
 func main() {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-me"
+		slog.Warn("JWT_SECRET is not set, using dev default")
+	}
+
+	auth.Init(jwtSecret)
+
 	router := mux.NewRouter()
 
 	router.PathPrefix("/static/").Handler(
@@ -22,14 +31,14 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	authRouter := api.PathPrefix("/auth").Subrouter()
-	notesRouter := api.PathPrefix("/notes").Subrouter()
+	api.HandleFunc("/auth/signup", auth.SignUp).Methods(http.MethodPost)
+	api.HandleFunc("/auth/signin", auth.SignIn).Methods(http.MethodPost)
 
-	authRouter.HandleFunc("/signup", auth.SignUp).
-		Methods(http.MethodPost)
+	protected := api.NewRoute().Subrouter()
+	protected.Use(auth.Middleware)
 
-	notesRouter.HandleFunc("/getall", note.ListNotes).
-		Methods(http.MethodGet)
+	protected.HandleFunc("/notes", note.ListNotes).Methods(http.MethodGet)
+	protected.HandleFunc("/notes/{id}", note.GetNote).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",

@@ -10,21 +10,21 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	uuid "github.com/satori/go.uuid"
 )
 
-var testUserID = uuid.New()
+var testUserID = uuid.NewV4()
 
 var notes = []models.Note{
 	{
-		ID:        uuid.New(),
+		ID:        uuid.NewV4(),
 		Title:     "Learning Go",
 		CreatedBy: testUserID,
 		BlocksID:  []uuid.UUID{},
 	},
 	{
-		ID:        uuid.New(),
+		ID:        uuid.NewV4(),
 		Title:     "Learning HTTP in Go",
 		CreatedBy: testUserID,
 		BlocksID:  []uuid.UUID{},
@@ -107,7 +107,7 @@ func GetNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	noteID, err := uuid.Parse(rawID)
+	noteID, err := uuid.FromString(rawID)
 	if err != nil {
 		slog.Warn("Invalid note id", "id", rawID, "error", err)
 		http.Error(w, "invalid note id", http.StatusBadRequest)

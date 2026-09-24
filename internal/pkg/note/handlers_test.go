@@ -10,8 +10,8 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,15 +23,15 @@ func resetNotes(list []models.Note) {
 }
 
 func TestGetNote(t *testing.T) {
-	ownerID := uuid.New()
-	otherID := uuid.New()
-	noteID := uuid.New()
+	ownerID := uuid.NewV4()
+	otherID := uuid.NewV4()
+	noteID := uuid.NewV4()
 
 	baseNote := models.Note{
 		ID:        noteID,
 		Title:     "Test note",
 		CreatedBy: ownerID,
-		BlocksID:  []uuid.UUID{},   // ← было []string{}
+		BlocksID:  []uuid.UUID{}, // ← было []string{}
 	}
 
 	tests := []struct {
@@ -52,7 +52,7 @@ func TestGetNote(t *testing.T) {
 		},
 		{
 			name:         "Note not found",
-			pathID:       uuid.New().String(),
+			pathID:       uuid.NewV4().String(),
 			authUserID:   &ownerID,
 			prepare:      func() { resetNotes([]models.Note{baseNote}) },
 			expectedCode: http.StatusNotFound,

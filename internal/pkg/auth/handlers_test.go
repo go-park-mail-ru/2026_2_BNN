@@ -11,7 +11,7 @@ import (
 
 	"bnn/internal/models"
 
-	"github.com/google/uuid"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func addTestUser(t *testing.T, login, password string) models.User {
 
 	now := time.Now().UTC()
 	user := models.User{
-		ID:           uuid.New(),
+		ID:           uuid.NewV4(),
 		Login:        login,
 		PasswordHash: hash,
 		Avatar:       "/static/default_avatar",

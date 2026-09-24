@@ -17,7 +17,7 @@ import (
 
 	"bnn/internal/models"
 
-	"github.com/google/uuid"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -78,7 +78,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	user := models.User{
-		ID:           uuid.New(),
+		ID:           uuid.NewV4(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
 		Avatar:       "/static/default_avatar.jpg",

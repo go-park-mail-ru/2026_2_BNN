@@ -1,9 +1,9 @@
 package main
 
 import (
-	"os"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/note"
@@ -31,14 +31,22 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	api.HandleFunc("/auth/signup", auth.SignUp).Methods(http.MethodPost)
-	api.HandleFunc("/auth/signin", auth.SignIn).Methods(http.MethodPost)
+	authRouter := api.PathPrefix("/auth").Subrouter()
 
-	protected := api.NewRoute().Subrouter()
-	protected.Use(auth.Middleware)
+	authRouter.HandleFunc("/signup", auth.SignUp).
+		Methods(http.MethodPost)
 
-	protected.HandleFunc("/notes", note.ListNotes).Methods(http.MethodGet)
-	protected.HandleFunc("/notes/{id}", note.GetNote).Methods(http.MethodGet)
+	authRouter.HandleFunc("/signin", auth.SignIn).
+		Methods(http.MethodPost)
+
+	notesRouter := api.PathPrefix("/notes").Subrouter()
+	notesRouter.Use(auth.Middleware)
+
+	notesRouter.HandleFunc("/getall", note.ListNotes).
+		Methods(http.MethodGet)
+
+	notesRouter.HandleFunc("/{id}", note.GetNote).
+		Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",

@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"crypto/pbkdf2"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +10,10 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"encoding/base64"
+
+	"golang.org/x/crypto/argon2"
 
 	"bnn/internal/models"
 
@@ -104,20 +106,41 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func hashPassword(password string) ([]byte, error) {
-	salt := rand.Text()
-
-	hash, err := pbkdf2.Key(
-		sha256.New,
-		password,
-		[]byte(salt),
-		600_000,
-		32,
+	const (
+		memory      uint32 = 19 * 1024
+		iterations  uint32 = 2
+		parallelism uint8  = 1
+		keyLength   uint32 = 32
+		saltLength         = 16
 	)
-	if err != nil {
-		return nil, err
+
+	salt := make([]byte, saltLength)
+
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("generate password salt: %w", err)
 	}
 
-	encoded := fmt.Sprintf("pbkdf2-sha256$600000$%s$%x", salt, hash)
+	hash := argon2.IDKey(
+		[]byte(password),
+		salt,
+		iterations,
+		memory,
+		parallelism,
+		keyLength,
+	)
+
+	saltBase64 := base64.RawStdEncoding.EncodeToString(salt)
+	hashBase64 := base64.RawStdEncoding.EncodeToString(hash)
+
+	encoded := fmt.Sprintf(
+		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
+		argon2.Version,
+		memory,
+		iterations,
+		parallelism,
+		saltBase64,
+		hashBase64,
+	)
 
 	return []byte(encoded), nil
 }

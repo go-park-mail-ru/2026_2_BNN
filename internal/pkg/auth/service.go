@@ -3,7 +3,6 @@ package auth
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,23 +13,20 @@ const (
 	tokenTTL   = 12 * time.Hour
 )
 
+var jwtSecret []byte
+
 type Claims struct {
 	UserID string `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-func jwtSecret() ([]byte, error) {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return nil, fmt.Errorf("JWT_SECRET is not set")
-	}
-	return []byte(secret), nil
+func Init(secret string) {
+	jwtSecret = []byte(secret)
 }
 
 func GenerateToken(userID string) (string, error) {
-	secret, err := jwtSecret()
-	if err != nil {
-		return "", err
+	if len(jwtSecret) == 0 {
+		return "", fmt.Errorf("jwt secret is not initialized")
 	}
 
 	claims := Claims{
@@ -42,13 +38,12 @@ func GenerateToken(userID string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secret)
+	return token.SignedString(jwtSecret)
 }
 
 func ParseToken(tokenString string) (*Claims, error) {
-	secret, err := jwtSecret()
-	if err != nil {
-		return nil, err
+	if len(jwtSecret) == 0 {
+		return nil, fmt.Errorf("jwt secret is not initialized")
 	}
 
 	claims := &Claims{}
@@ -56,7 +51,7 @@ func ParseToken(tokenString string) (*Claims, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return secret, nil
+		return jwtSecret, nil
 	})
 	if err != nil {
 		return nil, err

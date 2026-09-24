@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -14,6 +15,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain инициализирует jwtSecret один раз для всех тестов пакета.
+// Без этого GenerateToken вернёт "jwt secret is not initialized".
+func TestMain(m *testing.M) {
+	Init("test-secret-for-unit-tests-only")
+	os.Exit(m.Run())
+}
 
 func resetUsers() {
 	usersMu.Lock()
@@ -45,8 +53,6 @@ func addTestUser(t *testing.T, login, password string) models.User {
 }
 
 func TestSignIn(t *testing.T) {
-	t.Setenv("JWT_SECRET", "test-secret-for-unit-tests-only")
-
 	tests := []struct {
 		name         string
 		prepare      func(t *testing.T)

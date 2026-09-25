@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,16 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/argon2"
+)
+
+const (
+	maxRequestBodySize = 4096
+
+	minLoginLength = 3
+	maxLoginLength = 20
+
+	minPasswordLength = 8
+	maxPasswordLength = 128
 )
 
 var users = make(map[string]models.User)
@@ -38,40 +49,46 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SignUpRequest
 
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	decoder := json.NewDecoder(r.Body)
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
-	if err := decoder.Decode(&req); err != nil {
-		slog.Warn("Failed to decode signup request", "error", err)
-		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
+	requestBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		if sizeErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			slog.Warn("Request body too large", "limit", sizeErr.Limit)
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		slog.Warn("Failed to read request body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		slog.Warn("Unexpected data after signup JSON object")
-		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
+	if err := json.Unmarshal(requestBody, &req); err != nil {
+		slog.Warn("Failed to decode request JSON", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	loginLength := utf8.RuneCountInString(req.Login)
 	passwordLength := utf8.RuneCountInString(req.Password)
 
-	if loginLength < 3 || loginLength > 32 {
+	if loginLength < minLoginLength || loginLength > maxLoginLength {
 		slog.Warn("Invalid login length")
-		http.Error(w, "login must be between 3 and 32 characters", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if passwordLength < 8 || passwordLength > 128 {
+	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
 		slog.Warn("Invalid password length")
-		http.Error(w, "password must be between 8 and 128 characters", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
 		slog.Error("Failed to hash password", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -91,7 +108,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		usersMu.Unlock()
 
 		slog.Warn("Signup rejected: login already exists")
-		http.Error(w, "login is already taken", http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
 		return
 	}
 	users[req.Login] = user
@@ -100,7 +117,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	token, err := GenerateToken(user.ID.String())
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	setAuthCookie(w, token)
@@ -108,7 +125,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	body, err := json.Marshal(user)
 	if err != nil {
 		slog.Error("Failed to encode signup response", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -125,18 +142,24 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SignInRequest
 
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	decoder := json.NewDecoder(r.Body)
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
-	if err := decoder.Decode(&req); err != nil {
-		slog.Warn("Failed to decode sign in request", "error", err)
-		http.Error(w, "invalid JSON or request too large", http.StatusBadRequest)
+	requestBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		if sizeErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			slog.Warn("Request body too large", "limit", sizeErr.Limit)
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		slog.Warn("Failed to read request body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		slog.Warn("Extra data in sign in request")
-		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
+	if err := json.Unmarshal(requestBody, &req); err != nil {
+		slog.Warn("Failed to decode request JSON", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -146,14 +169,14 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 	if !exists || !verifyPassword(req.Password, user.PasswordHash) {
 		slog.Warn("Invalid login or password")
-		http.Error(w, "invalid login or password", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	token, err := GenerateToken(user.ID.String())
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -162,7 +185,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	body, err := json.Marshal(user)
 	if err != nil {
 		slog.Error("Failed to marshal user", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -179,14 +202,14 @@ func Middleware(next http.Handler) http.Handler {
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
 			slog.Warn("Auth cookie missing", "error", err)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		claims, err := ParseToken(cookie.Value)
 		if err != nil {
 			slog.Warn("Invalid token", "error", err)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 

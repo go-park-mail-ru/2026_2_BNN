@@ -31,22 +31,26 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	authRouter := api.PathPrefix("/auth").Subrouter()
+	{
+		authRouter := api.PathPrefix("/auth").Subrouter()
 
-	authRouter.HandleFunc("/signup", auth.SignUp).
-		Methods(http.MethodPost)
+		authRouter.HandleFunc("/signup", auth.SignUp).
+			Methods(http.MethodPost)
 
-	authRouter.HandleFunc("/signin", auth.SignIn).
-		Methods(http.MethodPost)
+		authRouter.HandleFunc("/signin", auth.SignIn).
+			Methods(http.MethodPost)
+	}
 
-	notesRouter := api.PathPrefix("/notes").Subrouter()
-	notesRouter.Use(auth.Middleware)
+	{
+		notesRouter := api.PathPrefix("/notes").Subrouter()
+		notesRouter.Use(auth.Middleware)
 
-	notesRouter.HandleFunc("/getall", note.ListNotes).
-		Methods(http.MethodGet)
+		notesRouter.HandleFunc("/getall", note.ListNotes).
+			Methods(http.MethodGet)
 
-	notesRouter.HandleFunc("/{id}", note.GetNote).
-		Methods(http.MethodGet)
+		notesRouter.HandleFunc("/{id}", note.GetNote).
+			Methods(http.MethodGet)
+	}
 
 	server := http.Server{
 		Addr:    ":5458",

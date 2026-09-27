@@ -2,8 +2,10 @@ package note
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 
@@ -33,32 +35,46 @@ var notes = []models.Note{
 
 var notesMu sync.RWMutex
 
-func ListNotes(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Processing notes list request")
+func parsePagination(query url.Values) (int, int, error) {
+	const (
+		defaultLimit  = 10
+		defaultOffset = 0
+		minLimit      = 1
+		maxLimit      = 100
+	)
 
-	limit := 10
-	offset := 0
-
-	query := r.URL.Query()
+	limit := defaultLimit
+	offset := defaultOffset
 
 	if query.Has("limit") {
 		value, err := strconv.Atoi(query.Get("limit"))
-		if err != nil || value < 1 || value > 100 {
-			slog.Warn("Invalid limit")
-			http.Error(w, "limit must be an integer between 1 and 100", http.StatusBadRequest)
-			return
+		if err != nil || value < minLimit || value > maxLimit {
+			return 0, 0, errors.New("invalid limit")
 		}
+
 		limit = value
 	}
 
 	if query.Has("offset") {
 		value, err := strconv.Atoi(query.Get("offset"))
 		if err != nil || value < 0 {
-			slog.Warn("Invalid offset")
-			http.Error(w, "offset must be a non-negative integer", http.StatusBadRequest)
-			return
+			return 0, 0, errors.New("invalid offset")
 		}
+
 		offset = value
+	}
+
+	return limit, offset, nil
+}
+
+func ListNotes(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Processing notes list request")
+
+	limit, offset, err := parsePagination(r.URL.Query())
+	if err != nil {
+		slog.Warn("Invalid pagination parameters", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	notesMu.RLock()

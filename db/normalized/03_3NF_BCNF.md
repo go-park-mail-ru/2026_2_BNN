@@ -10,6 +10,8 @@ login уникален и обязателен; иных функциональ�
 P.S.
 Почему у нас получились 3НФ и НФБК в одной схеме. НФБК строже 3НФ: левая часть каждой зависимости должна быть ключом. Разница появляется, только если часть ключа зависит от атрибута, который сам ключом не является. После выноса данных автора таких зависимостей нет: всё определяется ключами таблиц. Поэтому отдельно дробить схему для НФБК не является нужным.
 
+`_` перед именем атрибута — не тип данных. Без этого слова mermaid не рисует атрибут: строка `id PK` для него синтаксическая ошибка.
+
 ```mermaid
 erDiagram
     user ||..o{ note : "создаёт"
@@ -22,51 +24,51 @@ erDiagram
     attachment ||--o{ block_attachment : "прикреплено"
 
     user {
-        uuid id PK
-        text login UK
-        text password_hash
-        text avatar
-        timestamptz created_at
-        timestamptz updated_at
+        _ id PK
+        _ login UK
+        _ password_hash
+        _ avatar
+        _ created_at
+        _ updated_at
     }
 
     note {
-        uuid id PK
-        uuid parent_note_id FK
-        uuid created_by FK
-        text title
-        text header
-        text icon
-        timestamptz created_at
-        timestamptz updated_at
+        _ id PK
+        _ parent_note_id FK
+        _ created_by FK
+        _ title
+        _ header
+        _ icon
+        _ created_at
+        _ updated_at
     }
 
     favorite {
-        uuid user_id PK, FK
-        uuid note_id PK, FK
+        _ user_id PK, FK
+        _ note_id PK, FK
     }
 
     block {
-        uuid id PK
-        text content
-        timestamptz created_at
-        timestamptz updated_at
+        _ id PK
+        _ content
+        _ created_at
+        _ updated_at
     }
 
     note_block {
-        uuid note_id PK, FK
-        uuid block_id PK, FK
-        integer position UK "уникален вместе с note_id"
+        _ note_id PK, FK
+        _ block_id PK, FK
+        _ position "уникален вместе с note_id"
     }
 
     attachment {
-        uuid id PK
-        text path
+        _ id PK
+        _ path
     }
 
     block_attachment {
-        uuid block_id PK, FK
-        uuid attachment_id PK, FK
-        integer position UK "уникален вместе с block_id"
+        _ block_id PK, FK
+        _ attachment_id PK, FK
+        _ position "уникален вместе с block_id"
     }
 ```

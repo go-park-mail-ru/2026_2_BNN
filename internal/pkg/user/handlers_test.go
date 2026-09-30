@@ -108,7 +108,7 @@ func TestGetCurrentUser(t *testing.T) {
 				assert.Equal(t, expectedLogin, user.Login)
 				assert.NotEqual(t, "", user.ID.String())
 				assert.Nil(t, user.PasswordHash, "password hash must not be exposed")
-				assert.Equal(t, "/static/default_avatar.jpg", user.Avatar)
+				assert.Equal(t, "default_avatar.jpg", user.Avatar)
 				assert.Equal(t, 1, user.Version)
 			}
 		})

@@ -106,7 +106,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		ID:           uuid.NewV4(),
 		Login:        req.Login,
 		PasswordHash: passwordHash,
-		Avatar:       "/static/default_avatar.jpg",
+		Avatar:       "default_avatar.jpg",
 		Version:      1,
 		CreatedAt:    now,
 		UpdatedAt:    now,

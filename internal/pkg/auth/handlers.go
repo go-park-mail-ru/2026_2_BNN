@@ -33,6 +33,7 @@ const (
 )
 
 var users = make(map[string]models.User)
+var usersByID = make(map[string]models.User)
 var usersMu sync.RWMutex
 
 type ContextKey string
@@ -44,6 +45,13 @@ func GetUserID(r *http.Request) (string, bool) {
 	return id, ok
 }
 
+func GetUserByID(id string) (models.User, bool) {
+	usersMu.RLock()
+	defer usersMu.RUnlock()
+	user, ok := usersByID[id]
+	return user, ok
+}
+
 func SignUp(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing signup request")
 
@@ -53,12 +61,12 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		if sizeErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		var sizeErr *http.MaxBytesError
+		if errors.As(err, &sizeErr) {
 			slog.Warn("Request body too large", "limit", sizeErr.Limit)
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
-
 		slog.Warn("Failed to read request body", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -99,6 +107,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		Login:        req.Login,
 		PasswordHash: passwordHash,
 		Avatar:       "/static/default_avatar.jpg",
+		Version:      1,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -106,15 +115,15 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	usersMu.Lock()
 	if _, exists := users[req.Login]; exists {
 		usersMu.Unlock()
-
 		slog.Warn("Signup rejected: login already exists")
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
 	users[req.Login] = user
+	usersByID[user.ID.String()] = user
 	usersMu.Unlock()
 
-	token, err := GenerateToken(user.ID.String())
+	token, err := GenerateToken(user.ID.String(), user.Version)
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -146,12 +155,12 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		if sizeErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		var sizeErr *http.MaxBytesError
+		if errors.As(err, &sizeErr) {
 			slog.Warn("Request body too large", "limit", sizeErr.Limit)
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
-
 		slog.Warn("Failed to read request body", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -173,7 +182,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := GenerateToken(user.ID.String())
+	token, err := GenerateToken(user.ID.String(), user.Version)
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -209,6 +218,16 @@ func Middleware(next http.Handler) http.Handler {
 		claims, err := ParseToken(cookie.Value)
 		if err != nil {
 			slog.Warn("Invalid token", "error", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		usersMu.RLock()
+		user, exists := usersByID[claims.UserID]
+		usersMu.RUnlock()
+
+		if !exists || user.Version != claims.Version {
+			slog.Warn("Token version mismatch", "user_id", claims.UserID)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

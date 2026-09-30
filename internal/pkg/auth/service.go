@@ -10,13 +10,14 @@ import (
 
 const (
 	CookieName = "bnn_jwt"
-	tokenTTL   = 12 * time.Hour
+	tokenTTL   = 48 * time.Hour
 )
 
 var jwtSecret []byte
 
 type Claims struct {
-	UserID string `json:"user_id"`
+	UserID  string `json:"user_id"`
+	Version int    `json:"version"`
 	jwt.RegisteredClaims
 }
 
@@ -24,16 +25,20 @@ func Init(secret string) {
 	jwtSecret = []byte(secret)
 }
 
-func GenerateToken(userID string) (string, error) {
+func GenerateToken(userID string, version int) (string, error) {
 	if len(jwtSecret) == 0 {
 		return "", fmt.Errorf("jwt secret is not initialized")
 	}
 
+	now := time.Now().UTC()
+
 	claims := Claims{
-		UserID: userID,
+		UserID:  userID,
+		Version: version,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(now),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),
 		},
 	}
 
@@ -69,7 +74,7 @@ func setAuthCookie(w http.ResponseWriter, token string) {
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(tokenTTL),
+		Expires:  time.Now().UTC().Add(tokenTTL),
 		Path:     "/",
 	})
 }

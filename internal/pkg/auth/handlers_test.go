@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMain инициализирует jwtSecret один раз для всех тестов пакета.
-// Без этого GenerateToken вернёт "jwt secret is not initialized".
 func TestMain(m *testing.M) {
 	Init("test-secret-for-unit-tests-only")
 	os.Exit(m.Run())
@@ -27,6 +25,7 @@ func resetUsers() {
 	usersMu.Lock()
 	defer usersMu.Unlock()
 	users = make(map[string]models.User)
+	usersByID = make(map[string]models.User)
 }
 
 func addTestUser(t *testing.T, login, password string) models.User {
@@ -41,12 +40,14 @@ func addTestUser(t *testing.T, login, password string) models.User {
 		Login:        login,
 		PasswordHash: hash,
 		Avatar:       "/static/default_avatar",
+		Version:      1,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 
 	usersMu.Lock()
 	users[login] = user
+	usersByID[user.ID.String()] = user
 	usersMu.Unlock()
 
 	return user

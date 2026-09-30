@@ -7,15 +7,21 @@ import (
 
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/note"
+	"bnn/internal/pkg/user"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		slog.Warn("No .env file found, using system environment")
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "dev-secret-change-me"
-		slog.Warn("JWT_SECRET is not set, using dev default")
+		slog.Error("JWT_SECRET is not set")
+		os.Exit(1)
 	}
 
 	auth.Init(jwtSecret)
@@ -32,21 +38,15 @@ func main() {
 	api := router.PathPrefix("/api").Subrouter()
 
 	authRouter := api.PathPrefix("/auth").Subrouter()
+	authRouter.HandleFunc("/signup", auth.SignUp).Methods(http.MethodPost)
+	authRouter.HandleFunc("/signin", auth.SignIn).Methods(http.MethodPost)
 
-	authRouter.HandleFunc("/signup", auth.SignUp).
-		Methods(http.MethodPost)
+	protected := api.NewRoute().Subrouter()
+	protected.Use(auth.Middleware)
 
-	authRouter.HandleFunc("/signin", auth.SignIn).
-		Methods(http.MethodPost)
-
-	notesRouter := api.PathPrefix("/notes").Subrouter()
-	notesRouter.Use(auth.Middleware)
-
-	notesRouter.HandleFunc("/getall", note.ListNotes).
-		Methods(http.MethodGet)
-
-	notesRouter.HandleFunc("/{id}", note.GetNote).
-		Methods(http.MethodGet)
+	protected.HandleFunc("/notes", note.ListNotes).Methods(http.MethodGet)
+	protected.HandleFunc("/notes/{id}", note.GetNote).Methods(http.MethodGet)
+	protected.HandleFunc("/users/me", user.GetCurrentUser).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",

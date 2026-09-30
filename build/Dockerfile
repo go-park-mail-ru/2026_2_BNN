@@ -1,31 +1,26 @@
+# Этап сборки
 FROM golang:1.26-alpine AS builder
 
-WORKDIR /app
+WORKDIR /github.com/go-park-mail-ru/2026_2_BNN/
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-s -w" \
-    -o /app/bin/bnn \
-    ./cmd/main
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./.bin ./cmd/main/main.go
 
+# Этап запуска
+FROM scratch AS runner
 
-FROM alpine:3.20
+WORKDIR /app/
 
-RUN apk --no-cache add ca-certificates tzdata
+COPY --from=builder /github.com/go-park-mail-ru/2026_2_BNN/.bin .
 
-RUN adduser -D -g '' appuser
-
-WORKDIR /app
-
-COPY --from=builder /app/bin/bnn /app/bnn
-COPY --from=builder /app/static /app/static
-
-USER appuser
+COPY --from=builder /usr/local/go/lib/time/zoneinfo.zip /
+ENV TZ="Europe/Moscow"
+ENV ZONEINFO=/zoneinfo.zip
 
 EXPOSE 5458
 
-CMD ["/app/bnn"]
+ENTRYPOINT ["./.bin"]

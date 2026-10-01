@@ -31,7 +31,7 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE user (
+CREATE TABLE "user" (
     PRIMARY KEY (id),
     id            UUID        DEFAULT gen_random_uuid() NOT NULL,
     login         TEXT                                  NOT NULL UNIQUE,
@@ -44,7 +44,7 @@ CREATE TABLE user (
 );
 
 CREATE TRIGGER user_set_updated_at
-    BEFORE UPDATE ON user
+    BEFORE UPDATE ON "user"
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
@@ -63,7 +63,7 @@ CREATE TABLE note (
     FOREIGN KEY (parent_note_id) REFERENCES note (id)
         ON DELETE SET NULL
         ON UPDATE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES user (id)
+    FOREIGN KEY (created_by) REFERENCES "user" (id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT
 );
@@ -77,7 +77,7 @@ CREATE TABLE favorite (
     PRIMARY KEY (user_id, note_id),
     user_id UUID NOT NULL,
     note_id UUID NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user (id)
+    FOREIGN KEY (user_id) REFERENCES "user" (id)
         ON DELETE CASCADE
         ON UPDATE RESTRICT,
     FOREIGN KEY (note_id) REFERENCES note (id)
@@ -108,7 +108,7 @@ CREATE TABLE block_version (
     FOREIGN KEY (block_id) REFERENCES block (id)
         ON DELETE CASCADE
         ON UPDATE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES user (id)
+    FOREIGN KEY (created_by) REFERENCES "user" (id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT,
     CONSTRAINT block_version_number_positive

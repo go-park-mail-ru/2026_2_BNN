@@ -31,7 +31,7 @@ func TestGetNote(t *testing.T) {
 		ID:        noteID,
 		Title:     "Test note",
 		CreatedBy: ownerID,
-		BlocksID:  []uuid.UUID{}, // ← было []string{}
+		BlocksID:  []uuid.UUID{},
 	}
 
 	tests := []struct {

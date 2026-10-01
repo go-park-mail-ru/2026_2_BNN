@@ -119,14 +119,14 @@ func GetNote(w http.ResponseWriter, r *http.Request) {
 
 	if rawID == "" {
 		slog.Warn("Empty note id")
-		http.Error(w, "invalid note id", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest) //
 		return
 	}
 
 	noteID, err := uuid.FromString(rawID)
 	if err != nil {
 		slog.Warn("Invalid note id", "id", rawID, "error", err)
-		http.Error(w, "invalid note id", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest) //
 		return
 	}
 

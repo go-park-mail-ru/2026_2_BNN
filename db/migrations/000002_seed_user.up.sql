@@ -1,7 +1,7 @@
 -- Учётные записи для локальной проверки.
 -- password_hash — bcrypt от строки password.
 
-INSERT INTO user (
+INSERT INTO "user" (
     id,
     login,
     password_hash

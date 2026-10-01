@@ -5,6 +5,6 @@ DROP TABLE block_version;
 DROP TABLE block;
 DROP TABLE favorite;
 DROP TABLE note;
-DROP TABLE user;
+DROP TABLE "user";
 
 DROP FUNCTION set_updated_at();

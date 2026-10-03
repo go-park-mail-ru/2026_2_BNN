@@ -26,3 +26,4 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - /opt/public:/opt/public
+      - /etc/letsencrypt:/etc/letsencrypt:ro

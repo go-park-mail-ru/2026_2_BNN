@@ -14,21 +14,21 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserID(r)
 	if !ok {
 		slog.Warn("User not authenticated")
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	user, exists := auth.GetUserByID(userID)
 	if !exists {
 		slog.Warn("User not found", "user_id", userID)
-		http.Error(w, "user not found", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	body, err := json.Marshal(user)
 	if err != nil {
 		slog.Error("Failed to marshal user", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

@@ -8,6 +8,7 @@ services:
       - "5458:5458"
     environment:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5458/api/notes"]

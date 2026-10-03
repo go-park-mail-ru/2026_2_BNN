@@ -82,4 +82,4 @@ jobs:
             cd /home/ubuntu/backend/2026_2_BNN
             git fetch origin ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
-            docker compose up -d --build
+            sudo docker compose up -d --build

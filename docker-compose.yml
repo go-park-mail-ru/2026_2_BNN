@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+    container_name: bnn-backend
+    ports:
+      - "127.0.0.1:5458:5458"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is not set}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5458/api/notes"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/public:/opt/public:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: unless-stopped

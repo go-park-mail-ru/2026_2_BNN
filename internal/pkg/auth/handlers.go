@@ -30,6 +30,12 @@ const (
 
 	minPasswordLength = 8
 	maxPasswordLength = 128
+
+	memory      uint32 = 19 * 1024
+	iterations  uint32 = 2
+	parallelism uint8  = 1
+	keyLength   uint32 = 32
+	saltLength         = 16
 )
 
 var users = make(map[string]models.User)
@@ -238,13 +244,6 @@ func Middleware(next http.Handler) http.Handler {
 }
 
 func hashPassword(password string) ([]byte, error) {
-	const (
-		memory      uint32 = 19 * 1024
-		iterations  uint32 = 2
-		parallelism uint8  = 1
-		keyLength   uint32 = 32
-		saltLength         = 16
-	)
 
 	salt := make([]byte, saltLength)
 

@@ -5,10 +5,10 @@ services:
       dockerfile: build/Dockerfile
     container_name: bnn-backend
     ports:
-      - "5458:5458"
+      - "127.0.0.1:5458:5458"
     environment:
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is not set}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5458/api/notes"]

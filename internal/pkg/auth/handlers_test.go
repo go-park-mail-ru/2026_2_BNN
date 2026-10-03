@@ -89,6 +89,38 @@ func TestSignIn(t *testing.T) {
 			body:         `{"login":"testuser","password":`,
 			expectedCode: http.StatusBadRequest,
 		},
+
+		{
+			name:         "Sign in with missing fields",
+			prepare:      func(t *testing.T) { resetUsers() },
+			body:         `{}`,
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			name:         "Sign in with empty fields",
+			prepare:      func(t *testing.T) { resetUsers() },
+			body:         `{"login":"","password":""}`,
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			name:         "Sign in with wrong field type",
+			prepare:      func(t *testing.T) { resetUsers() },
+			body:         `{"login":123,"password":"password123"}`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:    "Sign in with oversized body",
+			prepare: func(t *testing.T) { resetUsers() },
+			body: `{"login":"testuser","password":"password123"}` +
+				strings.Repeat(" ", maxRequestBodySize),
+			expectedCode: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:         "Sign in with two JSON objects",
+			prepare:      func(t *testing.T) { resetUsers() },
+			body:         `{"login":"testuser","password":"password123"}{}`,
+			expectedCode: http.StatusBadRequest,
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,7 +132,19 @@ func TestSignIn(t *testing.T) {
 
 			SignIn(rec, req)
 
-			assert.Equal(t, tt.expectedCode, rec.Code)
+			require.Equal(t, tt.expectedCode, rec.Code)
+
+			if tt.expectedCode != http.StatusOK {
+				assert.Empty(t, rec.Body.String())
+				assert.Empty(t, rec.Result().Cookies())
+				return
+			}
+
+			assert.Equal(
+				t,
+				"application/json",
+				rec.Header().Get("Content-Type"),
+			)
 
 			if tt.expectCookie {
 				var found *http.Cookie
@@ -116,10 +160,18 @@ func TestSignIn(t *testing.T) {
 			}
 
 			if tt.expectNoHash {
-				var user models.User
-				require.NoError(t, json.NewDecoder(rec.Body).Decode(&user))
-				assert.Nil(t, user.PasswordHash)
-				assert.Equal(t, "testuser", user.Login)
+				var response map[string]any
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+
+				assert.NotContains(t, response, "password")
+				assert.NotContains(t, response, "password_hash")
+				assert.NotContains(t, response, "PasswordHash")
+
+				assert.Equal(t, "testuser", response["login"])
+				assert.Equal(t, "default_avatar.jpg", response["avatar"])
+				assert.NotEmpty(t, response["id"])
+				assert.NotEmpty(t, response["created_at"])
+				assert.NotEmpty(t, response["updated_at"])
 			}
 		})
 	}

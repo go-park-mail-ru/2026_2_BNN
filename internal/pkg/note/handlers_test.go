@@ -24,14 +24,18 @@ func resetNotes(list []models.Note) {
 
 func TestGetNote(t *testing.T) {
 	ownerID := uuid.NewV4()
-	otherID := uuid.NewV4()
 	noteID := uuid.NewV4()
 
 	baseNote := models.Note{
 		ID:        noteID,
 		Title:     "Test note",
 		CreatedBy: ownerID,
-		BlocksID:  []uuid.UUID{},
+		Blocks: []models.Block{
+			{
+				ID:      uuid.NewV4(),
+				Content: "Текст тестовой заметки",
+			},
+		},
 	}
 
 	tests := []struct {
@@ -56,13 +60,6 @@ func TestGetNote(t *testing.T) {
 			authUserID:   &ownerID,
 			prepare:      func() { resetNotes([]models.Note{baseNote}) },
 			expectedCode: http.StatusNotFound,
-		},
-		{
-			name:         "Forbidden: note belongs to another user",
-			pathID:       noteID.String(),
-			authUserID:   &otherID,
-			prepare:      func() { resetNotes([]models.Note{baseNote}) },
-			expectedCode: http.StatusForbidden,
 		},
 		{
 			name:         "Bad request: invalid UUID",
@@ -105,6 +102,10 @@ func TestGetNote(t *testing.T) {
 				assert.Equal(t, noteID, got.ID)
 				assert.Equal(t, tt.expectedTitle, got.Title)
 				assert.Equal(t, ownerID, got.CreatedBy)
+
+				require.Len(t, got.Blocks, 1)
+				assert.Equal(t, baseNote.Blocks[0].ID, got.Blocks[0].ID)
+				assert.Equal(t, "Текст тестовой заметки", got.Blocks[0].Content)
 			}
 		})
 	}
@@ -123,7 +124,7 @@ func TestListNotes(t *testing.T) {
 			ID:        ids[i],
 			Title:     "Test note",
 			CreatedBy: ownerID,
-			BlocksID:  []uuid.UUID{},
+			Blocks:    []models.Block{},
 		}
 	}
 

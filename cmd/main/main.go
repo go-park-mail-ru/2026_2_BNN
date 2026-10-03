@@ -4,8 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/middleware"
 	"bnn/internal/pkg/note"
 	"bnn/internal/pkg/user"
 
@@ -25,6 +27,30 @@ func main() {
 	}
 
 	auth.Init(jwtSecret)
+
+	frontendOrigin := os.Getenv("FRONTEND_ORIGIN")
+	if frontendOrigin == "" {
+		slog.Error("FRONTEND_ORIGIN is not set")
+		os.Exit(1)
+	}
+
+	allowedOrigins := make([]string, 0, 2)
+
+	for _, origin := range strings.Split(frontendOrigin, ",") {
+		origin = strings.TrimSpace(origin)
+		origin = strings.TrimSuffix(origin, "/")
+
+		if origin != "" {
+			allowedOrigins = append(allowedOrigins, origin)
+		}
+	}
+
+	if len(allowedOrigins) == 0 {
+		slog.Error("FRONTEND_ORIGIN contains no valid origins")
+		os.Exit(1)
+	}
+
+	slog.Info("CORS configured", "allowed_origins", allowedOrigins)
 
 	router := mux.NewRouter()
 
@@ -66,9 +92,11 @@ func main() {
 			Methods(http.MethodGet)
 	}
 
+	corsMiddleware := middleware.CORS(allowedOrigins)
+
 	server := http.Server{
 		Addr:    ":5458",
-		Handler: router,
+		Handler: corsMiddleware(router),
 	}
 
 	slog.Info("Starting server", "address", "http://localhost:5458")

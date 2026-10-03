@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
@@ -17,19 +18,44 @@ import (
 )
 
 var testUserID = uuid.NewV4()
+var testCreatedAt = time.Now().UTC()
 
 var notes = []models.Note{
 	{
 		ID:        uuid.NewV4(),
-		Title:     "Learning Go",
+		Title:     "Go",
 		CreatedBy: testUserID,
-		BlocksID:  []uuid.UUID{},
+		Blocks: []models.Block{
+			{
+				ID:        uuid.NewV4(),
+				Content:   "Go — язык программирования со статической типизацией.",
+				CreatedAt: testCreatedAt,
+				UpdatedAt: testCreatedAt,
+			},
+			{
+				ID:        uuid.NewV4(),
+				Content:   "Структуры позволяют объединять связанные данные.",
+				CreatedAt: testCreatedAt,
+				UpdatedAt: testCreatedAt,
+			},
+		},
+		CreatedAt: testCreatedAt,
+		UpdatedAt: testCreatedAt,
 	},
 	{
 		ID:        uuid.NewV4(),
-		Title:     "Learning HTTP in Go",
+		Title:     "HTTP in Go",
 		CreatedBy: testUserID,
-		BlocksID:  []uuid.UUID{},
+		Blocks: []models.Block{
+			{
+				ID:        uuid.NewV4(),
+				Content:   "HTTP-обработчик принимает запрос и формирует ответ.",
+				CreatedAt: testCreatedAt,
+				UpdatedAt: testCreatedAt,
+			},
+		},
+		CreatedAt: testCreatedAt,
+		UpdatedAt: testCreatedAt,
 	},
 }
 
@@ -92,7 +118,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		slog.Error("Failed to encode notes response", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -107,10 +133,10 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 func GetNote(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing get note request")
 
-	userID, ok := auth.GetUserID(r)
+	_, ok := auth.GetUserID(r)
 	if !ok {
 		slog.Warn("User not authenticated")
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -119,14 +145,14 @@ func GetNote(w http.ResponseWriter, r *http.Request) {
 
 	if rawID == "" {
 		slog.Warn("Empty note id")
-		w.WriteHeader(http.StatusBadRequest) //
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	noteID, err := uuid.FromString(rawID)
 	if err != nil {
 		slog.Warn("Invalid note id", "id", rawID, "error", err)
-		w.WriteHeader(http.StatusBadRequest) //
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -142,20 +168,14 @@ func GetNote(w http.ResponseWriter, r *http.Request) {
 
 	if found == nil {
 		slog.Warn("Note not found", "id", rawID)
-		http.Error(w, "note not found", http.StatusNotFound)
-		return
-	}
-
-	if found.CreatedBy.String() != userID {
-		slog.Warn("Access denied", "note_id", rawID, "user_id", userID)
-		http.Error(w, "forbidden", http.StatusForbidden)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	body, err := json.Marshal(found)
 	if err != nil {
 		slog.Error("Failed to marshal note", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

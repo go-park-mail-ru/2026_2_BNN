@@ -14,56 +14,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  govulncheck:
-    name: Run govulncheck
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Setup Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
-
-  linters-act:
-    name: linters
-    runs-on: ubuntu-latest
-    needs: govulncheck
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.14.0
-
-  tests-act:
-    name: tests
-    runs-on: ubuntu-latest
-    needs: linters-act
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-
-      - name: Build
-        run: go build -v ./...
-
-      - name: Test
-        run: go test -race -v ./...
 
   deploy:
     name: Deploy

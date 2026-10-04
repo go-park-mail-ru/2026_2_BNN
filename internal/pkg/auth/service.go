@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"bnn/internal/models"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,23 +15,37 @@ const (
 	tokenTTL   = 48 * time.Hour
 )
 
-var jwtSecret []byte
-
 type Claims struct {
 	UserID  string `json:"user_id"`
 	Version int    `json:"version"`
 	jwt.RegisteredClaims
 }
+type Service struct {
+	secret []byte
 
-func Init(secret string) {
-	jwtSecret = []byte(secret)
+	mu        sync.RWMutex
+	users     map[string]models.User
+	usersByID map[string]models.User
 }
 
-func GenerateToken(userID string, version int) (string, error) {
-	if len(jwtSecret) == 0 {
-		return "", fmt.Errorf("jwt secret is not initialized")
+func NewService(secret string) *Service {
+	return &Service{
+		secret:    []byte(secret),
+		users:     make(map[string]models.User),
+		usersByID: make(map[string]models.User),
 	}
+}
 
+func (s *Service) UserByID(id string) (models.User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	user, ok := s.usersByID[id]
+
+	return user, ok
+}
+
+func (s *Service) GenerateToken(userID string, version int) (string, error) {
 	now := time.Now().UTC()
 
 	claims := Claims{
@@ -43,27 +59,28 @@ func GenerateToken(userID string, version int) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+
+	return token.SignedString(s.secret)
 }
 
-func ParseToken(tokenString string) (*Claims, error) {
-	if len(jwtSecret) == 0 {
-		return nil, fmt.Errorf("jwt secret is not initialized")
-	}
-
+func (s *Service) ParseToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
+
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return jwtSecret, nil
+
+		return s.secret, nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
 	if !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
+
 	return claims, nil
 }
 

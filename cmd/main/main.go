@@ -26,7 +26,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	auth.Init(jwtSecret)
+	authService := auth.NewService(jwtSecret)
+	noteHandler := note.NewHandler(note.DemoNotes())
+	userHandler := user.NewHandler(authService)
 
 	frontendOrigin := os.Getenv("FRONTEND_ORIGIN")
 	if frontendOrigin == "" {
@@ -66,29 +68,29 @@ func main() {
 	{
 		authRouter := api.PathPrefix("/auth").Subrouter()
 
-		authRouter.HandleFunc("/signup", auth.SignUp).
+		authRouter.HandleFunc("/signup", authService.SignUp).
 			Methods(http.MethodPost)
 
-		authRouter.HandleFunc("/signin", auth.SignIn).
+		authRouter.HandleFunc("/signin", authService.SignIn).
 			Methods(http.MethodPost)
 	}
 
 	{
 		notesRouter := api.PathPrefix("/notes").Subrouter()
-		notesRouter.Use(auth.Middleware)
+		notesRouter.Use(authService.Middleware)
 
-		notesRouter.HandleFunc("/getall", note.ListNotes).
+		notesRouter.HandleFunc("/getall", noteHandler.ListNotes).
 			Methods(http.MethodGet)
 
-		notesRouter.HandleFunc("/{id}", note.GetNote).
+		notesRouter.HandleFunc("/{id}", noteHandler.GetNote).
 			Methods(http.MethodGet)
 	}
 
 	{
 		usersRouter := api.PathPrefix("/users").Subrouter()
-		usersRouter.Use(auth.Middleware)
+		usersRouter.Use(authService.Middleware)
 
-		usersRouter.HandleFunc("/me", user.GetCurrentUser).
+		usersRouter.HandleFunc("/me", userHandler.GetCurrentUser).
 			Methods(http.MethodGet)
 	}
 

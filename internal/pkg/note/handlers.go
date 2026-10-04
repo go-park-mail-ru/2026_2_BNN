@@ -17,49 +17,58 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-var testUserID = uuid.NewV4()
-var testCreatedAt = time.Now().UTC()
-
-var notes = []models.Note{
-	{
-		ID:        uuid.NewV4(),
-		Title:     "Go",
-		CreatedBy: testUserID,
-		Blocks: []models.Block{
-			{
-				ID:        uuid.NewV4(),
-				Content:   "Go — язык программирования со статической типизацией.",
-				CreatedAt: testCreatedAt,
-				UpdatedAt: testCreatedAt,
-			},
-			{
-				ID:        uuid.NewV4(),
-				Content:   "Структуры позволяют объединять связанные данные.",
-				CreatedAt: testCreatedAt,
-				UpdatedAt: testCreatedAt,
-			},
-		},
-		CreatedAt: testCreatedAt,
-		UpdatedAt: testCreatedAt,
-	},
-	{
-		ID:        uuid.NewV4(),
-		Title:     "HTTP in Go",
-		CreatedBy: testUserID,
-		Blocks: []models.Block{
-			{
-				ID:        uuid.NewV4(),
-				Content:   "HTTP-обработчик принимает запрос и формирует ответ.",
-				CreatedAt: testCreatedAt,
-				UpdatedAt: testCreatedAt,
-			},
-		},
-		CreatedAt: testCreatedAt,
-		UpdatedAt: testCreatedAt,
-	},
+type Handler struct {
+	mu    sync.RWMutex
+	notes []models.Note
 }
 
-var notesMu sync.RWMutex
+func NewHandler(notes []models.Note) *Handler {
+	return &Handler{notes: notes}
+}
+
+func DemoNotes() []models.Note {
+	createdAt := time.Now().UTC()
+	ownerID := uuid.NewV4()
+
+	return []models.Note{
+		{
+			ID:        uuid.NewV4(),
+			Title:     "Go",
+			CreatedBy: ownerID,
+			Blocks: []models.Block{
+				{
+					ID:        uuid.NewV4(),
+					Content:   "Go — язык программирования со статической типизацией.",
+					CreatedAt: createdAt,
+					UpdatedAt: createdAt,
+				},
+				{
+					ID:        uuid.NewV4(),
+					Content:   "Структуры позволяют объединять связанные данные.",
+					CreatedAt: createdAt,
+					UpdatedAt: createdAt,
+				},
+			},
+			CreatedAt: createdAt,
+			UpdatedAt: createdAt,
+		},
+		{
+			ID:        uuid.NewV4(),
+			Title:     "HTTP in Go",
+			CreatedBy: ownerID,
+			Blocks: []models.Block{
+				{
+					ID:        uuid.NewV4(),
+					Content:   "HTTP-обработчик принимает запрос и формирует ответ.",
+					CreatedAt: createdAt,
+					UpdatedAt: createdAt,
+				},
+			},
+			CreatedAt: createdAt,
+			UpdatedAt: createdAt,
+		},
+	}
+}
 
 func parsePagination(query url.Values) (int, int, error) {
 	const (
@@ -93,7 +102,7 @@ func parsePagination(query url.Values) (int, int, error) {
 	return limit, offset, nil
 }
 
-func ListNotes(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing notes list request")
 
 	limit, offset, err := parsePagination(r.URL.Query())
@@ -103,18 +112,18 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notesMu.RLock()
+	h.mu.RLock()
 
-	start := min(offset, len(notes))
-	count := min(limit, len(notes)-start)
+	start := min(offset, len(h.notes))
+	count := min(limit, len(h.notes)-start)
 	end := start + count
 
 	result := make([]models.Note, count)
-	copy(result, notes[start:end])
+	copy(result, h.notes[start:end])
 
 	body, err := json.Marshal(result)
 
-	notesMu.RUnlock()
+	h.mu.RUnlock()
 
 	if err != nil {
 		slog.Error("Failed to encode notes response", "error", err)
@@ -130,7 +139,7 @@ func ListNotes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GetNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing get note request")
 
 	_, ok := auth.GetUserID(r)
@@ -156,15 +165,15 @@ func GetNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notesMu.RLock()
+	h.mu.RLock()
 	var found *models.Note
-	for i := range notes {
-		if notes[i].ID == noteID {
-			found = &notes[i]
+	for i := range h.notes {
+		if h.notes[i].ID == noteID {
+			found = &h.notes[i]
 			break
 		}
 	}
-	notesMu.RUnlock()
+	h.mu.RUnlock()
 
 	if found == nil {
 		slog.Warn("Note not found", "id", rawID)

@@ -8,20 +8,30 @@ import (
 	"bnn/internal/pkg/auth"
 )
 
-func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+type Handler struct {
+	auth *auth.Service
+}
+
+func NewHandler(authService *auth.Service) *Handler {
+	return &Handler{auth: authService}
+}
+
+func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing get current user request")
 
 	userID, ok := auth.GetUserID(r)
 	if !ok {
 		slog.Warn("User not authenticated")
 		w.WriteHeader(http.StatusUnauthorized)
+
 		return
 	}
 
-	user, exists := auth.GetUserByID(userID)
+	user, exists := h.auth.UserByID(userID)
 	if !exists {
 		slog.Warn("User not found", "user_id", userID)
 		w.WriteHeader(http.StatusNotFound)
+
 		return
 	}
 
@@ -29,6 +39,7 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Failed to marshal user", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
+
 		return
 	}
 

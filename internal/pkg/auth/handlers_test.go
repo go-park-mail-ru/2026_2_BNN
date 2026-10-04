@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,19 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(m *testing.M) {
-	Init("test-secret-for-unit-tests-only")
-	os.Exit(m.Run())
-}
+const testSecret = "test-secret-for-unit-tests-only"
 
-func resetUsers() {
-	usersMu.Lock()
-	defer usersMu.Unlock()
-	users = make(map[string]models.User)
-	usersByID = make(map[string]models.User)
-}
-
-func addTestUser(t *testing.T, login, password string) models.User {
+func addTestUser(t *testing.T, s *Service, login, password string) models.User {
 	t.Helper()
 
 	hash, err := hashPassword(password)
@@ -46,18 +35,22 @@ func addTestUser(t *testing.T, login, password string) models.User {
 		UpdatedAt:    now,
 	}
 
-	usersMu.Lock()
-	users[login] = user
-	usersByID[user.ID.String()] = user
-	usersMu.Unlock()
+	s.mu.Lock()
+	s.users[login] = user
+	s.usersByID[user.ID.String()] = user
+	s.mu.Unlock()
 
 	return user
 }
 
 func TestSignIn(t *testing.T) {
+	withUser := func(t *testing.T, s *Service) {
+		addTestUser(t, s, "testuser", "password123")
+	}
+
 	tests := []struct {
 		name         string
-		prepare      func(t *testing.T)
+		prepare      func(t *testing.T, s *Service)
 		body         string
 		expectedCode int
 		expectCookie bool
@@ -65,7 +58,7 @@ func TestSignIn(t *testing.T) {
 	}{
 		{
 			name:         "OK sign in with valid credentials",
-			prepare:      func(t *testing.T) { resetUsers(); addTestUser(t, "testuser", "password123") },
+			prepare:      withUser,
 			body:         `{"login":"testuser","password":"password123"}`,
 			expectedCode: http.StatusOK,
 			expectCookie: true,
@@ -73,53 +66,105 @@ func TestSignIn(t *testing.T) {
 		},
 		{
 			name:         "Sign in with unknown login",
-			prepare:      func(t *testing.T) { resetUsers() },
 			body:         `{"login":"nobody","password":"password123"}`,
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
 			name:         "Sign in with wrong password",
-			prepare:      func(t *testing.T) { resetUsers(); addTestUser(t, "testuser", "password123") },
+			prepare:      withUser,
 			body:         `{"login":"testuser","password":"wrong-password"}`,
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
 			name:         "Sign in with invalid JSON",
-			prepare:      func(t *testing.T) { resetUsers() },
 			body:         `{"login":"testuser","password":`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Sign in with missing fields",
+			body:         `{}`,
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			name:         "Sign in with empty fields",
+			body:         `{"login":"","password":""}`,
+			expectedCode: http.StatusUnauthorized,
+		},
+		{
+			name:         "Sign in with wrong field type",
+			body:         `{"login":123,"password":"password123"}`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "Sign in with oversized body",
+			body: `{"login":"testuser","password":"password123"}` +
+				strings.Repeat(" ", maxRequestBodySize),
+			expectedCode: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:         "Sign in with two JSON objects",
+			body:         `{"login":"testuser","password":"password123"}{}`,
 			expectedCode: http.StatusBadRequest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.prepare(t)
+			s := NewService(testSecret)
+
+			if tt.prepare != nil {
+				tt.prepare(t, s)
+			}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/auth/signin", bytes.NewBufferString(tt.body))
 			rec := httptest.NewRecorder()
 
-			SignIn(rec, req)
+			s.SignIn(rec, req)
 
-			assert.Equal(t, tt.expectedCode, rec.Code)
+			require.Equal(t, tt.expectedCode, rec.Code)
+
+			if tt.expectedCode != http.StatusOK {
+				assert.Empty(t, rec.Body.String())
+				assert.Empty(t, rec.Result().Cookies())
+
+				return
+			}
+
+			assert.Equal(
+				t,
+				"application/json",
+				rec.Header().Get("Content-Type"),
+			)
 
 			if tt.expectCookie {
 				var found *http.Cookie
+
 				for _, c := range rec.Result().Cookies() {
 					if c.Name == CookieName {
 						found = c
+
 						break
 					}
 				}
+
 				require.NotNil(t, found, "auth cookie must be set")
 				assert.NotEmpty(t, found.Value)
 				assert.True(t, found.HttpOnly)
 			}
 
 			if tt.expectNoHash {
-				var user models.User
-				require.NoError(t, json.NewDecoder(rec.Body).Decode(&user))
-				assert.Nil(t, user.PasswordHash)
-				assert.Equal(t, "testuser", user.Login)
+				var response map[string]any
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+
+				assert.NotContains(t, response, "password")
+				assert.NotContains(t, response, "password_hash")
+				assert.NotContains(t, response, "PasswordHash")
+
+				assert.Equal(t, "testuser", response["login"])
+				assert.Equal(t, "default_avatar.jpg", response["avatar"])
+				assert.NotEmpty(t, response["id"])
+				assert.NotEmpty(t, response["created_at"])
+				assert.NotEmpty(t, response["updated_at"])
 			}
 		})
 	}
@@ -223,11 +268,10 @@ func TestSignUp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetUsers()
-			t.Cleanup(resetUsers)
+			s := NewService(testSecret)
 
 			if tt.existingUser {
-				addTestUser(t, "testuser", "password123")
+				addTestUser(t, s, "testuser", "password123")
 			}
 
 			req := httptest.NewRequest(
@@ -239,13 +283,13 @@ func TestSignUp(t *testing.T) {
 
 			rec := httptest.NewRecorder()
 
-			SignUp(rec, req)
+			s.SignUp(rec, req)
 
 			require.Equal(t, tt.expectedCode, rec.Code)
 
-			usersMu.RLock()
-			userCount := len(users)
-			usersMu.RUnlock()
+			s.mu.RLock()
+			userCount := len(s.users)
+			s.mu.RUnlock()
 
 			if tt.expectedCode != http.StatusCreated {
 				assert.Empty(t, rec.Body.String())
@@ -279,9 +323,9 @@ func TestSignUp(t *testing.T) {
 
 			assert.Equal(t, sent.Login, response["login"])
 
-			usersMu.RLock()
-			storedUser, exists := users[sent.Login]
-			usersMu.RUnlock()
+			s.mu.RLock()
+			storedUser, exists := s.users[sent.Login]
+			s.mu.RUnlock()
 
 			require.True(t, exists)
 			assert.Equal(t, storedUser.ID.String(), response["id"])
@@ -292,9 +336,11 @@ func TestSignUp(t *testing.T) {
 			assert.Equal(t, storedUser.CreatedAt, storedUser.UpdatedAt)
 
 			var authCookie *http.Cookie
+
 			for _, cookie := range rec.Result().Cookies() {
 				if cookie.Name == CookieName {
 					authCookie = cookie
+
 					break
 				}
 			}
@@ -303,7 +349,7 @@ func TestSignUp(t *testing.T) {
 			assert.True(t, authCookie.HttpOnly)
 			assert.Equal(t, "/", authCookie.Path)
 
-			claims, err := ParseToken(authCookie.Value)
+			claims, err := s.ParseToken(authCookie.Value)
 			require.NoError(t, err)
 			assert.Equal(t, storedUser.ID.String(), claims.UserID)
 		})

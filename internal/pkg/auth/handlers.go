@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -30,11 +29,13 @@ const (
 
 	minPasswordLength = 8
 	maxPasswordLength = 128
-)
 
-var users = make(map[string]models.User)
-var usersByID = make(map[string]models.User)
-var usersMu sync.RWMutex
+	memory      uint32 = 19 * 1024
+	iterations  uint32 = 2
+	parallelism uint8  = 1
+	keyLength   uint32 = 32
+	saltLength         = 16
+)
 
 type ContextKey string
 
@@ -45,14 +46,7 @@ func GetUserID(r *http.Request) (string, bool) {
 	return id, ok
 }
 
-func GetUserByID(id string) (models.User, bool) {
-	usersMu.RLock()
-	defer usersMu.RUnlock()
-	user, ok := usersByID[id]
-	return user, ok
-}
-
-func SignUp(w http.ResponseWriter, r *http.Request) {
+func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing signup request")
 
 	var req models.SignUpRequest
@@ -112,18 +106,18 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
-	usersMu.Lock()
-	if _, exists := users[req.Login]; exists {
-		usersMu.Unlock()
+	s.mu.Lock()
+	if _, exists := s.users[req.Login]; exists {
+		s.mu.Unlock()
 		slog.Warn("Signup rejected: login already exists")
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
-	users[req.Login] = user
-	usersByID[user.ID.String()] = user
-	usersMu.Unlock()
+	s.users[req.Login] = user
+	s.usersByID[user.ID.String()] = user
+	s.mu.Unlock()
 
-	token, err := GenerateToken(user.ID.String(), user.Version)
+	token, err := s.GenerateToken(user.ID.String(), user.Version)
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -146,7 +140,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func SignIn(w http.ResponseWriter, r *http.Request) {
+func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing sign in request")
 
 	var req models.SignInRequest
@@ -172,9 +166,9 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usersMu.RLock()
-	user, exists := users[req.Login]
-	usersMu.RUnlock()
+	s.mu.RLock()
+	user, exists := s.users[req.Login]
+	s.mu.RUnlock()
 
 	if !exists || !verifyPassword(req.Password, user.PasswordHash) {
 		slog.Warn("Invalid login or password")
@@ -182,7 +176,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := GenerateToken(user.ID.String(), user.Version)
+	token, err := s.GenerateToken(user.ID.String(), user.Version)
 	if err != nil {
 		slog.Error("Failed to generate token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -206,7 +200,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Middleware(next http.Handler) http.Handler {
+func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
@@ -215,16 +209,16 @@ func Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := ParseToken(cookie.Value)
+		claims, err := s.ParseToken(cookie.Value)
 		if err != nil {
 			slog.Warn("Invalid token", "error", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		usersMu.RLock()
-		user, exists := usersByID[claims.UserID]
-		usersMu.RUnlock()
+		s.mu.RLock()
+		user, exists := s.usersByID[claims.UserID]
+		s.mu.RUnlock()
 
 		if !exists || user.Version != claims.Version {
 			slog.Warn("Token version mismatch", "user_id", claims.UserID)
@@ -238,13 +232,6 @@ func Middleware(next http.Handler) http.Handler {
 }
 
 func hashPassword(password string) ([]byte, error) {
-	const (
-		memory      uint32 = 19 * 1024
-		iterations  uint32 = 2
-		parallelism uint8  = 1
-		keyLength   uint32 = 32
-		saltLength         = 16
-	)
 
 	salt := make([]byte, saltLength)
 

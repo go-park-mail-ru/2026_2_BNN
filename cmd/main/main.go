@@ -45,6 +45,9 @@ func main() {
 
 		authRouter.HandleFunc("/signin", auth.SignIn).
 			Methods(http.MethodPost)
+
+		authRouter.HandleFunc("/logout", auth.Logout).
+			Methods(http.MethodPost)
 	}
 
 	{

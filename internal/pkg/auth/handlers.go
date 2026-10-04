@@ -315,3 +315,17 @@ func verifyPassword(password string, encodedHash []byte) bool {
 
 	return subtle.ConstantTimeCompare(expectedHash, actualHash) == 1
 }
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.WriteHeader(http.StatusOK)
+}

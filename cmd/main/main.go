@@ -9,7 +9,6 @@ import (
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/middleware"
 	"bnn/internal/pkg/note"
-	"bnn/internal/pkg/user"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -28,7 +27,6 @@ func main() {
 
 	authService := auth.NewService(jwtSecret)
 	noteHandler := note.NewHandler(note.DemoNotes())
-	userHandler := user.NewHandler(authService)
 
 	frontendOrigin := os.Getenv("FRONTEND_ORIGIN")
 	if frontendOrigin == "" {
@@ -77,6 +75,14 @@ func main() {
 		authRouter.HandleFunc("/logout", auth.Logout).
 			Methods(http.MethodPost)
 	}
+	{
+		authProtected := api.PathPrefix("/auth").Subrouter()
+		authProtected.Use(authService.Middleware)
+
+		authProtected.HandleFunc("/me", authService.GetCurrentUser).
+			Methods(http.MethodGet)
+
+	}
 
 	{
 		notesRouter := api.PathPrefix("/notes").Subrouter()
@@ -86,14 +92,6 @@ func main() {
 			Methods(http.MethodGet)
 
 		notesRouter.HandleFunc("/{id}", noteHandler.GetNote).
-			Methods(http.MethodGet)
-	}
-
-	{
-		usersRouter := api.PathPrefix("/users").Subrouter()
-		usersRouter.Use(authService.Middleware)
-
-		usersRouter.HandleFunc("/me", userHandler.GetCurrentUser).
 			Methods(http.MethodGet)
 	}
 

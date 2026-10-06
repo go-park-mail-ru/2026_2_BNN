@@ -355,3 +355,73 @@ func TestSignUp(t *testing.T) {
 		})
 	}
 }
+
+func TestLogout(t *testing.T) {
+	s := NewService(testSecret)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	rec := httptest.NewRecorder()
+
+	Logout(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Empty(t, rec.Body.String(), "logout must not write a body")
+
+	var cleared *http.Cookie
+
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == CookieName {
+			cleared = c
+
+			break
+		}
+	}
+
+	require.NotNil(t, cleared, "logout must set a cookie with CookieName")
+
+	assert.Empty(t, cleared.Value, "cookie value must be cleared")
+	assert.Equal(t, "/", cleared.Path)
+	assert.Equal(t, -1, cleared.MaxAge, "cookie must be expired")
+	assert.True(t, cleared.HttpOnly)
+	assert.True(t, cleared.Secure)
+	assert.Equal(t, http.SameSiteLaxMode, cleared.SameSite)
+
+	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+
+	protected := s.Middleware(router)
+
+	checkReq := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	checkReq.AddCookie(cleared)
+
+	checkRec := httptest.NewRecorder()
+	protected.ServeHTTP(checkRec, checkReq)
+
+	assert.Equal(t, http.StatusUnauthorized, checkRec.Code)
+}
+
+func TestLogout_OverridesExistingCookie(t *testing.T) {
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: CookieName, Value: "some-old-jwt"})
+
+	rec := httptest.NewRecorder()
+	Logout(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var cleared *http.Cookie
+
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == CookieName {
+			cleared = c
+
+			break
+		}
+	}
+
+	require.NotNil(t, cleared)
+	assert.Empty(t, cleared.Value)
+	assert.Equal(t, -1, cleared.MaxAge)
+}

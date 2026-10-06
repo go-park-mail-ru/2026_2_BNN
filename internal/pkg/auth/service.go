@@ -89,7 +89,7 @@ func setAuthCookie(w http.ResponseWriter, token string) {
 		Name:     CookieName,
 		Value:    token,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().UTC().Add(tokenTTL),
 		Path:     "/",

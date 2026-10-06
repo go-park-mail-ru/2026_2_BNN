@@ -231,41 +231,6 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Service) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Processing get current user request")
-
-	userID, ok := GetUserID(r)
-	if !ok {
-		slog.Warn("User not authenticated")
-		w.WriteHeader(http.StatusUnauthorized)
-
-		return
-	}
-
-	u, exists := s.UserByID(userID)
-	if !exists {
-		slog.Warn("User not found", "user_id", userID)
-		w.WriteHeader(http.StatusNotFound)
-
-		return
-	}
-
-	body, err := json.Marshal(u)
-	if err != nil {
-		slog.Error("Failed to marshal user", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write response", "error", err)
-	}
-}
-
 func hashPassword(password string) ([]byte, error) {
 
 	salt := make([]byte, saltLength)

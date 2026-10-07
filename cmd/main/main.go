@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/middleware"
@@ -28,75 +27,43 @@ func main() {
 	authService := auth.NewService(jwtSecret)
 	noteHandler := note.NewHandler(note.DemoNotes())
 
-	frontendOrigin := os.Getenv("FRONTEND_ORIGIN")
-	if frontendOrigin == "" {
-		slog.Error("FRONTEND_ORIGIN is not set")
+	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
+	if err != nil {
+		slog.Error("Failed to configure CORS", "error", err)
 		os.Exit(1)
 	}
-
-	allowedOrigins := make([]string, 0, 2)
-
-	for _, origin := range strings.Split(frontendOrigin, ",") {
-		origin = strings.TrimSpace(origin)
-		origin = strings.TrimSuffix(origin, "/")
-
-		if origin != "" {
-			allowedOrigins = append(allowedOrigins, origin)
-		}
-	}
-
-	if len(allowedOrigins) == 0 {
-		slog.Error("FRONTEND_ORIGIN contains no valid origins")
-		os.Exit(1)
-	}
-
-	slog.Info("CORS configured", "allowed_origins", allowedOrigins)
 
 	router := mux.NewRouter()
-
-	router.PathPrefix("/static/").Handler(
-		http.StripPrefix(
-			"/static/",
-			http.FileServer(http.Dir("static")),
-		),
-	)
-
 	api := router.PathPrefix("/api").Subrouter()
 
+	authRouter := api.PathPrefix("/auth").Subrouter()
 	{
-		authRouter := api.PathPrefix("/auth").Subrouter()
-
 		authRouter.HandleFunc("/signup", authService.SignUp).
 			Methods(http.MethodPost)
 
 		authRouter.HandleFunc("/signin", authService.SignIn).
 			Methods(http.MethodPost)
-
 	}
-	{
-		authProtected := api.PathPrefix("/auth").Subrouter()
-		authProtected.Use(authService.Middleware)
 
-		authProtected.HandleFunc("/me", authService.GetCurrentUser).
+	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
+	authProtectedRouter.Use(authService.Middleware)
+	{
+		authProtectedRouter.HandleFunc("/me", authService.GetCurrentUser).
 			Methods(http.MethodGet)
 
-		authProtected.HandleFunc("/logout", authService.Logout).
+		authProtectedRouter.HandleFunc("/logout", authService.Logout).
 			Methods(http.MethodPost)
-
 	}
 
+	notesRouter := api.PathPrefix("/notes").Subrouter()
+	notesRouter.Use(authService.Middleware)
 	{
-		notesRouter := api.PathPrefix("/notes").Subrouter()
-		notesRouter.Use(authService.Middleware)
-
 		notesRouter.HandleFunc("/getall", noteHandler.ListNotes).
 			Methods(http.MethodGet)
 
 		notesRouter.HandleFunc("/{id}", noteHandler.GetNote).
 			Methods(http.MethodGet)
 	}
-
-	corsMiddleware := middleware.CORS(allowedOrigins)
 
 	server := http.Server{
 		Addr:    ":5458",

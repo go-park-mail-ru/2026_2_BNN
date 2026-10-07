@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -10,11 +13,35 @@ const (
 	corsMaxAge       = "600"
 )
 
-func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
-	allowed := make(map[string]struct{}, len(allowedOrigins))
-	for _, origin := range allowedOrigins {
+var ErrNoOrigins = errors.New("no valid CORS origins")
+
+func parseOrigins(rawOrigins string) []string {
+	origins := make([]string, 0, 2)
+
+	for _, origin := range strings.Split(rawOrigins, ",") {
+		origin = strings.TrimSpace(origin)
+		origin = strings.TrimSuffix(origin, "/")
+
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+
+	return origins
+}
+
+func NewCORS(rawOrigins string) (func(http.Handler) http.Handler, error) {
+	origins := parseOrigins(rawOrigins)
+	if len(origins) == 0 {
+		return nil, ErrNoOrigins
+	}
+
+	allowed := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
 		allowed[origin] = struct{}{}
 	}
+
+	slog.Info("CORS configured", "allowed_origins", origins)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -40,5 +67,5 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(w, r)
 		})
-	}
+	}, nil
 }

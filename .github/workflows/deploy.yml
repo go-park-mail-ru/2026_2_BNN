@@ -29,6 +29,5 @@ jobs:
           script_stop: true
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
-            git fetch origin ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
             sudo docker compose up -d --build

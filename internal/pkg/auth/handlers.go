@@ -5,10 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/httpjson"
 
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/argon2"
@@ -50,25 +48,9 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing signup request")
 
 	var req models.SignUpRequest
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
-	requestBody, err := io.ReadAll(r.Body)
-	if err != nil {
-		var sizeErr *http.MaxBytesError
-		if errors.As(err, &sizeErr) {
-			slog.Warn("Request body too large", "limit", sizeErr.Limit)
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			return
-		}
-		slog.Warn("Failed to read request body", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if err := json.Unmarshal(requestBody, &req); err != nil {
-		slog.Warn("Failed to decode request JSON", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
+	if err := httpjson.Read(w, r, &req, maxRequestBodySize); err != nil {
+		slog.Warn("Failed to read signup request", "error", err)
+		w.WriteHeader(httpjson.ReadErrorStatus(err))
 		return
 	}
 
@@ -125,44 +107,16 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 	setAuthCookie(w, token)
 
-	body, err := json.Marshal(user)
-	if err != nil {
-		slog.Error("Failed to encode signup response", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write signup response", "error", err)
-	}
+	httpjson.Write(w, http.StatusCreated, user)
 }
 
 func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing sign in request")
 
 	var req models.SignInRequest
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
-	requestBody, err := io.ReadAll(r.Body)
-	if err != nil {
-		var sizeErr *http.MaxBytesError
-		if errors.As(err, &sizeErr) {
-			slog.Warn("Request body too large", "limit", sizeErr.Limit)
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			return
-		}
-		slog.Warn("Failed to read request body", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if err := json.Unmarshal(requestBody, &req); err != nil {
-		slog.Warn("Failed to decode request JSON", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
+	if err := httpjson.Read(w, r, &req, maxRequestBodySize); err != nil {
+		slog.Warn("Failed to read sign in request", "error", err)
+		w.WriteHeader(httpjson.ReadErrorStatus(err))
 		return
 	}
 
@@ -185,19 +139,48 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	setAuthCookie(w, token)
 
-	body, err := json.Marshal(user)
-	if err != nil {
-		slog.Error("Failed to marshal user", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	httpjson.Write(w, http.StatusOK, user)
+}
+
+func (s *Service) Logout(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Processing logout request")
+
+	userID, ok := GetUserID(r)
+	if !ok {
+		slog.Warn("User not authenticated")
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	s.mu.Lock()
 
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write response", "error", err)
+	user, exists := s.usersByID[userID]
+	if !exists {
+		s.mu.Unlock()
+		slog.Warn("User not found", "user_id", userID)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
+
+	user.Version++
+	user.UpdatedAt = time.Now().UTC()
+
+	s.usersByID[userID] = user
+	s.users[user.Login] = user
+
+	s.mu.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Service) Middleware(next http.Handler) http.Handler {
@@ -250,20 +233,7 @@ func (s *Service) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := json.Marshal(u)
-	if err != nil {
-		slog.Error("Failed to marshal user", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write response", "error", err)
-	}
+	httpjson.Write(w, http.StatusOK, u)
 }
 
 func hashPassword(password string) ([]byte, error) {
@@ -342,45 +312,4 @@ func verifyPassword(password string, encodedHash []byte) bool {
 	)
 
 	return subtle.ConstantTimeCompare(expectedHash, actualHash) == 1
-}
-
-func (s *Service) Logout(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Processing logout request")
-
-	userID, ok := GetUserID(r)
-	if !ok {
-		slog.Warn("User not authenticated")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	s.mu.Lock()
-
-	user, exists := s.usersByID[userID]
-	if !exists {
-		s.mu.Unlock()
-		slog.Warn("User not found", "user_id", userID)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	user.Version++
-	user.UpdatedAt = time.Now().UTC()
-
-	s.usersByID[userID] = user
-	s.users[user.Login] = user
-
-	s.mu.Unlock()
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     CookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	w.WriteHeader(http.StatusOK)
 }

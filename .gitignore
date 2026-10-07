@@ -33,3 +33,5 @@ go.work.sum
 
 .postman
 .DS_Store
+
+cover.html

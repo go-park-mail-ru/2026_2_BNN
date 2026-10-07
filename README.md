@@ -10,9 +10,10 @@ Backend аналога Notion. Команда BNN.
 build/             Dockerfile
 cmd/main/          точка входа, роутинг
 internal/models/   структуры данных
-internal/pkg/      auth, note, user, middleware
+internal/pkg/      auth, note, httpjson, middleware
 postman/           коллекция запросов
-nginx.conf         конфиг nginx 
+nginx.conf         конфиг nginx
+Makefile           тесты и покрытие
 ```
 
 ## Запуск
@@ -30,7 +31,7 @@ cp .env.example .env
 | Переменная | Что это |
 |---|---|
 | `JWT_SECRET` | Ключ подписи токенов. Сгенерировать: `openssl rand -hex 32` |
-| `FRONTEND_ORIGIN` | Адрес фронтенда для CORS|
+| `FRONTEND_ORIGIN` | Адрес фронтенда для CORS |
 
 Без них приложение не запустится.
 
@@ -52,15 +53,14 @@ docker compose up --build
 |---|---|---|
 | POST | `/api/auth/signup` | Регистрация |
 | POST | `/api/auth/signin` | Вход |
-| GET | `/api/users/me` | Профиль текущего пользователя |
+| POST | `/api/auth/logout` | Выход |
+| GET | `/api/auth/me` | Профиль текущего пользователя |
 | GET | `/api/notes/getall` | Список заметок, параметры `limit` и `offset` |
 | GET | `/api/notes/{id}` | Заметка по UUID |
 
 Примеры запросов и ответов — в коллекции `postman/BNN.postman_collection.json`.
 
 Ограничения: логин 3–20 символов и уникален, пароль 8–128 символов, тело запроса до 4096 байт. `limit` 1–100 (по умолчанию 10), `offset` от 0.
-
-У ошибок нет тела — только HTTP-код. Пустой список приходит как `[]`, не `null`.
 
 
 ## Проверка
@@ -69,8 +69,15 @@ docker compose up --build
 go build ./... && go vet ./... && go test -race -cover ./...
 ```
 
+Тесты и покрытие через Makefile:
 
-## Cхема БД
+```bash
+make test
+make cover
+```
+
+
+## Схема БД
 
 ```mermaid
 erDiagram

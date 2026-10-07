@@ -338,7 +338,34 @@ func verifyPassword(password string, encodedHash []byte) bool {
 	return subtle.ConstantTimeCompare(expectedHash, actualHash) == 1
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
+func (s *Service) Logout(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Processing logout request")
+
+	userID, ok := GetUserID(r)
+	if !ok {
+		slog.Warn("User not authenticated")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	s.mu.Lock()
+
+	user, exists := s.usersByID[userID]
+	if !exists {
+		s.mu.Unlock()
+		slog.Warn("User not found", "user_id", userID)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	user.Version++
+	user.UpdatedAt = time.Now().UTC()
+
+	s.usersByID[userID] = user
+	s.users[user.Login] = user
+
+	s.mu.Unlock()
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",

@@ -1,0 +1,32 @@
+name: Brand New Notes
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          command_timeout: 30m
+          script_stop: true
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin ${{ github.ref_name }}
+            sudo docker compose up -d --build

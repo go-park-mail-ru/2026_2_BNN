@@ -1,0 +1,232 @@
+{
+	"info": {
+		"_postman_id": "78778a44-9a24-41b5-9226-161c7d18faf4",
+		"name": "BNN API",
+		"description": "API сервиса Brand New Notes.\n\nАвторизация через JWT в HttpOnly-куке `bnn_jwt`. Postman хранит куки сам, поэтому после запроса «Регистрация» или «Вход» защищённые ручки работают без дополнительных настроек.\n\nУ ошибок нет тела — только HTTP-код.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://brandnewnotes.ru",
+			"type": "string"
+		},
+		{
+			"key": "noteId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Регистрация",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"login\": \"seyran\",\n    \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/signup",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"signup"
+					]
+				},
+				"description": "Создаёт пользователя и ставит куку `bnn_jwt` на 48 часов.\n\nЛогин — 3–20 символов, уникальный. Пароль — 8–128 символов. Размер тела — не больше 4096 байт.\n\n201 — создан\n400 — не прошла валидация или битый JSON\n409 — логин занят\n413 — тело слишком большое"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test(\"пароль не утекает в ответ\", function () {",
+							"    const body = pm.response.json();",
+							"    pm.expect(body).to.not.have.property(\"password\");",
+							"    pm.expect(body).to.not.have.property(\"password_hash\");",
+							"});"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Вход",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"login\": \"seyran\",\n    \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/signin",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"signin"
+					]
+				},
+				"description": "Проверяет логин и пароль, ставит новую куку `bnn_jwt`.\n\n200 — вход выполнен\n400 — битый JSON\n401 — неверный логин или пароль\n413 — тело слишком большое"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Профиль текущего пользователя",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/users/me",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"users",
+						"me"
+					]
+				},
+				"description": "Данные пользователя по куке.\n\n200 — ок\n401 — нет куки или она невалидна\n404 — пользователь не найден"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Список заметок",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/notes/getall?limit=10&offset=0",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"notes",
+						"getall"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "1..100, по умолчанию 10"
+						},
+						{
+							"key": "offset",
+							"value": "0",
+							"description": "от 0, по умолчанию 0"
+						}
+					]
+				},
+				"description": "Список заметок с пагинацией. Пустой результат приходит как `[]`, а не `null`.\n\n200 — ок\n400 — limit вне 1..100, offset отрицательный или не число\n401 — нет куки"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"ответ — массив\", function () {",
+							"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+							"});",
+							"",
+							"const notes = pm.response.json();",
+							"if (notes.length > 0) {",
+							"    pm.collectionVariables.set(\"noteId\", notes[0].id);",
+							"}"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Заметка по ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/notes/{{noteId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"notes",
+						"{{noteId}}"
+					]
+				},
+				"description": "Одна заметка по UUID.\n\nПеременная `noteId` заполняется автоматически после запроса «Список заметок».\n\n200 — ок\n400 — id не UUID\n401 — нет куки\n404 — заметки нет"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						]
+					}
+				}
+			],
+			"response": []
+		}
+	]
+}

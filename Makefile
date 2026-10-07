@@ -1,22 +1,11 @@
-GO         ?= go
-COVER_FILE ?= cover.out
-COVER_HTML ?= cover.html
+.PHONY: test cover cover-html
 
-.PHONY: help
-help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
-
-.PHONY: test
 test:
-	$(GO) test ./...
+	go test ./...
 
-.PHONY: cover
 cover:
-	$(GO) test -covermode=atomic -coverprofile=$(COVER_FILE) ./...
-	$(GO) tool cover -func=$(COVER_FILE)
+	go test -coverprofile=cover.out ./...
+	go tool cover -func=cover.out
 
-.PHONY: cover-html
 cover-html: cover
-	$(GO) tool cover -html=$(COVER_FILE) -o $(COVER_HTML)
-	@echo ">> $(COVER_HTML)"
+	go tool cover -html=cover.out -o cover.html

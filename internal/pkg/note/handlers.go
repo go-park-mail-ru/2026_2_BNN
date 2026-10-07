@@ -1,7 +1,6 @@
 package note
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/httpjson"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
@@ -121,22 +121,9 @@ func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
 	result := make([]models.Note, count)
 	copy(result, h.notes[start:end])
 
-	body, err := json.Marshal(result)
-
 	h.mu.RUnlock()
 
-	if err != nil {
-		slog.Error("Failed to encode notes response", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write notes response", "error", err)
-	}
+	httpjson.Write(w, http.StatusOK, result)
 }
 
 func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
@@ -181,17 +168,5 @@ func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := json.Marshal(found)
-	if err != nil {
-		slog.Error("Failed to marshal note", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := w.Write(body); err != nil {
-		slog.Error("Failed to write response", "error", err)
-	}
+	httpjson.Write(w, http.StatusOK, found)
 }

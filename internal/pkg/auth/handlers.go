@@ -306,33 +306,39 @@ func verifyPassword(password string, encodedHash []byte) bool {
 		return false
 	}
 
-	expectedVersion := fmt.Sprintf("v=%d", argon2.Version)
-
-	if parts[2] != expectedVersion {
+	var version int
+	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
 		return false
 	}
 
-	if parts[3] != "m=19456,t=2,p=1" {
+	var (
+		hashMemory      uint32
+		hashIterations  uint32
+		hashParallelism uint8
+	)
+
+	_, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &hashMemory, &hashIterations, &hashParallelism)
+	if err != nil || hashIterations < 1 || hashParallelism < 1 {
 		return false
 	}
 
 	salt, err := base64.RawStdEncoding.Strict().DecodeString(parts[4])
-	if err != nil || len(salt) != 16 {
+	if err != nil || len(salt) == 0 {
 		return false
 	}
 
 	expectedHash, err := base64.RawStdEncoding.Strict().DecodeString(parts[5])
-	if err != nil || len(expectedHash) != 32 {
+	if err != nil || len(expectedHash) == 0 {
 		return false
 	}
 
 	actualHash := argon2.IDKey(
 		[]byte(password),
 		salt,
-		2,
-		19*1024,
-		1,
-		32,
+		hashIterations,
+		hashMemory,
+		hashParallelism,
+		uint32(len(expectedHash)),
 	)
 
 	return subtle.ConstantTimeCompare(expectedHash, actualHash) == 1

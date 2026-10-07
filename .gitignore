@@ -31,6 +31,5 @@ go.work.sum
 .idea/
 .vscode/
 
-.env
-
-.postman.DS_Store
+.postman
+.DS_Store

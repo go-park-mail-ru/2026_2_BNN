@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -358,11 +359,18 @@ func TestSignUp(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	s := NewService(testSecret)
+	user := addTestUser(t, s, "testuser", "password123")
+
+	token, err := s.GenerateToken(user.ID.String(), user.Version)
+	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	req = req.WithContext(
+		context.WithValue(req.Context(), UserIDKey, user.ID.String()),
+	)
 	rec := httptest.NewRecorder()
 
-	Logout(rec, req)
+	s.Logout(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Empty(t, rec.Body.String(), "logout must not write a body")
@@ -378,13 +386,19 @@ func TestLogout(t *testing.T) {
 	}
 
 	require.NotNil(t, cleared, "logout must set a cookie with CookieName")
-
 	assert.Empty(t, cleared.Value, "cookie value must be cleared")
 	assert.Equal(t, "/", cleared.Path)
 	assert.Equal(t, -1, cleared.MaxAge, "cookie must be expired")
 	assert.True(t, cleared.HttpOnly)
 	assert.True(t, cleared.Secure)
 	assert.Equal(t, http.SameSiteLaxMode, cleared.SameSite)
+
+	s.mu.RLock()
+	updatedUser, exists := s.usersByID[user.ID.String()]
+	s.mu.RUnlock()
+
+	require.True(t, exists, "user must still exist after logout")
+	assert.Equal(t, user.Version+1, updatedUser.Version, "logout must bump user version")
 
 	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
@@ -393,21 +407,27 @@ func TestLogout(t *testing.T) {
 	protected := s.Middleware(router)
 
 	checkReq := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
-	checkReq.AddCookie(cleared)
+	checkReq.AddCookie(&http.Cookie{Name: CookieName, Value: token})
 
 	checkRec := httptest.NewRecorder()
 	protected.ServeHTTP(checkRec, checkReq)
 
-	assert.Equal(t, http.StatusUnauthorized, checkRec.Code)
+	assert.Equal(t, http.StatusUnauthorized, checkRec.Code,
+		"old token must be invalidated after logout")
 }
 
 func TestLogout_OverridesExistingCookie(t *testing.T) {
+	s := NewService(testSecret)
+	user := addTestUser(t, s, "testuser", "password123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
 	req.AddCookie(&http.Cookie{Name: CookieName, Value: "some-old-jwt"})
+	req = req.WithContext(
+		context.WithValue(req.Context(), UserIDKey, user.ID.String()),
+	)
 
 	rec := httptest.NewRecorder()
-	Logout(rec, req)
+	s.Logout(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -424,4 +444,18 @@ func TestLogout_OverridesExistingCookie(t *testing.T) {
 	require.NotNil(t, cleared)
 	assert.Empty(t, cleared.Value)
 	assert.Equal(t, -1, cleared.MaxAge)
+}
+
+func TestLogout_UnauthorizedWithoutUserInContext(t *testing.T) {
+	s := NewService(testSecret)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	rec := httptest.NewRecorder()
+
+	s.Logout(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Empty(t, rec.Body.String())
+	assert.Empty(t, rec.Result().Cookies(),
+		"no cookie must be cleared when user is not authenticated")
 }

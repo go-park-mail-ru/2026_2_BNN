@@ -72,8 +72,6 @@ func main() {
 		authRouter.HandleFunc("/signin", authService.SignIn).
 			Methods(http.MethodPost)
 
-		authRouter.HandleFunc("/logout", auth.Logout).
-			Methods(http.MethodPost)
 	}
 	{
 		authProtected := api.PathPrefix("/auth").Subrouter()
@@ -81,6 +79,9 @@ func main() {
 
 		authProtected.HandleFunc("/me", authService.GetCurrentUser).
 			Methods(http.MethodGet)
+
+		authProtected.HandleFunc("/logout", authService.Logout).
+			Methods(http.MethodPost)
 
 	}
 

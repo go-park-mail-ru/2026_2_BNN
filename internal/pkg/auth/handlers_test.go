@@ -84,12 +84,24 @@ func TestSignIn(t *testing.T) {
 		{
 			name:         "Sign in with missing fields",
 			body:         `{}`,
-			expectedCode: http.StatusUnauthorized,
+			expectedCode: http.StatusBadRequest,
 		},
 		{
 			name:         "Sign in with empty fields",
 			body:         `{"login":"","password":""}`,
-			expectedCode: http.StatusUnauthorized,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Sign in with too short login",
+			prepare:      withUser,
+			body:         `{"login":"ab","password":"password123"}`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Sign in with too short password",
+			prepare:      withUser,
+			body:         `{"login":"testuser","password":"short"}`,
+			expectedCode: http.StatusBadRequest,
 		},
 		{
 			name:         "Sign in with wrong field type",

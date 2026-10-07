@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -44,6 +45,20 @@ func GetUserID(r *http.Request) (string, bool) {
 	return id, ok
 }
 
+func validateCredentials(login, password string) error {
+	loginLength := utf8.RuneCountInString(login)
+	if loginLength < minLoginLength || loginLength > maxLoginLength {
+		return errors.New("invalid login length")
+	}
+
+	passwordLength := utf8.RuneCountInString(password)
+	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
+		return errors.New("invalid password length")
+	}
+
+	return nil
+}
+
 func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing signup request")
 
@@ -54,17 +69,8 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginLength := utf8.RuneCountInString(req.Login)
-	passwordLength := utf8.RuneCountInString(req.Password)
-
-	if loginLength < minLoginLength || loginLength > maxLoginLength {
-		slog.Warn("Invalid login length")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
-		slog.Warn("Invalid password length")
+	if err := validateCredentials(req.Login, req.Password); err != nil {
+		slog.Warn("Invalid signup credentials", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -117,6 +123,12 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	if err := httpjson.Read(w, r, &req, maxRequestBodySize); err != nil {
 		slog.Warn("Failed to read sign in request", "error", err)
 		w.WriteHeader(httpjson.ReadErrorStatus(err))
+		return
+	}
+
+	if err := validateCredentials(req.Login, req.Password); err != nil {
+		slog.Warn("Invalid sign in credentials", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 

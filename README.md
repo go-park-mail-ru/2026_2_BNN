@@ -86,11 +86,17 @@ erDiagram
     users {
         uuid id PK
         text login UK
-        text password_hash
+        bytea password_hash
         text avatar
-        int version
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    refresh_tokens {
+        bytea token_hash PK
+        uuid user_id FK
+        timestamptz expires_at
+        timestamptz created_at
     }
 
     notes {
@@ -100,6 +106,7 @@ erDiagram
         varchar(255) title
         text header
         text icon
+        uuid[] block_ids
         timestamptz created_at
         timestamptz updated_at
     }
@@ -115,7 +122,7 @@ erDiagram
     attachments {
         uuid id PK
         uuid block_id FK
-        text path
+        text path UK
     }
 
     favorite {
@@ -123,6 +130,7 @@ erDiagram
         uuid note_id PK, FK
     }
 
+    users ||--o{ refresh_tokens : has
     users ||--o{ notes : creates
     notes o|--o{ notes : contains
     notes ||--o{ blocks : consists_of

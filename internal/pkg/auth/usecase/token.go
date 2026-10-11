@@ -4,13 +4,10 @@ import (
 	"crypto/sha256"
 	"time"
 
+	"bnn/internal/models"
+
 	"github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
-)
-
-const (
-	accessTokenTTL  = 15 * time.Minute
-	refreshTokenTTL = 30 * 24 * time.Hour
 )
 
 func (u *Usecase) newAccessToken(userID uuid.UUID) (string, error) {
@@ -19,7 +16,7 @@ func (u *Usecase) newAccessToken(userID uuid.UUID) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   userID.String(),
 		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
+		ExpiresAt: jwt.NewNumericDate(now.Add(models.AccessTokenTTL)),
 	}
 
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(u.secret)

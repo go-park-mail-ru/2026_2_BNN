@@ -6,6 +6,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+const (
+	AccessTokenTTL  = 15 * time.Minute
+	RefreshTokenTTL = 30 * 24 * time.Hour
+)
+
 type SignUpRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`

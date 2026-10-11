@@ -143,7 +143,7 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	err = u.repo.CreateRefreshToken(ctx, models.RefreshToken{
 		TokenHash: hashRefreshToken(refreshToken),
 		UserID:    userID,
-		ExpiresAt: now.Add(refreshTokenTTL),
+		ExpiresAt: now.Add(models.RefreshTokenTTL),
 		CreatedAt: now,
 	})
 	if err != nil {

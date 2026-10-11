@@ -9,7 +9,7 @@ import (
 type Note struct {
 	ID           uuid.UUID  `json:"id"`
 	ParentNoteID *uuid.UUID `json:"parent_note_id,omitempty"`
-	Blocks       []Block    `json:"blocks"`
+	Blocks       []Block    `json:"blocks,omitempty"`
 	CreatedBy    uuid.UUID  `json:"created_by"`
 	Title        string     `json:"title"`
 	Header       string     `json:"header,omitempty"`

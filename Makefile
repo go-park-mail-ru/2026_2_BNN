@@ -1,10 +1,15 @@
-.PHONY: test cover cover-html
+.PHONY: generate test cover cover-html
+
+generate:
+	go generate ./...
 
 test:
 	go test ./...
 
 cover:
-	go test -coverprofile=cover.out ./...
+	go test -coverprofile=cover.out.tmp ./...
+	grep -v '/mocks/' cover.out.tmp > cover.out
+	rm cover.out.tmp
 	go tool cover -func=cover.out
 
 cover-html: cover

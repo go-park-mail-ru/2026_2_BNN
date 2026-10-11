@@ -63,52 +63,34 @@ func main() {
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
-		slog.Error("Failed to connect to DB", "error", err)
+		slog.Error("Failed to create CORS middleware", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
-
-	authRepo := postgres.NewRepo(db)
-	authUC := usecase.NewUsecase(authRepo, jwtSecret)
-	authHandler := authdelivery.NewHandler(authUC)
-
-	// notes — точные имена уточним по notes/usecase
-	//notesUC := notesusecase.NewUsecase( /* repo */ )
-	notesHandler := notesdelivery.NewHandler(notesdelivery.DemoNotes())
 
 	router := mux.NewRouter()
+	router.Use(corsMiddleware)
+
 	api := router.PathPrefix("/api").Subrouter()
 
 	authRouter := api.PathPrefix("/auth").Subrouter()
 	{
-		authRouter.HandleFunc("/signup", authHandler.SignUp).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/signin", authHandler.SignIn).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/refresh", authHandler.Refresh).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/logout", authHandler.Logout).
-			Methods(http.MethodPost)
+		authRouter.HandleFunc("/signup", authHandler.SignUp).Methods(http.MethodPost)
+		authRouter.HandleFunc("/signin", authHandler.SignIn).Methods(http.MethodPost)
+		authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
+		authRouter.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
 	}
 
 	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
 	authProtectedRouter.Use(authHandler.Middleware)
 	{
-		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).
-			Methods(http.MethodGet)
+		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).Methods(http.MethodGet)
 	}
 
 	notesRouter := api.PathPrefix("/notes").Subrouter()
 	notesRouter.Use(authHandler.Middleware)
 	{
-		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).
-			Methods(http.MethodGet)
-
-		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).
-			Methods(http.MethodGet)
+		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
+		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
 	}
 
 	server := http.Server{

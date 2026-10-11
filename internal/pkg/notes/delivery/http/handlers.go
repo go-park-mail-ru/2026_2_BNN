@@ -1,4 +1,4 @@
-package note
+package delivery
 
 import (
 	"errors"
@@ -6,84 +6,82 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
-	"time"
 
 	"bnn/internal/models"
-	authdelivery "bnn/internal/pkg/auth/delivery/http"
+	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	"bnn/internal/pkg/httpjson"
+	"bnn/internal/pkg/notes"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 )
 
+const (
+	defaultLimit = 10
+	maxLimit     = 100
+)
+
 type Handler struct {
-	mu    sync.RWMutex
-	notes []models.Note
+	uc notes.Usecase
 }
 
-func NewHandler(notes []models.Note) *Handler {
-	return &Handler{notes: notes}
+func NewHandler(uc notes.Usecase) *Handler {
+	return &Handler{uc: uc}
 }
 
-func DemoNotes() []models.Note {
-	createdAt := time.Now().UTC()
-	ownerID := uuid.NewV4()
-
-	return []models.Note{
-		{
-			ID:        uuid.NewV4(),
-			Title:     "Go",
-			CreatedBy: ownerID,
-			Blocks: []models.Block{
-				{
-					ID:        uuid.NewV4(),
-					Content:   "Go — язык программирования со статической типизацией.",
-					CreatedAt: createdAt,
-					UpdatedAt: createdAt,
-				},
-				{
-					ID:        uuid.NewV4(),
-					Content:   "Структуры позволяют объединять связанные данные.",
-					CreatedAt: createdAt,
-					UpdatedAt: createdAt,
-				},
-			},
-			CreatedAt: createdAt,
-			UpdatedAt: createdAt,
-		},
-		{
-			ID:        uuid.NewV4(),
-			Title:     "HTTP in Go",
-			CreatedBy: ownerID,
-			Blocks: []models.Block{
-				{
-					ID:        uuid.NewV4(),
-					Content:   "HTTP-обработчик принимает запрос и формирует ответ.",
-					CreatedAt: createdAt,
-					UpdatedAt: createdAt,
-				},
-			},
-			CreatedAt: createdAt,
-			UpdatedAt: createdAt,
-		},
+func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authDelivery.GetUserID(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
+
+	limit, offset, err := parsePagination(r.URL.Query())
+	if err != nil {
+		slog.Warn("Invalid pagination parameters", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.uc.GetNotes(r.Context(), userID, limit, offset)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, result)
 }
 
-func parsePagination(query url.Values) (int, int, error) {
-	const (
-		defaultLimit  = 10
-		defaultOffset = 0
-		minLimit      = 1
-		maxLimit      = 100
-	)
+func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authDelivery.GetUserID(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-	limit := defaultLimit
-	offset := defaultOffset
+	noteID, err := uuid.FromString(mux.Vars(r)["id"])
+	if err != nil {
+		slog.Warn("Invalid note id", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	note, err := h.uc.GetNote(r.Context(), userID, noteID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, note)
+}
+
+func parsePagination(query url.Values) (int64, int64, error) {
+	limit := int64(defaultLimit)
+	offset := int64(0)
 
 	if query.Has("limit") {
-		value, err := strconv.Atoi(query.Get("limit"))
-		if err != nil || value < minLimit || value > maxLimit {
+		value, err := strconv.ParseInt(query.Get("limit"), 10, 64)
+		if err != nil || value < 1 || value > maxLimit {
 			return 0, 0, errors.New("invalid limit")
 		}
 
@@ -91,7 +89,7 @@ func parsePagination(query url.Values) (int, int, error) {
 	}
 
 	if query.Has("offset") {
-		value, err := strconv.Atoi(query.Get("offset"))
+		value, err := strconv.ParseInt(query.Get("offset"), 10, 64)
 		if err != nil || value < 0 {
 			return 0, 0, errors.New("invalid offset")
 		}
@@ -102,77 +100,13 @@ func parsePagination(query url.Values) (int, int, error) {
 	return limit, offset, nil
 }
 
-func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Processing notes list request")
-
-	limit, offset, err := parsePagination(r.URL.Query())
-	if err != nil {
-		slog.Warn("Invalid pagination parameters", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	h.mu.RLock()
-
-	start := min(offset, len(h.notes))
-	count := min(limit, len(h.notes)-start)
-	end := start + count
-
-	result := make([]models.Note, count)
-	copy(result, h.notes[start:end])
-
-	h.mu.RUnlock()
-
-	httpjson.Write(w, http.StatusOK, result)
-}
-
-func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Processing get note request")
-
-	userID, ok := authdelivery.GetUserID(r.Context())
-	if !ok {
-		slog.Warn("User not authenticated")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	vars := mux.Vars(r)
-	rawID := vars["id"]
-
-	if rawID == "" {
-		slog.Warn("Empty note id")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	noteID, err := uuid.FromString(rawID)
-	if err != nil {
-		slog.Warn("Invalid note id", "id", rawID, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	h.mu.RLock()
-	var found *models.Note
-	for i := range h.notes {
-		if h.notes[i].ID == noteID {
-			found = &h.notes[i]
-			break
-		}
-	}
-	h.mu.RUnlock()
-
-	if found == nil {
-		slog.Warn("Note not found", "id", rawID)
+func writeError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrNoteNotFound) {
+		slog.Warn("Request failed", "error", err)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if found.CreatedBy != userID {
-		slog.Warn("Access denied", "note_id", rawID, "user_id", userID)
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	httpjson.Write(w, http.StatusOK, found)
+	slog.Error("Request failed", "error", err)
+	w.WriteHeader(http.StatusInternalServerError)
 }

@@ -25,9 +25,7 @@ import (
 var buckets = []string{"avatars", "attachments"}
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		slog.Warn("No .env file found, using system environment")
-	}
+	_ = godotenv.Load()
 
 	ctx := context.Background()
 
@@ -65,52 +63,42 @@ func main() {
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
-		slog.Error("Failed to configure CORS", "error", err)
+		slog.Error("Failed to create CORS middleware", "error", err)
 		os.Exit(1)
 	}
 
 	router := mux.NewRouter()
+	router.Use(corsMiddleware)
+
 	api := router.PathPrefix("/api").Subrouter()
 
 	authRouter := api.PathPrefix("/auth").Subrouter()
 	{
-		authRouter.HandleFunc("/signup", authHandler.SignUp).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/signin", authHandler.SignIn).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/refresh", authHandler.Refresh).
-			Methods(http.MethodPost)
-
-		authRouter.HandleFunc("/logout", authHandler.Logout).
-			Methods(http.MethodPost)
+		authRouter.HandleFunc("/signup", authHandler.SignUp).Methods(http.MethodPost)
+		authRouter.HandleFunc("/signin", authHandler.SignIn).Methods(http.MethodPost)
+		authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
+		authRouter.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
 	}
 
 	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
 	authProtectedRouter.Use(authHandler.Middleware)
 	{
-		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).
-			Methods(http.MethodGet)
+		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).Methods(http.MethodGet)
 	}
 
 	notesRouter := api.PathPrefix("/notes").Subrouter()
 	notesRouter.Use(authHandler.Middleware)
 	{
-		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).
-			Methods(http.MethodGet)
-
-		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).
-			Methods(http.MethodGet)
+		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
+		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
 	}
 
 	server := http.Server{
 		Addr:    ":5458",
-		Handler: corsMiddleware(router),
+		Handler: router,
 	}
 
 	slog.Info("Starting server", "address", "http://localhost:5458")
-
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("Server failed", "error", err)
 	}

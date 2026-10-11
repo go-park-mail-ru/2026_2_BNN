@@ -132,18 +132,21 @@ func (u *Usecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, e
 }
 
 func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
-	accessToken, err := u.newAccessToken(userID)
+	now := time.Now().UTC()
+	accessExpiresAt := now.Add(accessTokenTTL)
+	refreshExpiresAt := now.Add(refreshTokenTTL)
+
+	accessToken, err := u.newAccessToken(userID, accessExpiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
 	}
 
 	refreshToken := rand.Text()
-	now := time.Now().UTC()
 
 	err = u.repo.CreateRefreshToken(ctx, models.RefreshToken{
 		TokenHash: hashRefreshToken(refreshToken),
 		UserID:    userID,
-		ExpiresAt: now.Add(models.RefreshTokenTTL),
+		ExpiresAt: refreshExpiresAt,
 		CreatedAt: now,
 	})
 	if err != nil {
@@ -151,8 +154,10 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	}
 
 	return models.AuthTokens{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:      accessToken,
+		AccessExpiresAt:  accessExpiresAt,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refreshExpiresAt,
 	}, nil
 }
 

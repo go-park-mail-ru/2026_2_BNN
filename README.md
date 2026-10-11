@@ -10,10 +10,11 @@ Backend аналога Notion. Команда BNN.
 build/             Dockerfile
 cmd/main/          точка входа, роутинг
 internal/models/   структуры данных
-internal/pkg/      auth, note, httpjson, middleware
+internal/pkg/      auth, notes, ctxutil, httpjson, middleware
+migrations/        миграции БД
 postman/           коллекция запросов
 nginx.conf         конфиг nginx
-Makefile           тесты и покрытие
+Makefile           тесты, покрытие, генерация моков
 ```
 
 ## Запуск
@@ -26,23 +27,19 @@ cd 2026_2_BNN
 cp .env.example .env
 ```
 
-В `.env` указать два значения:
+В `.env` заменить все `replace-me` на свои значения. Пароли можно сгенерировать: `openssl rand -hex 16`, для `JWT_SECRET` — `openssl rand -hex 32`.
 
-| Переменная | Что это |
-|---|---|
-| `JWT_SECRET` | Ключ подписи токенов. Сгенерировать: `openssl rand -hex 32` |
-| `FRONTEND_ORIGIN` | Адрес фронтенда для CORS |
-
-Без них приложение не запустится.
+Без них не запустится.
 
 ```bash
-go run ./cmd/main
+docker compose up -d --build postgres migrate s3 backend
 ```
 
-через Docker:
+Или база и S3 в Docker, а бэкенд локально:
 
 ```bash
-docker compose up --build
+docker compose up -d postgres migrate s3
+go run ./cmd/main
 ```
 
 Адрес: `http://localhost:5458`
@@ -53,10 +50,11 @@ docker compose up --build
 |---|---|---|
 | POST | `/api/auth/signup` | Регистрация |
 | POST | `/api/auth/signin` | Вход |
+| POST | `/api/auth/refresh` | Обновить access и refresh токены |
 | POST | `/api/auth/logout` | Выход |
 | GET | `/api/auth/me` | Профиль текущего пользователя |
-| GET | `/api/notes/getall` | Список заметок, параметры `limit` и `offset` |
-| GET | `/api/notes/{id}` | Заметка по UUID |
+| GET | `/api/notes/getall` | Список своих заметок, параметры `limit` и `offset` |
+| GET | `/api/notes/{id}` | Заметка с блоками по UUID |
 
 Примеры запросов и ответов — в коллекции `postman/BNN.postman_collection.json`.
 

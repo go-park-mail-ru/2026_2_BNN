@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+
+	"bnn/internal/models"
 )
 
 var ErrBodyTooLarge = errors.New("request body too large")
@@ -54,4 +56,27 @@ func ReadErrorStatus(err error) int {
 	}
 
 	return http.StatusBadRequest
+}
+
+func WriteError(w http.ResponseWriter, err error) {
+	status := http.StatusInternalServerError
+
+	switch {
+	case errors.Is(err, models.ErrValidation):
+		status = http.StatusBadRequest
+	case errors.Is(err, models.ErrInvalidCredentials), errors.Is(err, models.ErrInvalidToken):
+		status = http.StatusUnauthorized
+	case errors.Is(err, models.ErrUserNotFound), errors.Is(err, models.ErrNoteNotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, models.ErrUserExists):
+		status = http.StatusConflict
+	}
+
+	if status == http.StatusInternalServerError {
+		slog.Error("Request failed", "error", err)
+	} else {
+		slog.Warn("Request failed", "error", err)
+	}
+
+	w.WriteHeader(status)
 }

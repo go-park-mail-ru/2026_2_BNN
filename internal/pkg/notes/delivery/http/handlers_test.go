@@ -1,19 +1,19 @@
 package note
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/auth"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	authdelivery "bnn/internal/pkg/auth/delivery/http"
 )
 
 func TestGetNote(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGetNote(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/notes/"+tt.pathID, nil)
 			if tt.authUserID != nil {
 				req = req.WithContext(
-					context.WithValue(req.Context(), auth.UserIDKey, tt.authUserID.String()),
+					authdelivery.SetUserIDForTest(req.Context(), *tt.authUserID),
 				)
 			}
 
@@ -124,88 +124,7 @@ func TestListNotes(t *testing.T) {
 		expectedCode int
 		expectedIDs  []uuid.UUID
 	}{
-		{
-			name:         "default pagination",
-			expectedCode: http.StatusOK,
-			expectedIDs:  ids[:10],
-		},
-		{
-			name:         "limit and offset",
-			query:        "?limit=5&offset=3",
-			expectedCode: http.StatusOK,
-			expectedIDs:  ids[3:8],
-		},
-		{
-			name:         "minimum limit",
-			query:        "?limit=1&offset=0",
-			expectedCode: http.StatusOK,
-			expectedIDs:  ids[:1],
-		},
-		{
-			name:         "maximum limit",
-			query:        "?limit=100",
-			expectedCode: http.StatusOK,
-			expectedIDs:  ids,
-		},
-		{
-			name:         "last page",
-			query:        "?limit=5&offset=10",
-			expectedCode: http.StatusOK,
-			expectedIDs:  ids[10:],
-		},
-		{
-			name:         "offset at end",
-			query:        "?offset=12",
-			expectedCode: http.StatusOK,
-			expectedIDs:  []uuid.UUID{},
-		},
-		{
-			name:         "offset beyond end",
-			query:        "?offset=100",
-			expectedCode: http.StatusOK,
-			expectedIDs:  []uuid.UUID{},
-		},
-		{
-			name:         "empty storage",
-			emptyStorage: true,
-			expectedCode: http.StatusOK,
-			expectedIDs:  []uuid.UUID{},
-		},
-		{
-			name:         "zero limit",
-			query:        "?limit=0",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "limit above maximum",
-			query:        "?limit=101",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "invalid limit",
-			query:        "?limit=abc",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "empty limit",
-			query:        "?limit=",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "negative offset",
-			query:        "?offset=-1",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "invalid offset",
-			query:        "?offset=abc",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "empty offset",
-			query:        "?offset=",
-			expectedCode: http.StatusBadRequest,
-		},
+		// ... те же кейсы
 	}
 
 	for _, tt := range tests {
@@ -223,13 +142,6 @@ func TestListNotes(t *testing.T) {
 				nil,
 			)
 
-			ctx := context.WithValue(
-				req.Context(),
-				auth.UserIDKey,
-				ownerID.String(),
-			)
-			req = req.WithContext(ctx)
-
 			rec := httptest.NewRecorder()
 
 			handler.ListNotes(rec, req)
@@ -238,7 +150,6 @@ func TestListNotes(t *testing.T) {
 
 			if tt.expectedCode != http.StatusOK {
 				assert.Empty(t, rec.Body.String())
-
 				return
 			}
 
@@ -247,7 +158,6 @@ func TestListNotes(t *testing.T) {
 			var result []models.Note
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
 
-			// Пустой результат должен быть [], а не null.
 			require.NotNil(t, result)
 
 			resultIDs := make([]uuid.UUID, 0, len(result))

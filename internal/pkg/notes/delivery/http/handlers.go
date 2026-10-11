@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/auth"
+	authdelivery "bnn/internal/pkg/auth/delivery/http"
 	"bnn/internal/pkg/httpjson"
 
 	"github.com/gorilla/mux"
@@ -129,7 +129,7 @@ func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Processing get note request")
 
-	_, ok := auth.GetUserID(r)
+	userID, ok := authdelivery.GetUserID(r.Context())
 	if !ok {
 		slog.Warn("User not authenticated")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -165,6 +165,12 @@ func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
 	if found == nil {
 		slog.Warn("Note not found", "id", rawID)
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if found.CreatedBy != userID {
+		slog.Warn("Access denied", "note_id", rawID, "user_id", userID)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 

@@ -1,27 +1,12 @@
 package delivery
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
-	uuid "github.com/satori/go.uuid"
+	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/httpjson"
 )
-
-type contextKey string
-
-const userIDKey contextKey = "userID"
-
-// SetUserIDForTest — устанавливает userID в контекст.
-// Только для тестов других пакетов.
-func SetUserIDForTest(ctx context.Context, userID uuid.UUID) context.Context {
-	return context.WithValue(ctx, userIDKey, userID)
-}
-
-func GetUserID(ctx context.Context) (uuid.UUID, bool) {
-	userID, ok := ctx.Value(userIDKey).(uuid.UUID)
-	return userID, ok
-}
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,11 +19,11 @@ func (h *Handler) Middleware(next http.Handler) http.Handler {
 
 		userID, err := h.uc.Authenticate(r.Context(), cookie.Value)
 		if err != nil {
-			writeError(w, err)
+			httpjson.WriteError(w, err)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		ctx := ctxutil.WithUserID(r.Context(), userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

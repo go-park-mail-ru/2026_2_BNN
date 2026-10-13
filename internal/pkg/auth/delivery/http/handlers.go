@@ -1,12 +1,12 @@
 package delivery
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/httpjson"
 )
 
@@ -36,7 +36,7 @@ func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 
 	user, tokens, err := h.uc.SignUp(r.Context(), req.Login, req.Password)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	user, tokens, err := h.uc.SignIn(r.Context(), req.Login, req.Password)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.uc.Refresh(r.Context(), cookie.Value)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(refreshCookieName); err == nil {
 		if err := h.uc.Logout(r.Context(), cookie.Value); err != nil {
-			writeError(w, err)
+			httpjson.WriteError(w, err)
 			return
 		}
 	}
@@ -93,7 +93,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserID(r.Context())
+	userID, ok := ctxutil.GetUserID(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -101,7 +101,7 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.uc.GetUser(r.Context(), userID)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func setAuthCookies(w http.ResponseWriter, tokens models.AuthTokens) {
 		Name:     accessCookieName,
 		Value:    tokens.AccessToken,
 		Path:     "/",
-		MaxAge:   int(models.AccessTokenTTL.Seconds()),
+		Expires:  tokens.AccessExpiresAt,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
@@ -123,7 +123,7 @@ func setAuthCookies(w http.ResponseWriter, tokens models.AuthTokens) {
 		Name:     refreshCookieName,
 		Value:    tokens.RefreshToken,
 		Path:     refreshCookiePath,
-		MaxAge:   int(models.RefreshTokenTTL.Seconds()),
+		Expires:  tokens.RefreshExpiresAt,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
@@ -148,27 +148,4 @@ func clearAuthCookies(w http.ResponseWriter) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-}
-
-func writeError(w http.ResponseWriter, err error) {
-	status := http.StatusInternalServerError
-
-	switch {
-	case errors.Is(err, models.ErrValidation):
-		status = http.StatusBadRequest
-	case errors.Is(err, models.ErrUserExists):
-		status = http.StatusConflict
-	case errors.Is(err, models.ErrInvalidCredentials), errors.Is(err, models.ErrInvalidToken):
-		status = http.StatusUnauthorized
-	case errors.Is(err, models.ErrUserNotFound):
-		status = http.StatusNotFound
-	}
-
-	if status == http.StatusInternalServerError {
-		slog.Error("Request failed", "error", err)
-	} else {
-		slog.Warn("Request failed", "error", err)
-	}
-
-	w.WriteHeader(status)
 }

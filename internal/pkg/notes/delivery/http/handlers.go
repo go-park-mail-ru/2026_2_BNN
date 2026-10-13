@@ -7,8 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"bnn/internal/models"
-	authDelivery "bnn/internal/pkg/auth/delivery/http"
+	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/notes"
 
@@ -30,7 +29,7 @@ func NewHandler(uc notes.Usecase) *Handler {
 }
 
 func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authDelivery.GetUserID(r.Context())
+	userID, ok := ctxutil.GetUserID(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -45,7 +44,7 @@ func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.uc.GetNotes(r.Context(), userID, limit, offset)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -53,7 +52,7 @@ func (h *Handler) ListNotes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authDelivery.GetUserID(r.Context())
+	userID, ok := ctxutil.GetUserID(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -68,7 +67,7 @@ func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := h.uc.GetNote(r.Context(), userID, noteID)
 	if err != nil {
-		writeError(w, err)
+		httpjson.WriteError(w, err)
 		return
 	}
 
@@ -98,15 +97,4 @@ func parsePagination(query url.Values) (int64, int64, error) {
 	}
 
 	return limit, offset, nil
-}
-
-func writeError(w http.ResponseWriter, err error) {
-	if errors.Is(err, models.ErrNoteNotFound) {
-		slog.Warn("Request failed", "error", err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	slog.Error("Request failed", "error", err)
-	w.WriteHeader(http.StatusInternalServerError)
 }

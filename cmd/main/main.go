@@ -72,7 +72,6 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	router.Use(corsMiddleware)
 
 	api := router.PathPrefix("/api").Subrouter()
 
@@ -119,7 +118,7 @@ func main() {
 
 	server := http.Server{
 		Addr:    ":5458",
-		Handler: router,
+		Handler: corsMiddleware(router),
 	}
 
 	slog.Info("Starting server", "address", "http://localhost:5458")

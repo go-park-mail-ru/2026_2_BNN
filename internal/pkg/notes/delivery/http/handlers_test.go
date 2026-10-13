@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"bnn/internal/models"
-	authdelivery "bnn/internal/pkg/auth/delivery/http"
+	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
 
 	"github.com/gorilla/mux"
@@ -129,7 +129,7 @@ func TestGetNote(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/notes/"+tt.pathID, nil)
 			if tt.authUserID != nil {
 				req = req.WithContext(
-					authdelivery.SetUserIDForTest(req.Context(), *tt.authUserID),
+					ctxutil.WithUserID(req.Context(), *tt.authUserID),
 				)
 			}
 
@@ -228,7 +228,7 @@ func TestListNotes(t *testing.T) {
 				nil,
 			)
 			req = req.WithContext(
-				authdelivery.SetUserIDForTest(req.Context(), userID),
+				ctxutil.WithUserID(req.Context(), userID),
 			)
 
 			rec := httptest.NewRecorder()

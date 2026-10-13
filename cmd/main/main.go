@@ -20,6 +20,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	authapi "bnn/internal/pkg/auth/delivery/http/api"
+	"encoding/json"
 )
 
 var buckets = []string{"avatars", "attachments"}
@@ -92,6 +96,26 @@ func main() {
 		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
 		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
 	}
+
+	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
+		swagger, err := authapi.GetSwagger()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(swagger); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}).Methods(http.MethodGet)
+
+	router.PathPrefix("/swagger/").Handler(
+		httpSwagger.Handler(
+			httpSwagger.URL("/swagger/spec.json"), // URL, где лежит спека
+			httpSwagger.DeepLinking(true),
+			httpSwagger.DocExpansion("none"),
+		),
+	).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",

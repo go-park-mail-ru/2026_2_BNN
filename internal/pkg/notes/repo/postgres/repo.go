@@ -37,6 +37,9 @@ var deleteBlocksQuery string
 //go:embed queries/create_block.sql
 var createBlockQuery string
 
+//go:embed queries/update_user_avatar.sql
+var updateUserAvatarQuery string
+
 type Repo struct {
 	db *pgxpool.Pool
 }

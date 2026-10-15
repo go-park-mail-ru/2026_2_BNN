@@ -17,6 +17,7 @@ type Usecase interface {
 	Logout(ctx context.Context, refreshToken string) error
 	Authenticate(ctx context.Context, accessToken string) (uuid.UUID, error)
 	GetUser(ctx context.Context, userID uuid.UUID) (models.User, error)
+	UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte) (models.User, error)
 }
 
 type Repo interface {
@@ -26,4 +27,10 @@ type Repo interface {
 
 	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
 	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
+	UpdateAvatar(ctx context.Context, user models.User) error
+}
+
+type S3 interface {
+	Upload(ctx context.Context, bucket, objectName string, data []byte, contentType string) (string, error)
+	Delete(ctx context.Context, bucket, objectName string) error
 }

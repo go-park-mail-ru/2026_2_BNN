@@ -1,0 +1,426 @@
+openapi: "3.0.0"
+info:
+  title: BNN Notes API
+  version: 1.0.0
+  description: API для сервиса заметок (аналог Notion)
+
+servers:
+  - url: http://localhost:5458
+    description: DEV LOCAL
+  - url: https://brandnewnotes.ru
+    description: PROD
+
+tags:
+  - name: auth
+    description: Аутентификация и управление сессией
+  - name: notes
+    description: Работа с заметками
+
+paths:
+  /auth/signup:
+    post:
+      tags: [auth]
+      operationId: SignUp
+      summary: Регистрация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '201':
+          description: Пользователь создан. Устанавливает куки bnn_access и bnn_refresh.
+          headers:
+            Set-Cookie:
+              description: bnn_access и bnn_refresh
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Некорректные данные
+        '409':
+          description: Логин уже занят
+
+  /auth/signin:
+    post:
+      tags: [auth]
+      operationId: SignIn
+      summary: Вход в систему
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: Успешный вход. Устанавливает куки bnn_access и bnn_refresh.
+          headers:
+            Set-Cookie:
+              description: bnn_access и bnn_refresh
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Некорректные данные
+        '401':
+          description: Неверный логин или пароль
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: Refresh
+      summary: Обновление access-токена
+      responses:
+        '200':
+          description: Токен обновлён. Устанавливает новые куки.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          description: Невалидный или отсутствующий refresh-токен
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: Logout
+      summary: Выход из системы
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешный выход. Удаляет куки.
+        '401':
+          description: Не авторизован
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: GetCurrentUser
+      summary: Получить профиль текущего пользователя
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+        '404':
+          description: Пользователь не найден
+
+  /notes/getall:
+    get:
+      tags: [notes]
+      operationId: ListNotes
+      summary: Получить список заметок
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 10
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: Список заметок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+        '400':
+          description: Некорректные параметры пагинации
+        '401':
+          description: Не авторизован
+
+  /notes:
+    post:
+      tags: [notes]
+      operationId: CreateNote
+      summary: Создать заметку
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteRequest'
+      responses:
+        '201':
+          description: Заметка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: Некорректные данные
+        '401':
+          description: Не авторизован
+
+  /notes/{id}:
+    get:
+      tags: [notes]
+      operationId: GetNote
+      summary: Получить заметку по ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/NoteID'
+      responses:
+        '200':
+          description: Заметка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: Некорректный ID
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заметка не найдена
+
+    put:
+      tags: [notes]
+      operationId: UpdateNote
+      summary: Обновить заметку
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/NoteID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNoteRequest'
+      responses:
+        '200':
+          description: Заметка обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: Некорректные данные
+        '401':
+          description: Не авторизован
+        '403':
+          description: Нет доступа
+        '404':
+          description: Заметка не найдена
+
+    delete:
+      tags: [notes]
+      operationId: DeleteNote
+      summary: Удалить заметку
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/NoteID'
+      responses:
+        '204':
+          description: Заметка удалена
+        '401':
+          description: Не авторизован
+        '403':
+          description: Нет доступа
+        '404':
+          description: Заметка не найдена
+
+  /auth/avatar:
+    post:
+      tags: [auth]
+      operationId: UpdateAvatar
+      summary: Обновить аватарку пользователя
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Аватарка обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Некорректный файл
+        '401':
+          description: Не авторизован
+        '413':
+          description: Файл слишком большой
+        '415':
+          description: Неподдерживаемый формат
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: bnn_access
+
+  parameters:
+    NoteID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+
+  schemas:
+    SignUpRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 20
+          example: "testuser"
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          example: "password123"
+
+    SignInRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          example: "testuser"
+        password:
+          type: string
+          example: "password123"
+
+    User:
+      type: object
+      required: [id, login, avatar, version, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+          example: "testuser"
+        avatar:
+          type: string
+          example: "https://cdn.example.com/avatars/uuid.jpg"
+        version:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Note:
+      type: object
+      required: [id, title, created_by, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Моя заметка"
+        created_by:
+          type: string
+          format: uuid
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Block'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Block:
+      type: object
+      required: [id, content, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          example: "Текст блока"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateNoteRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Новая заметка"
+        blocks:
+          type: array
+          items:
+            type: string
+            example: "Текст блока"
+
+    UpdateNoteRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Обновлённый заголовок"
+        blocks:
+          type: array
+          items:
+            type: string
+            example: "Обновлённый текст"

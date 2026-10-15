@@ -10,4 +10,5 @@ var (
 	ErrInvalidToken         = errors.New("invalid token")
 	ErrNoteNotFound         = errors.New("note not found")
 	ErrRefreshTokenNotFound = errors.New("refresh token not found")
+	ErrUnsupportedMediaType = errors.New("unsupported media type")
 )

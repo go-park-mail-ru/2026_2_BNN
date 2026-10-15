@@ -1,0 +1,1 @@
+DELETE FROM blocks WHERE note_id = $1;

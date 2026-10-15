@@ -2,16 +2,25 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
+	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
 	authUsecase "bnn/internal/pkg/auth/usecase"
+	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/middleware"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
+	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
 	notesUsecase "bnn/internal/pkg/notes/usecase"
 
@@ -21,10 +30,9 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-
-	authapi "bnn/internal/pkg/auth/delivery/http/api"
-	"encoding/json"
 )
+
+const shutdownTimeout = 5 * time.Second
 
 var buckets = []string{"avatars", "attachments"}
 
@@ -72,59 +80,68 @@ func main() {
 	}
 
 	router := mux.NewRouter()
+	router.Use(cookies.Middleware)
 
-	api := router.PathPrefix("/api").Subrouter()
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.Use(authHandler.Middleware)
 
-	authRouter := api.PathPrefix("/auth").Subrouter()
-	{
-		authRouter.HandleFunc("/signup", authHandler.SignUp).Methods(http.MethodPost)
-		authRouter.HandleFunc("/signin", authHandler.SignIn).Methods(http.MethodPost)
-		authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
-		authRouter.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
-	}
+	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
 
-	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
-	authProtectedRouter.Use(authHandler.Middleware)
-	{
-		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).Methods(http.MethodGet)
-	}
-
-	notesRouter := api.PathPrefix("/notes").Subrouter()
-	notesRouter.Use(authHandler.Middleware)
-	{
-		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
-		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
-	}
+	notesapi.HandlerFromMux(notesapi.NewStrictHandlerWithOptions(notesHandler, nil, notesapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		swagger, err := authapi.GetSwagger()
+		spec, err := authapi.GetSwagger()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpjson.ResponseError(w, r, err)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(swagger); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(spec); err != nil {
+			slog.Error("Failed to write spec", "error", err)
 		}
 	}).Methods(http.MethodGet)
 
-	router.PathPrefix("/swagger/").Handler(
-		httpSwagger.Handler(
-			httpSwagger.URL("/swagger/spec.json"), // URL, где лежит спека
-			httpSwagger.DeepLinking(true),
-			httpSwagger.DocExpansion("none"),
-		),
-	).Methods(http.MethodGet)
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("/swagger/spec.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+	)).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",
 		Handler: corsMiddleware(router),
 	}
 
-	slog.Info("Starting server", "address", "http://localhost:5458")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("Server failed", "error", err)
+	go func() {
+		slog.Info("Starting server", "address", "http://localhost:5458")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("Server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-signalCh
+	slog.Info("Received signal, shutting down", "signal", sig)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Server shutdown failed", "error", err)
+		return
 	}
+
+	slog.Info("Server stopped")
 }
 
 func mustEnv(key string) string {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"bnn/internal/pkg/api"
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
 	authUsecase "bnn/internal/pkg/auth/usecase"
@@ -22,7 +23,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
-	authapi "bnn/internal/pkg/auth/delivery/http/api"
+	apigen "bnn/internal/pkg/api"
 	"encoding/json"
 )
 
@@ -73,6 +74,8 @@ func main() {
 
 	router := mux.NewRouter()
 
+	router.Use(api.CookieMiddleware)
+
 	api := router.PathPrefix("/api").Subrouter()
 
 	authRouter := api.PathPrefix("/auth").Subrouter()
@@ -97,7 +100,7 @@ func main() {
 	}
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		swagger, err := authapi.GetSwagger()
+		swagger, err := apigen.GetSwagger()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

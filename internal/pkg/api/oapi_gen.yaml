@@ -6,3 +6,7 @@ generate:
   gorilla-server: true
   strict-server: true
   embedded-spec: true
+output-options:
+  include-tags:
+    - auth
+    - notes

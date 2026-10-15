@@ -8,13 +8,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"bnn/internal/pkg/api"
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
+	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
 	authUsecase "bnn/internal/pkg/auth/usecase"
+	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/middleware"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
+	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
 	notesUsecase "bnn/internal/pkg/notes/usecase"
 
@@ -25,6 +31,8 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
+
+const shutdownTimeout = 5 * time.Second
 
 var buckets = []string{"avatars", "attachments"}
 
@@ -58,81 +66,82 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- usecases ---
-	authUC := authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET"))
-	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db))
-
-	// --- handlers ---
-	authHandler := authDelivery.NewHandler(authUC)
-	notesHandler := notesDelivery.NewHandler(notesUC)
-
-	// --- strict middleware ---
-	strictAuthMW := authDelivery.StrictAuthMiddleware(authUC)
-
-	// --- strict server (агрегатор) ---
-	strictServer := api.NewStrictHandlerWithOptions(
-		api.NewServer(authHandler, notesHandler),
-		[]api.StrictMiddlewareFunc{strictAuthMW},
-		api.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-			},
-			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				if errors.Is(err, authDelivery.ErrUnauthorized) {
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-				slog.Error("Response error", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			},
-		},
+	authHandler := authDelivery.NewHandler(
+		authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET")),
+	)
+	notesHandler := notesDelivery.NewHandler(
+		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
 	)
 
-	// --- CORS ---
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
 		slog.Error("Failed to create CORS middleware", "error", err)
 		os.Exit(1)
 	}
 
-	// --- router ---
 	router := mux.NewRouter()
-	router.Use(api.CookieMiddleware)
+	router.Use(cookies.Middleware)
 
-	// /api — все ручки из спеки
 	apiRouter := router.PathPrefix("/api").Subrouter()
-	api.HandlerFromMux(strictServer, apiRouter)
+	apiRouter.Use(authHandler.Middleware)
 
-	// --- Swagger ---
+	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
+
+	notesapi.HandlerFromMux(notesapi.NewStrictHandlerWithOptions(notesHandler, nil, notesapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
+
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		swagger, err := api.GetSpec()
+		spec, err := authapi.GetSwagger()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpjson.ResponseError(w, r, err)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(swagger); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(spec); err != nil {
+			slog.Error("Failed to write spec", "error", err)
 		}
 	}).Methods(http.MethodGet)
 
-	router.PathPrefix("/swagger/").Handler(
-		httpSwagger.Handler(
-			httpSwagger.URL("/swagger/spec.json"),
-			httpSwagger.DeepLinking(true),
-			httpSwagger.DocExpansion("none"),
-		),
-	).Methods(http.MethodGet)
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("/swagger/spec.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+	)).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",
 		Handler: corsMiddleware(router),
 	}
 
-	slog.Info("Starting server", "address", "http://localhost:5458")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("Server failed", "error", err)
+	go func() {
+		slog.Info("Starting server", "address", "http://localhost:5458")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("Server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-signalCh
+	slog.Info("Received signal, shutting down", "signal", sig)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Server shutdown failed", "error", err)
+		return
 	}
+
+	slog.Info("Server stopped")
 }
 
 func mustEnv(key string) string {
@@ -141,6 +150,7 @@ func mustEnv(key string) string {
 		slog.Error("Environment variable is not set", "key", key)
 		os.Exit(1)
 	}
+
 	return value
 }
 

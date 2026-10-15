@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/v2.7.2/configuration-schema.json
 package: api
 output: api.gen.go
 generate:
@@ -8,5 +7,6 @@ generate:
   embedded-spec: true
 output-options:
   include-tags:
-    - auth
     - notes
+
+    

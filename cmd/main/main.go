@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,9 +24,6 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-
-	apigen "bnn/internal/pkg/api"
-	"encoding/json"
 )
 
 var buckets = []string{"avatars", "attachments"}
@@ -59,48 +58,54 @@ func main() {
 		os.Exit(1)
 	}
 
-	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET")),
-	)
-	notesHandler := notesDelivery.NewHandler(
-		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
+	// --- usecases ---
+	authUC := authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET"))
+	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db))
+
+	// --- handlers ---
+	authHandler := authDelivery.NewHandler(authUC)
+	notesHandler := notesDelivery.NewHandler(notesUC)
+
+	// --- strict middleware ---
+	strictAuthMW := authDelivery.StrictAuthMiddleware(authUC)
+
+	// --- strict server (агрегатор) ---
+	strictServer := api.NewStrictHandlerWithOptions(
+		api.NewServer(authHandler, notesHandler),
+		[]api.StrictMiddlewareFunc{strictAuthMW},
+		api.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			},
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				if errors.Is(err, authDelivery.ErrUnauthorized) {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				slog.Error("Response error", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			},
+		},
 	)
 
+	// --- CORS ---
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
 		slog.Error("Failed to create CORS middleware", "error", err)
 		os.Exit(1)
 	}
 
+	// --- router ---
 	router := mux.NewRouter()
-
 	router.Use(api.CookieMiddleware)
 
-	api := router.PathPrefix("/api").Subrouter()
+	// /api — все ручки из спеки
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	api.HandlerFromMux(strictServer, apiRouter)
 
-	authRouter := api.PathPrefix("/auth").Subrouter()
-	{
-		authRouter.HandleFunc("/signup", authHandler.SignUp).Methods(http.MethodPost)
-		authRouter.HandleFunc("/signin", authHandler.SignIn).Methods(http.MethodPost)
-		authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
-		authRouter.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
-	}
-
-	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
-	authProtectedRouter.Use(authHandler.Middleware)
-	{
-		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).Methods(http.MethodGet)
-	}
-
-	notesRouter := api.PathPrefix("/notes").Subrouter()
-	notesRouter.Use(authHandler.Middleware)
-	{
-		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
-		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
-	}
-
+	// --- Swagger ---
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		swagger, err := apigen.GetSwagger()
+		swagger, err := api.GetSpec()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -113,7 +118,7 @@ func main() {
 
 	router.PathPrefix("/swagger/").Handler(
 		httpSwagger.Handler(
-			httpSwagger.URL("/swagger/spec.json"), // URL, где лежит спека
+			httpSwagger.URL("/swagger/spec.json"),
 			httpSwagger.DeepLinking(true),
 			httpSwagger.DocExpansion("none"),
 		),
@@ -136,7 +141,6 @@ func mustEnv(key string) string {
 		slog.Error("Environment variable is not set", "key", key)
 		os.Exit(1)
 	}
-
 	return value
 }
 

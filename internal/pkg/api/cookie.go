@@ -2,12 +2,16 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
 )
 
-type cookieStoreKey struct{}
+type (
+	cookieStoreKey struct{}
+	requestKey     struct{}
+)
 
 type Cookie struct {
 	Name     string
@@ -54,4 +58,31 @@ func SetCookie(ctx context.Context, c Cookie) {
 	if store := cookieStoreFromContext(ctx); store != nil {
 		store.add(c)
 	}
+}
+
+func WithRequest(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, requestKey{}, r)
+}
+
+func GetRequest(ctx context.Context) (*http.Request, bool) {
+	r, ok := ctx.Value(requestKey{}).(*http.Request)
+	return r, ok
+}
+
+var ErrNoRequest = errors.New("no http request in context")
+
+func GetCookieValue(ctx context.Context, name string) (string, error) {
+	r, ok := GetRequest(ctx)
+	if !ok {
+		return "", ErrNoRequest
+	}
+	c, err := r.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+	return c.Value, nil
+}
+
+func GetCookieStore(ctx context.Context) *cookieStore {
+	return cookieStoreFromContext(ctx)
 }

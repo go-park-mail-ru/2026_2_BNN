@@ -7,7 +7,7 @@ info:
 servers:
   - url: http://localhost:5458
     description: DEV LOCAL
-  - url: https://brandnewnotes.ru
+  - url: https://brandnewnotes.ru/api
     description: PROD
 
 tags:
@@ -334,7 +334,7 @@ components:
 
     User:
       type: object
-      required: [id, login, avatar, version, created_at, updated_at]
+      required: [id, login, avatar, created_at, updated_at]
       properties:
         id:
           type: string
@@ -345,9 +345,6 @@ components:
         avatar:
           type: string
           example: "https://cdn.example.com/avatars/uuid.jpg"
-        version:
-          type: integer
-          example: 1
         created_at:
           type: string
           format: date-time
@@ -362,9 +359,16 @@ components:
         id:
           type: string
           format: uuid
+        parent_note_id:
+          type: string
+          format: uuid
+          nullable: true
         title:
           type: string
-          example: "Моя заметка"
+        header:
+          type: string
+        icon:
+          type: string
         created_by:
           type: string
           format: uuid
@@ -372,23 +376,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Block'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    Block:
-      type: object
-      required: [id, content, created_at, updated_at]
-      properties:
-        id:
-          type: string
-          format: uuid
-        content:
-          type: string
-          example: "Текст блока"
         created_at:
           type: string
           format: date-time
@@ -424,3 +411,20 @@ components:
           items:
             type: string
             example: "Обновлённый текст"
+    Block:
+      type: object
+      required: [id, content, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: object
+          additionalProperties: true
+          description: JSON-объект с содержимым блока
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

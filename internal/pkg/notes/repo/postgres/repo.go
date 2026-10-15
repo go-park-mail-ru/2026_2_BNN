@@ -22,6 +22,21 @@ var readNotesQuery string
 //go:embed queries/read_blocks.sql
 var readBlocksQuery string
 
+//go:embed queries/create_note.sql
+var createNoteQuery string
+
+//go:embed queries/update_note.sql
+var updateNoteQuery string
+
+//go:embed queries/delete_note.sql
+var deleteNoteQuery string
+
+//go:embed queries/delete_blocks.sql
+var deleteBlocksQuery string
+
+//go:embed queries/create_block.sql
+var createBlockQuery string
+
 type Repo struct {
 	db *pgxpool.Pool
 }
@@ -29,6 +44,8 @@ type Repo struct {
 func NewRepo(db *pgxpool.Pool) *Repo {
 	return &Repo{db: db}
 }
+
+// --- Read ---
 
 func (r *Repo) ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error) {
 	var note models.Note
@@ -119,4 +136,110 @@ func (r *Repo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.Block
 	}
 
 	return blocks, nil
+}
+
+// --- Create ---
+
+func (r *Repo) CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, createNoteQuery,
+		note.ID,
+		note.ParentNoteID,
+		note.CreatedBy,
+		note.Title,
+		note.Header,
+		note.Icon,
+		note.CreatedAt,
+		note.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create note: %w", err)
+	}
+
+	for _, b := range blocks {
+		_, err = tx.Exec(ctx, createBlockQuery,
+			b.ID,
+			note.ID,
+			b.Content,
+			b.CreatedAt,
+			b.UpdatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("create block: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// --- Update ---
+
+func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, updateNoteQuery,
+		note.Title,
+		note.Header,
+		note.Icon,
+		note.UpdatedAt,
+		note.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update note: %w", err)
+	}
+
+	// Если blocks == nil — блоки не трогаем.
+	// Если blocks != nil — полностью заменяем.
+	if blocks != nil {
+		_, err = tx.Exec(ctx, deleteBlocksQuery, note.ID)
+		if err != nil {
+			return fmt.Errorf("delete old blocks: %w", err)
+		}
+
+		for _, b := range blocks {
+			_, err = tx.Exec(ctx, createBlockQuery,
+				b.ID,
+				note.ID,
+				b.Content,
+				b.CreatedAt,
+				b.UpdatedAt,
+			)
+			if err != nil {
+				return fmt.Errorf("create block: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// --- Delete ---
+
+func (r *Repo) DeleteNote(ctx context.Context, noteID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, deleteBlocksQuery, noteID)
+	if err != nil {
+		return fmt.Errorf("delete blocks: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, deleteNoteQuery, noteID)
+	if err != nil {
+		return fmt.Errorf("delete note: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }

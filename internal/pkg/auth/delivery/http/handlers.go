@@ -21,8 +21,6 @@ func NewHandler(uc auth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// SignUp
-
 func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.SignUpResponseObject, error) {
 	user, tokens, err := h.uc.SignUp(ctx, req.Body.Login, req.Body.Password)
 	if errors.Is(err, models.ErrValidation) {
@@ -40,8 +38,6 @@ func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.
 	return toSignUpResponse(user), nil
 }
 
-// SignIn
-
 func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.SignInResponseObject, error) {
 	user, tokens, err := h.uc.SignIn(ctx, req.Body.Login, req.Body.Password)
 	if errors.Is(err, models.ErrInvalidCredentials) {
@@ -58,8 +54,6 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 
 	return toSignInResponse(user), nil
 }
-
-// Refresh
 
 func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (api.RefreshResponseObject, error) {
 	cookie, err := cookies.Get(ctx, refreshCookieName)
@@ -80,8 +74,6 @@ func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (ap
 	return api.Refresh200Response{}, nil
 }
 
-// Logout
-
 func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.LogoutResponseObject, error) {
 	if cookie, err := cookies.Get(ctx, refreshCookieName); err == nil {
 		if err := h.uc.Logout(ctx, cookie); err != nil {
@@ -93,8 +85,6 @@ func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.
 
 	return api.Logout200Response{}, nil
 }
-
-// GetCurrentUser
 
 func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequestObject) (api.GetCurrentUserResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -113,22 +103,20 @@ func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequ
 	return toGetCurrentUserResponse(user), nil
 }
 
-// UpdateAvatar (заглушка)
+func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequestObject) (api.ChangePasswordResponseObject, error) {
+	return nil, errors.New("not implemented")
+}
 
 func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestObject) (api.UpdateAvatarResponseObject, error) {
-	return api.UpdateAvatar400Response{}, nil
+	return nil, errors.New("not implemented")
 }
 
 func toSignUpResponse(u models.User) api.SignUp201JSONResponse {
-	return api.SignUp201JSONResponse{
-		Body: toAPIUser(u),
-	}
+	return api.SignUp201JSONResponse(toAPIUser(u))
 }
 
 func toSignInResponse(u models.User) api.SignIn200JSONResponse {
-	return api.SignIn200JSONResponse{
-		Body: toAPIUser(u),
-	}
+	return api.SignIn200JSONResponse(toAPIUser(u))
 }
 
 func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {

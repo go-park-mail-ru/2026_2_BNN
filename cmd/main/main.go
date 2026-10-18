@@ -14,6 +14,9 @@ import (
 
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
+	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
+	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
+	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
@@ -76,7 +79,9 @@ func main() {
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
 	)
 
-	attachmentsHandler := attachmentsDelivery.NewHandler()
+	attachmentsHandler := attachmentsDelivery.NewHandler(
+		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsFiles.NewRepo(s3, "attachments")),
+	)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {

@@ -12,6 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
+	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
+
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
@@ -73,6 +76,8 @@ func main() {
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
 	)
 
+	attachmentsHandler := attachmentsDelivery.NewHandler()
+
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
 		slog.Error("Failed to create CORS middleware", "error", err)
@@ -91,6 +96,11 @@ func main() {
 	}), apiRouter)
 
 	notesapi.HandlerFromMux(notesapi.NewStrictHandlerWithOptions(notesHandler, nil, notesapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
+
+	attachmentsapi.HandlerFromMux(attachmentsapi.NewStrictHandlerWithOptions(attachmentsHandler, nil, attachmentsapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)

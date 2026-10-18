@@ -1,0 +1,10 @@
+package: api
+output: api.gen.go
+generate:
+  models: true
+  gorilla-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  include-tags:
+    - attachments

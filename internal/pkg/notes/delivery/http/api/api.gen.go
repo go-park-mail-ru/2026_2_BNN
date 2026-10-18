@@ -25,43 +25,82 @@ import (
 
 // Block defines model for Block.
 type Block struct {
-	// Content JSON-объект с содержимым блока
-	Content   map[string]interface{} `json:"content"`
-	CreatedAt time.Time              `json:"created_at"`
-	Id        openapi_types.UUID     `json:"id"`
-	UpdatedAt time.Time              `json:"updated_at"`
+	// Content Произвольный JSON блока
+	//
+	// Example: {"text":"Привет","type":"text"}
+	Content   BlockContent       `json:"content"`
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+
+// BlockContent Произвольный JSON блока
+//
+// Example: {"text":"Привет","type":"text"}
+type BlockContent map[string]interface{}
+
+// BlockInput defines model for BlockInput.
+type BlockInput struct {
+	// Content Произвольный JSON блока
+	//
+	// Example: {"text":"Привет","type":"text"}
+	Content BlockContent `json:"content"`
+
+	// Id Нет у нового блока
+	Id *openapi_types.UUID `json:"id,omitempty"`
 }
 
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
-	Blocks *[]string `json:"blocks,omitempty"`
+	Header *string `json:"header,omitempty"`
+	Icon   *string `json:"icon,omitempty"`
+
+	// ParentNoteId Если заметка вложенная
+	ParentNoteId *openapi_types.UUID `json:"parent_note_id,omitempty"`
+
+	// Title Example: Новая заметка
+	Title *string `json:"title,omitempty"`
+}
+
+// Note defines model for Note.
+type Note struct {
+	// Blocks Только в ответах на одну заметку, в списке нет
+	Blocks    *[]Block           `json:"blocks,omitempty"`
+	CreatedAt time.Time          `json:"created_at"`
+	CreatedBy openapi_types.UUID `json:"created_by"`
+
+	// Header Нет в ответе, если пустой
+	Header *string `json:"header,omitempty"`
+
+	// Icon Нет в ответе, если пустой
+	Icon *string            `json:"icon,omitempty"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// ParentNoteId Есть только у вложенных заметок
+	ParentNoteId *openapi_types.UUID `json:"parent_note_id,omitempty"`
+
+	// Title Example: Моя заметка
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UpdateNoteRequest defines model for UpdateNoteRequest.
+type UpdateNoteRequest struct {
+	Blocks []BlockInput `json:"blocks"`
+	Header *string      `json:"header,omitempty"`
+	Icon   *string      `json:"icon,omitempty"`
 
 	// Title Example: Новая заметка
 	Title string `json:"title"`
 }
 
-// Note defines model for Note.
-type Note struct {
-	Blocks       *[]Block            `json:"blocks,omitempty"`
-	CreatedAt    time.Time           `json:"created_at"`
-	CreatedBy    openapi_types.UUID  `json:"created_by"`
-	Header       *string             `json:"header,omitempty"`
-	Icon         *string             `json:"icon,omitempty"`
-	Id           openapi_types.UUID  `json:"id"`
-	ParentNoteId *openapi_types.UUID `json:"parent_note_id,omitempty"`
-	Title        string              `json:"title"`
-	UpdatedAt    time.Time           `json:"updated_at"`
-}
+// AttachmentID defines model for AttachmentID.
+type AttachmentID = openapi_types.UUID
 
-// UpdateNoteRequest defines model for UpdateNoteRequest.
-type UpdateNoteRequest struct {
-	Blocks *[]string `json:"blocks,omitempty"`
+// BlockID defines model for BlockID.
+type BlockID = openapi_types.UUID
 
-	// Title Example: Обновлённый заголовок
-	Title *string `json:"title,omitempty"`
-}
-
-// NoteID Example: 550e8400-e29b-41d4-a716-446655440000
+// NoteID defines model for NoteID.
 type NoteID = openapi_types.UUID
 
 // ListNotesParams defines parameters for ListNotes.
@@ -81,16 +120,16 @@ type ServerInterface interface {
 	// CreateNote Создать заметку
 	// (POST /notes)
 	CreateNote(w http.ResponseWriter, r *http.Request)
-	// ListNotes Получить список заметок
-	// (GET /notes/getall)
+	// ListNotes Список своих заметок
+	// (GET /notes/all)
 	ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams)
 	// DeleteNote Удалить заметку
 	// (DELETE /notes/{id})
 	DeleteNote(w http.ResponseWriter, r *http.Request, id NoteID)
-	// GetNote Получить заметку по ID
+	// GetNote Заметка с блоками
 	// (GET /notes/{id})
 	GetNote(w http.ResponseWriter, r *http.Request, id NoteID)
-	// UpdateNote Обновить заметку
+	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(w http.ResponseWriter, r *http.Request, id NoteID)
 }
@@ -355,7 +394,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	r.HandleFunc(options.BaseURL+"/notes/getall", wrapper.ListNotes).Methods(http.MethodGet)
+	r.HandleFunc(options.BaseURL+"/notes/all", wrapper.ListNotes).Methods(http.MethodGet)
 
 	r.HandleFunc(options.BaseURL+"/notes", wrapper.CreateNote).Methods(http.MethodPost)
 
@@ -403,6 +442,22 @@ type CreateNote401Response struct {
 
 func (response CreateNote401Response) VisitCreateNoteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
+	return nil
+}
+
+type CreateNote404Response struct {
+}
+
+func (response CreateNote404Response) VisitCreateNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type CreateNote413Response struct {
+}
+
+func (response CreateNote413Response) VisitCreateNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(413)
 	return nil
 }
 
@@ -460,19 +515,19 @@ func (response DeleteNote204Response) VisitDeleteNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type DeleteNote400Response struct {
+}
+
+func (response DeleteNote400Response) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
 type DeleteNote401Response struct {
 }
 
 func (response DeleteNote401Response) VisitDeleteNoteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
-	return nil
-}
-
-type DeleteNote403Response struct {
-}
-
-func (response DeleteNote403Response) VisitDeleteNoteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(403)
 	return nil
 }
 
@@ -569,14 +624,6 @@ func (response UpdateNote401Response) VisitUpdateNoteResponse(w http.ResponseWri
 	return nil
 }
 
-type UpdateNote403Response struct {
-}
-
-func (response UpdateNote403Response) VisitUpdateNoteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(403)
-	return nil
-}
-
 type UpdateNote404Response struct {
 }
 
@@ -585,21 +632,29 @@ func (response UpdateNote404Response) VisitUpdateNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type UpdateNote413Response struct {
+}
+
+func (response UpdateNote413Response) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(413)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// CreateNote Создать заметку
 	// (POST /notes)
 	CreateNote(ctx context.Context, request CreateNoteRequestObject) (CreateNoteResponseObject, error)
-	// ListNotes Получить список заметок
-	// (GET /notes/getall)
+	// ListNotes Список своих заметок
+	// (GET /notes/all)
 	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
 	// DeleteNote Удалить заметку
 	// (DELETE /notes/{id})
 	DeleteNote(ctx context.Context, request DeleteNoteRequestObject) (DeleteNoteResponseObject, error)
-	// GetNote Получить заметку по ID
+	// GetNote Заметка с блоками
 	// (GET /notes/{id})
 	GetNote(ctx context.Context, request GetNoteRequestObject) (GetNoteResponseObject, error)
-	// UpdateNote Обновить заметку
+	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
 }
@@ -790,29 +845,37 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, id N
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"dv+nFBBEAxVN2qRO6Ufj+jteG/83AAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

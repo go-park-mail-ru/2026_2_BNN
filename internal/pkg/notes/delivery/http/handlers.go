@@ -28,8 +28,6 @@ func NewHandler(uc notes.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// ListNotes
-
 func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject) (api.ListNotesResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
@@ -65,8 +63,6 @@ func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject)
 	return api.ListNotes200JSONResponse(apiNotes), nil
 }
 
-//  GetNote
-
 func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (api.GetNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
@@ -86,55 +82,13 @@ func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (ap
 	return api.GetNote200JSONResponse(toAPINote(note)), nil
 }
 
-// CreateNote
-
 func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObject) (api.CreateNoteResponseObject, error) {
-	userID, ok := ctxutil.GetUserID(ctx)
-	if !ok {
-		return api.CreateNote401Response{}, nil
-	}
-
-	var blocks []string
-	if req.Body.Blocks != nil {
-		blocks = *req.Body.Blocks
-	}
-
-	note, err := h.uc.CreateNote(ctx, userID, req.Body.Title, blocks)
-	if errors.Is(err, models.ErrValidation) {
-		return api.CreateNote400Response{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CreateNote201JSONResponse(toAPINote(note)), nil
+	return nil, errors.New("not implemented")
 }
-
-// UpdateNote
 
 func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObject) (api.UpdateNoteResponseObject, error) {
-	userID, ok := ctxutil.GetUserID(ctx)
-	if !ok {
-		return api.UpdateNote401Response{}, nil
-	}
-
-	noteID := uuid.UUID(req.Id)
-
-	note, err := h.uc.UpdateNote(ctx, userID, noteID, req.Body.Title, req.Body.Blocks)
-	if errors.Is(err, models.ErrNoteNotFound) {
-		return api.UpdateNote404Response{}, nil
-	}
-	if errors.Is(err, models.ErrValidation) {
-		return api.UpdateNote400Response{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return api.UpdateNote200JSONResponse(toAPINote(note)), nil
+	return nil, errors.New("not implemented")
 }
-
-// DeleteNote
 
 func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -154,8 +108,6 @@ func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObjec
 
 	return api.DeleteNote204Response{}, nil
 }
-
-// конвертеры
 
 func toAPINote(n models.Note) api.Note {
 	var blocks *[]api.Block

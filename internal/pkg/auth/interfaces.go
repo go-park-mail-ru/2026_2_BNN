@@ -17,13 +17,16 @@ type Usecase interface {
 	Logout(ctx context.Context, refreshToken string) error
 	Authenticate(ctx context.Context, accessToken string) (uuid.UUID, error)
 	GetUser(ctx context.Context, userID uuid.UUID) (models.User, error)
+	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error)
 }
 
 type Repo interface {
 	CreateUser(ctx context.Context, user models.User) error
 	ReadUserByLogin(ctx context.Context, login string) (models.User, error)
 	ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error)
+	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash []byte) error
 
 	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
 	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
+	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
 }

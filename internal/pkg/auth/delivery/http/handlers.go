@@ -104,7 +104,28 @@ func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequ
 }
 
 func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequestObject) (api.ChangePasswordResponseObject, error) {
-	return nil, errors.New("not implemented")
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.ChangePassword401Response{}, nil
+	}
+
+	tokens, err := h.uc.ChangePassword(ctx, userID, req.Body.OldPassword, req.Body.NewPassword)
+	if errors.Is(err, models.ErrValidation) {
+		return api.ChangePassword400Response{}, nil
+	}
+	if errors.Is(err, models.ErrWrongPassword) {
+		return api.ChangePassword403Response{}, nil
+	}
+	if errors.Is(err, models.ErrUserNotFound) {
+		return api.ChangePassword401Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	setAuthCookies(ctx, tokens)
+
+	return api.ChangePassword204Response{}, nil
 }
 
 func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestObject) (api.UpdateAvatarResponseObject, error) {

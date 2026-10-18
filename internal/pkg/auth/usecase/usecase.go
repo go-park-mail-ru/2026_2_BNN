@@ -131,6 +131,36 @@ func (u *Usecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, e
 	return u.repo.ReadUserByID(ctx, userID)
 }
 
+func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error) {
+	if err := validatePassword(newPassword); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if !verifyPassword(oldPassword, user.PasswordHash) {
+		return models.AuthTokens{}, models.ErrWrongPassword
+	}
+
+	passwordHash, err := hashPassword(newPassword)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.UpdatePassword(ctx, userID, passwordHash); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	return u.createTokens(ctx, userID)
+}
+
 func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
 	now := time.Now().UTC()
 	accessExpiresAt := now.Add(accessTokenTTL)
@@ -167,6 +197,10 @@ func validateCredentials(login, password string) error {
 		return fmt.Errorf("%w: invalid login length", models.ErrValidation)
 	}
 
+	return validatePassword(password)
+}
+
+func validatePassword(password string) error {
 	passwordLength := utf8.RuneCountInString(password)
 	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
 		return fmt.Errorf("%w: invalid password length", models.ErrValidation)

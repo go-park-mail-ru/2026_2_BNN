@@ -6,9 +6,10 @@ import (
 	"errors"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/api"
+
 	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
+	"bnn/internal/pkg/notes/delivery/http/api"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
@@ -27,7 +28,7 @@ func NewHandler(uc notes.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// --- ListNotes ---
+// ListNotes
 
 func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject) (api.ListNotesResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -64,7 +65,7 @@ func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject)
 	return api.ListNotes200JSONResponse(apiNotes), nil
 }
 
-// --- GetNote ---
+//  GetNote
 
 func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (api.GetNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -85,7 +86,7 @@ func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (ap
 	return api.GetNote200JSONResponse(toAPINote(note)), nil
 }
 
-// --- CreateNote ---
+// CreateNote
 
 func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObject) (api.CreateNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -109,7 +110,7 @@ func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObjec
 	return api.CreateNote201JSONResponse(toAPINote(note)), nil
 }
 
-// --- UpdateNote ---
+// UpdateNote
 
 func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObject) (api.UpdateNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -133,7 +134,7 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 	return api.UpdateNote200JSONResponse(toAPINote(note)), nil
 }
 
-// --- DeleteNote ---
+// DeleteNote
 
 func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -154,7 +155,7 @@ func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObjec
 	return api.DeleteNote204Response{}, nil
 }
 
-// --- конвертеры ---
+// конвертеры
 
 func toAPINote(n models.Note) api.Note {
 	var blocks *[]api.Block

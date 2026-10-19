@@ -161,6 +161,10 @@ func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestO
 		return api.UpdateAvatar400Response{}, nil
 	}
 
+	if len(data) > 5<<20 {
+		return api.UpdateAvatar413Response{}, nil // <-- Просто пустой статус 413
+	}
+
 	user, err := h.uc.UpdateAvatar(ctx, userID, data)
 	if errors.Is(err, models.ErrValidation) {
 		return api.UpdateAvatar400Response{}, nil

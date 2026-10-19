@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -98,7 +97,7 @@ func main() {
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
-	apiRouter.Use(middleware.MaxBytesMiddleware(10 << 20))
+	apiRouter.Use(middleware.MaxBytesMiddleware(20 << 20))
 
 	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
@@ -116,16 +115,15 @@ func main() {
 	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		spec, err := authapi.GetSwagger()
+		data, err := os.ReadFile("docs/openapi.yaml")
 		if err != nil {
-			httpjson.ResponseError(w, r, err)
+			slog.Error("Failed to read spec", "error", err)
+			http.Error(w, "Spec not found", http.StatusNotFound)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(spec); err != nil {
-			slog.Error("Failed to write spec", "error", err)
-		}
+		w.Write(data)
 	}).Methods(http.MethodGet)
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(

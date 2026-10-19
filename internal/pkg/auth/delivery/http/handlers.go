@@ -3,6 +3,8 @@ package delivery
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
@@ -13,6 +15,8 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const maxAvatarSize = 5 << 20
+
 type Handler struct {
 	uc auth.Usecase
 }
@@ -20,8 +24,6 @@ type Handler struct {
 func NewHandler(uc auth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
-
-// SignUp
 
 func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.SignUpResponseObject, error) {
 	user, tokens, err := h.uc.SignUp(ctx, req.Body.Login, req.Body.Password)
@@ -40,8 +42,6 @@ func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.
 	return toSignUpResponse(user), nil
 }
 
-// SignIn
-
 func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.SignInResponseObject, error) {
 	user, tokens, err := h.uc.SignIn(ctx, req.Body.Login, req.Body.Password)
 	if errors.Is(err, models.ErrInvalidCredentials) {
@@ -58,8 +58,6 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 
 	return toSignInResponse(user), nil
 }
-
-// Refresh
 
 func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (api.RefreshResponseObject, error) {
 	cookie, err := cookies.Get(ctx, refreshCookieName)
@@ -80,8 +78,6 @@ func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (ap
 	return api.Refresh200Response{}, nil
 }
 
-// Logout
-
 func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.LogoutResponseObject, error) {
 	if cookie, err := cookies.Get(ctx, refreshCookieName); err == nil {
 		if err := h.uc.Logout(ctx, cookie); err != nil {
@@ -93,8 +89,6 @@ func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.
 
 	return api.Logout200Response{}, nil
 }
-
-// GetCurrentUser
 
 func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequestObject) (api.GetCurrentUserResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -113,22 +107,84 @@ func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequ
 	return toGetCurrentUserResponse(user), nil
 }
 
-// UpdateAvatar (заглушка)
+func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequestObject) (api.ChangePasswordResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.ChangePassword401Response{}, nil
+	}
+
+	tokens, err := h.uc.ChangePassword(ctx, userID, req.Body.OldPassword, req.Body.NewPassword)
+	if errors.Is(err, models.ErrValidation) {
+		return api.ChangePassword400Response{}, nil
+	}
+	if errors.Is(err, models.ErrWrongPassword) {
+		return api.ChangePassword403Response{}, nil
+	}
+	if errors.Is(err, models.ErrUserNotFound) {
+		return api.ChangePassword401Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	setAuthCookies(ctx, tokens)
+
+	return api.ChangePassword204Response{}, nil
+}
 
 func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestObject) (api.UpdateAvatarResponseObject, error) {
-	return api.UpdateAvatar400Response{}, nil
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.UpdateAvatar401Response{}, nil
+	}
+
+	if req.Body == nil {
+		return api.UpdateAvatar400Response{}, nil
+	}
+
+	part, err := req.Body.NextPart()
+	if err != nil {
+		return api.UpdateAvatar400Response{}, nil
+	}
+	defer part.Close()
+
+	if part.FormName() != "avatar" {
+		return api.UpdateAvatar400Response{}, nil
+	}
+
+	data, err := io.ReadAll(part)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return api.UpdateAvatar413Response{}, nil
+		}
+		return api.UpdateAvatar400Response{}, nil
+	}
+
+	user, err := h.uc.UpdateAvatar(ctx, userID, data)
+	if errors.Is(err, models.ErrValidation) {
+		return api.UpdateAvatar400Response{}, nil
+	}
+	if errors.Is(err, models.ErrUnsupportedMediaType) {
+		return api.UpdateAvatar415Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return toUpdateAvatarResponse(user), nil
+}
+
+func toUpdateAvatarResponse(u models.User) api.UpdateAvatar200JSONResponse {
+	return api.UpdateAvatar200JSONResponse(toAPIUser(u))
 }
 
 func toSignUpResponse(u models.User) api.SignUp201JSONResponse {
-	return api.SignUp201JSONResponse{
-		Body: toAPIUser(u),
-	}
+	return api.SignUp201JSONResponse(toAPIUser(u))
 }
 
 func toSignInResponse(u models.User) api.SignIn200JSONResponse {
-	return api.SignIn200JSONResponse{
-		Body: toAPIUser(u),
-	}
+	return api.SignIn200JSONResponse(toAPIUser(u))
 }
 
 func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {

@@ -12,6 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
+	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
+	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
+	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
+	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
+
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
@@ -23,6 +29,7 @@ import (
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
 	notesUsecase "bnn/internal/pkg/notes/usecase"
+	"bnn/internal/pkg/s3" // Наш пакет S3-обёртки
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,7 +60,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	s3, err := minio.New(mustEnv("S3_ENDPOINT"), &minio.Options{
+	minioClient, err := minio.New(mustEnv("S3_ENDPOINT"), &minio.Options{
 		Creds: credentials.NewStaticV4(mustEnv("S3_ACCESS_KEY"), mustEnv("S3_SECRET_KEY"), ""),
 	})
 	if err != nil {
@@ -61,16 +68,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := createBuckets(ctx, s3); err != nil {
+	if err := createBuckets(ctx, minioClient); err != nil {
 		slog.Error("Failed to create S3 buckets", "error", err)
 		os.Exit(1)
 	}
 
+	s3Client := s3.NewClient(minioClient, "/static")
+
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), s3Client, mustEnv("JWT_SECRET")),
 	)
+
 	notesHandler := notesDelivery.NewHandler(
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
+	)
+
+	attachmentsHandler := attachmentsDelivery.NewHandler(
+		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsFiles.NewRepo(minioClient, "attachments")),
 	)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
@@ -84,6 +98,7 @@ func main() {
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
+	apiRouter.Use(middleware.MaxBytesMiddleware(10 << 20))
 
 	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
@@ -91,6 +106,11 @@ func main() {
 	}), apiRouter)
 
 	notesapi.HandlerFromMux(notesapi.NewStrictHandlerWithOptions(notesHandler, nil, notesapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
+
+	attachmentsapi.HandlerFromMux(attachmentsapi.NewStrictHandlerWithOptions(attachmentsHandler, nil, attachmentsapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
@@ -154,9 +174,9 @@ func mustEnv(key string) string {
 	return value
 }
 
-func createBuckets(ctx context.Context, s3 *minio.Client) error {
+func createBuckets(ctx context.Context, client *minio.Client) error {
 	for _, bucket := range buckets {
-		exists, err := s3.BucketExists(ctx, bucket)
+		exists, err := client.BucketExists(ctx, bucket)
 		if err != nil {
 			return fmt.Errorf("check bucket %s: %w", bucket, err)
 		}
@@ -165,7 +185,7 @@ func createBuckets(ctx context.Context, s3 *minio.Client) error {
 			continue
 		}
 
-		if err := s3.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 			return fmt.Errorf("create bucket %s: %w", bucket, err)
 		}
 	}

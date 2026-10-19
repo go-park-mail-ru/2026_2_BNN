@@ -6,18 +6,12 @@ import (
 	"errors"
 
 	"bnn/internal/models"
-
 	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
 	"bnn/internal/pkg/notes/delivery/http/api"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
-)
-
-const (
-	defaultLimit = 10
-	maxLimit     = 100
 )
 
 type Handler struct {
@@ -28,18 +22,16 @@ func NewHandler(uc notes.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// ListNotes
-
 func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject) (api.ListNotesResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
 		return api.ListNotes401Response{}, nil
 	}
 
-	limit := int64(defaultLimit)
+	limit := int64(10)
 	if req.Params.Limit != nil {
 		limit = int64(*req.Params.Limit)
-		if limit < 1 || limit > maxLimit {
+		if limit < 1 || limit > 100 {
 			return api.ListNotes400Response{}, nil
 		}
 	}
@@ -61,11 +53,8 @@ func (h *Handler) ListNotes(ctx context.Context, req api.ListNotesRequestObject)
 	for _, n := range notesList {
 		apiNotes = append(apiNotes, toAPINote(n))
 	}
-
 	return api.ListNotes200JSONResponse(apiNotes), nil
 }
-
-//  GetNote
 
 func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (api.GetNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -73,20 +62,15 @@ func (h *Handler) GetNote(ctx context.Context, req api.GetNoteRequestObject) (ap
 		return api.GetNote401Response{}, nil
 	}
 
-	noteID := uuid.UUID(req.Id)
-
-	note, err := h.uc.GetNote(ctx, userID, noteID)
+	note, err := h.uc.GetNote(ctx, userID, uuid.UUID(req.Id))
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.GetNote404Response{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	return api.GetNote200JSONResponse(toAPINote(note)), nil
 }
-
-// CreateNote
 
 func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObject) (api.CreateNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -94,23 +78,28 @@ func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObjec
 		return api.CreateNote401Response{}, nil
 	}
 
-	var blocks []string
-	if req.Body.Blocks != nil {
-		blocks = *req.Body.Blocks
+	var parentNoteID *uuid.UUID
+	if req.Body.ParentNoteId != nil {
+		id := uuid.UUID(*req.Body.ParentNoteId)
+		parentNoteID = &id
 	}
 
-	note, err := h.uc.CreateNote(ctx, userID, req.Body.Title, blocks)
-	if errors.Is(err, models.ErrValidation) {
-		return api.CreateNote400Response{}, nil
+	title := ""
+	if req.Body.Title != nil {
+		title = *req.Body.Title
 	}
+
+	note, err := h.uc.CreateNote(ctx, userID, notes.CreateNoteRequest{
+		Title:        title,
+		ParentNoteID: parentNoteID,
+		Header:       req.Body.Header,
+		Icon:         req.Body.Icon,
+	})
 	if err != nil {
 		return nil, err
 	}
-
 	return api.CreateNote201JSONResponse(toAPINote(note)), nil
 }
-
-// UpdateNote
 
 func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObject) (api.UpdateNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -118,23 +107,28 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 		return api.UpdateNote401Response{}, nil
 	}
 
-	noteID := uuid.UUID(req.Id)
+	blocks := make([]notes.BlockInput, 0, len(req.Body.Blocks))
+	for _, b := range req.Body.Blocks {
+		var id *uuid.UUID
+		if b.Id != nil {
+			uid := uuid.UUID(*b.Id)
+			id = &uid
+		}
+		contentBytes, _ := json.Marshal(b.Content)
+		blocks = append(blocks, notes.BlockInput{ID: id, Content: contentBytes})
+	}
 
-	note, err := h.uc.UpdateNote(ctx, userID, noteID, req.Body.Title, req.Body.Blocks)
-	if errors.Is(err, models.ErrNoteNotFound) {
-		return api.UpdateNote404Response{}, nil
-	}
-	if errors.Is(err, models.ErrValidation) {
-		return api.UpdateNote400Response{}, nil
-	}
+	note, err := h.uc.UpdateNote(ctx, userID, uuid.UUID(req.Id), notes.UpdateNoteRequest{
+		Title:  req.Body.Title,
+		Header: req.Body.Header,
+		Icon:   req.Body.Icon,
+		Blocks: blocks,
+	})
 	if err != nil {
 		return nil, err
 	}
-
 	return api.UpdateNote200JSONResponse(toAPINote(note)), nil
 }
-
-// DeleteNote
 
 func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -142,20 +136,15 @@ func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObjec
 		return api.DeleteNote401Response{}, nil
 	}
 
-	noteID := uuid.UUID(req.Id)
-
-	err := h.uc.DeleteNote(ctx, userID, noteID)
+	err := h.uc.DeleteNote(ctx, userID, uuid.UUID(req.Id))
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.DeleteNote404Response{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	return api.DeleteNote204Response{}, nil
 }
-
-// конвертеры
 
 func toAPINote(n models.Note) api.Note {
 	var blocks *[]api.Block
@@ -177,7 +166,6 @@ func toAPINote(n models.Note) api.Note {
 	if n.Header != "" {
 		header = &n.Header
 	}
-
 	var icon *string
 	if n.Icon != "" {
 		icon = &n.Icon
@@ -199,7 +187,6 @@ func toAPINote(n models.Note) api.Note {
 func toAPIBlock(b models.Block) api.Block {
 	var content map[string]interface{}
 	_ = json.Unmarshal(b.Content, &content)
-
 	return api.Block{
 		Id:        openapi_types.UUID(b.ID),
 		Content:   content,

@@ -3,11 +3,11 @@ package delivery
 import (
 	"context"
 	"errors"
-	"log/slog"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/api"
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/auth/delivery/http/api"
+	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/ctxutil"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -21,7 +21,7 @@ func NewHandler(uc auth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// --- SignUp ---
+// SignUp
 
 func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.SignUpResponseObject, error) {
 	user, tokens, err := h.uc.SignUp(ctx, req.Body.Login, req.Body.Password)
@@ -40,7 +40,7 @@ func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.
 	return toSignUpResponse(user), nil
 }
 
-// --- SignIn ---
+// SignIn
 
 func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.SignInResponseObject, error) {
 	user, tokens, err := h.uc.SignIn(ctx, req.Body.Login, req.Body.Password)
@@ -54,17 +54,15 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 		return nil, err
 	}
 
-	slog.Info("SignIn: setting cookies", "store_found", api.GetCookieStore(ctx) != nil)
-
 	setAuthCookies(ctx, tokens)
 
 	return toSignInResponse(user), nil
 }
 
-// --- Refresh ---
+// Refresh
 
 func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (api.RefreshResponseObject, error) {
-	cookie, err := api.GetCookieValue(ctx, refreshCookieName)
+	cookie, err := cookies.Get(ctx, refreshCookieName)
 	if err != nil {
 		return api.Refresh401Response{}, nil
 	}
@@ -82,10 +80,10 @@ func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (ap
 	return api.Refresh200Response{}, nil
 }
 
-// --- Logout ---
+// Logout
 
 func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.LogoutResponseObject, error) {
-	if cookie, err := api.GetCookieValue(ctx, refreshCookieName); err == nil {
+	if cookie, err := cookies.Get(ctx, refreshCookieName); err == nil {
 		if err := h.uc.Logout(ctx, cookie); err != nil {
 			return nil, err
 		}
@@ -96,7 +94,7 @@ func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.
 	return api.Logout200Response{}, nil
 }
 
-// --- GetCurrentUser ---
+// GetCurrentUser
 
 func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequestObject) (api.GetCurrentUserResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
@@ -115,7 +113,7 @@ func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequ
 	return toGetCurrentUserResponse(user), nil
 }
 
-// --- UpdateAvatar (заглушка, реализуем позже) ---
+// UpdateAvatar (заглушка)
 
 func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestObject) (api.UpdateAvatarResponseObject, error) {
 	return api.UpdateAvatar400Response{}, nil

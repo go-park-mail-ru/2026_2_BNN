@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/api"
+	"bnn/internal/pkg/cookies"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 )
 
 func setAuthCookies(ctx context.Context, tokens models.AuthTokens) {
-	api.SetCookie(ctx, api.Cookie{
+	cookies.Set(ctx, &http.Cookie{
 		Name:     accessCookieName,
 		Value:    tokens.AccessToken,
 		Path:     "/",
@@ -24,7 +24,8 @@ func setAuthCookies(ctx context.Context, tokens models.AuthTokens) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	api.SetCookie(ctx, api.Cookie{
+
+	cookies.Set(ctx, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    tokens.RefreshToken,
 		Path:     refreshCookiePath,
@@ -36,7 +37,7 @@ func setAuthCookies(ctx context.Context, tokens models.AuthTokens) {
 }
 
 func clearAuthCookies(ctx context.Context) {
-	api.SetCookie(ctx, api.Cookie{
+	cookies.Set(ctx, &http.Cookie{
 		Name:     accessCookieName,
 		Path:     "/",
 		MaxAge:   -1,
@@ -44,7 +45,8 @@ func clearAuthCookies(ctx context.Context) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	api.SetCookie(ctx, api.Cookie{
+
+	cookies.Set(ctx, &http.Cookie{
 		Name:     refreshCookieName,
 		Path:     refreshCookiePath,
 		MaxAge:   -1,

@@ -12,7 +12,6 @@ require (
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.12.1
-	github.com/swaggo/files/v2 v2.0.2
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.57.0
@@ -48,6 +47,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.3 // indirect
 	github.com/speakeasy-api/openapi v1.24.0 // indirect
+	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/swaggo/swag v1.8.1 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
@@ -63,3 +63,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen

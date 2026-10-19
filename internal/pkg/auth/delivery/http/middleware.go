@@ -1,29 +1,37 @@
 package delivery
 
 import (
-	"log/slog"
 	"net/http"
 
 	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/httpjson"
 )
+
+var publicPaths = map[string]bool{
+	"/api/auth/signup":  true,
+	"/api/auth/signin":  true,
+	"/api/auth/refresh": true,
+	"/api/auth/logout":  true,
+}
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if publicPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		cookie, err := r.Cookie(accessCookieName)
 		if err != nil {
-			slog.Warn("Access cookie missing")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		userID, err := h.uc.Authenticate(r.Context(), cookie.Value)
 		if err != nil {
-			httpjson.WriteError(w, err)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		ctx := ctxutil.WithUserID(r.Context(), userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(ctxutil.WithUserID(r.Context(), userID)))
 	})
 }

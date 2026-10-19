@@ -1,1 +1,1 @@
-DELETE FROM blocks WHERE note_id = $1;
+DELETE FROM blocks WHERE id = ANY($1);

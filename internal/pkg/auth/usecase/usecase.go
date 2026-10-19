@@ -28,7 +28,7 @@ const (
 
 type Usecase struct {
 	repo   auth.Repo
-	s3     auth.Repo
+	s3     auth.S3
 	secret []byte
 }
 
@@ -36,6 +36,14 @@ var allowedAvatarTypes = map[string]string{
 	"image/jpeg": ".jpg",
 	"image/png":  ".png",
 	"image/webp": ".webp",
+}
+
+func NewUsecase(repo auth.Repo, s3 auth.S3, secret string) *Usecase {
+	return &Usecase{
+		repo:   repo,
+		s3:     s3,
+		secret: []byte(secret),
+	}
 }
 
 func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte) (models.User, error) {
@@ -55,8 +63,8 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 	}
 
 	oldAvatar := user.Avatar
-
 	objectName := userID.String() + ext
+
 	newURL, err := u.s3.Upload(ctx, avatarBucket, objectName, data, contentType)
 	if err != nil {
 		return models.User{}, fmt.Errorf("upload avatar: %w", err)
@@ -66,7 +74,7 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 	user.UpdatedAt = time.Now().UTC()
 
 	if err := u.repo.UpdateAvatar(ctx, user); err != nil {
-		_ = u.s3.Delete(ctx, avatarBucket, objectName)
+		_ = u.s3.Delete(ctx, avatarBucket, objectName) // откат
 		return models.User{}, fmt.Errorf("update avatar: %w", err)
 	}
 
@@ -87,14 +95,6 @@ func extractObjectName(url, bucket string) string {
 		return ""
 	}
 	return url[idx+len(marker):]
-}
-
-func NewUsecase(repo auth.Repo, secret string) *Usecase {
-	return &Usecase{
-		repo:   repo,
-		s3:     s3,
-		secret: []byte(secret),
-	}
 }
 
 func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.User, models.AuthTokens, error) {
@@ -193,6 +193,36 @@ func (u *Usecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, e
 	return u.repo.ReadUserByID(ctx, userID)
 }
 
+func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error) {
+	if err := validatePassword(newPassword); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if !verifyPassword(oldPassword, user.PasswordHash) {
+		return models.AuthTokens{}, models.ErrWrongPassword
+	}
+
+	passwordHash, err := hashPassword(newPassword)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.UpdatePassword(ctx, userID, passwordHash); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	return u.createTokens(ctx, userID)
+}
+
 func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
 	now := time.Now().UTC()
 	accessExpiresAt := now.Add(accessTokenTTL)
@@ -229,6 +259,10 @@ func validateCredentials(login, password string) error {
 		return fmt.Errorf("%w: invalid login length", models.ErrValidation)
 	}
 
+	return validatePassword(password)
+}
+
+func validatePassword(password string) error {
 	passwordLength := utf8.RuneCountInString(password)
 	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
 		return fmt.Errorf("%w: invalid password length", models.ErrValidation)

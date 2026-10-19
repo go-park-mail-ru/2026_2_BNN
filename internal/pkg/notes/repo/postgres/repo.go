@@ -31,14 +31,14 @@ var updateNoteQuery string
 //go:embed queries/delete_note.sql
 var deleteNoteQuery string
 
-//go:embed queries/delete_blocks.sql
-var deleteBlocksQuery string
-
 //go:embed queries/create_block.sql
 var createBlockQuery string
 
-//go:embed queries/update_user_avatar.sql
-var updateUserAvatarQuery string
+//go:embed queries/update_block.sql
+var updateBlockQuery string
+
+//go:embed queries/delete_blocks.sql
+var deleteBlocksQuery string
 
 type Repo struct {
 	db *pgxpool.Pool
@@ -48,200 +48,122 @@ func NewRepo(db *pgxpool.Pool) *Repo {
 	return &Repo{db: db}
 }
 
-// --- Read ---
-
 func (r *Repo) ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error) {
 	var note models.Note
-
 	err := r.db.QueryRow(ctx, readNoteQuery, id).Scan(
-		&note.ID,
-		&note.ParentNoteID,
-		&note.CreatedBy,
-		&note.Title,
-		&note.Header,
-		&note.Icon,
-		&note.CreatedAt,
-		&note.UpdatedAt,
+		&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title,
+		&note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return models.Note{}, models.ErrNoteNotFound
 	}
-	if err != nil {
-		return models.Note{}, fmt.Errorf("read note: %w", err)
-	}
-
-	return note, nil
+	return note, err
 }
 
 func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	rows, err := r.db.Query(ctx, readNotesQuery, userID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("read notes: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 
 	notes := make([]models.Note, 0)
-
 	for rows.Next() {
 		var note models.Note
-
-		err := rows.Scan(
-			&note.ID,
-			&note.ParentNoteID,
-			&note.CreatedBy,
-			&note.Title,
-			&note.Header,
-			&note.Icon,
-			&note.CreatedAt,
-			&note.UpdatedAt,
-		)
+		err := rows.Scan(&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title, &note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt)
 		if err != nil {
-			return nil, fmt.Errorf("scan note: %w", err)
+			return nil, err
 		}
-
 		notes = append(notes, note)
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read notes: %w", err)
-	}
-
-	return notes, nil
+	return notes, rows.Err()
 }
 
 func (r *Repo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.Block, error) {
 	rows, err := r.db.Query(ctx, readBlocksQuery, noteID)
 	if err != nil {
-		return nil, fmt.Errorf("read blocks: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 
 	blocks := make([]models.Block, 0)
-
 	for rows.Next() {
 		var block models.Block
-
-		err := rows.Scan(
-			&block.ID,
-			&block.Content,
-			&block.CreatedAt,
-			&block.UpdatedAt,
-		)
+		err := rows.Scan(&block.ID, &block.Content, &block.CreatedAt, &block.UpdatedAt)
 		if err != nil {
-			return nil, fmt.Errorf("scan block: %w", err)
+			return nil, err
 		}
-
 		blocks = append(blocks, block)
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read blocks: %w", err)
-	}
-
-	return blocks, nil
+	return blocks, rows.Err()
 }
 
-// --- Create ---
-
 func (r *Repo) CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
+	// Собираем ID блоков в массив для колонки block_ids
+	blockIDs := make([]uuid.UUID, len(blocks))
+	for i, b := range blocks {
+		blockIDs[i] = b.ID
+	}
+
+	_, err := r.db.Exec(ctx, createNoteQuery, note.ID, note.ParentNoteID, note.CreatedBy, note.Title, note.Header, note.Icon, blockIDs, note.CreatedAt, note.UpdatedAt)
+	return err
+}
+
+func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	_, err = tx.Exec(ctx, createNoteQuery,
-		note.ID,
-		note.ParentNoteID,
-		note.CreatedBy,
-		note.Title,
-		note.Header,
-		note.Icon,
-		note.CreatedAt,
-		note.UpdatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("create note: %w", err)
-	}
+	// 1. Обновляем блоки (вставляем новые или обновляем существующие)
+	blockIDs := make([]uuid.UUID, len(blocks))
+	for i, b := range blocks {
+		blockIDs[i] = b.ID
 
-	for _, b := range blocks {
-		_, err = tx.Exec(ctx, createBlockQuery,
-			b.ID,
-			note.ID,
-			b.Content,
-			b.CreatedAt,
-			b.UpdatedAt,
-		)
+		// Используем ON CONFLICT для upsert'а (вставить или обновить)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO blocks (id, note_id, content, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
+		`, b.ID, note.ID, b.Content, b.CreatedAt, b.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("create block: %w", err)
+			return fmt.Errorf("upsert block: %w", err)
 		}
 	}
 
-	return tx.Commit(ctx)
-}
-
-// --- Update ---
-
-func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	_, err = tx.Exec(ctx, updateNoteQuery,
-		note.Title,
-		note.Header,
-		note.Icon,
-		note.UpdatedAt,
-		note.ID,
-	)
+	// 2. Обновляем саму заметку (с новым порядком в block_ids)
+	_, err = tx.Exec(ctx, updateNoteQuery, note.Title, note.Header, note.Icon, blockIDs, note.UpdatedAt, note.ID)
 	if err != nil {
 		return fmt.Errorf("update note: %w", err)
 	}
 
-	// Если blocks == nil — блоки не трогаем.
-	// Если blocks != nil — полностью заменяем.
-	if blocks != nil {
-		_, err = tx.Exec(ctx, deleteBlocksQuery, note.ID)
+	// 3. Удаляем блоки, которых больше нет в массиве
+	if len(deletedBlockIDs) > 0 {
+		_, err = tx.Exec(ctx, deleteBlocksQuery, deletedBlockIDs)
 		if err != nil {
-			return fmt.Errorf("delete old blocks: %w", err)
-		}
-
-		for _, b := range blocks {
-			_, err = tx.Exec(ctx, createBlockQuery,
-				b.ID,
-				note.ID,
-				b.Content,
-				b.CreatedAt,
-				b.UpdatedAt,
-			)
-			if err != nil {
-				return fmt.Errorf("create block: %w", err)
-			}
+			return fmt.Errorf("delete removed blocks: %w", err)
 		}
 	}
 
 	return tx.Commit(ctx)
 }
 
-// --- Delete ---
-
 func (r *Repo) DeleteNote(ctx context.Context, noteID uuid.UUID) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	_, err = tx.Exec(ctx, deleteBlocksQuery, noteID)
+	_, err = tx.Exec(ctx, deleteBlocksQuery, "DELETE FROM blocks WHERE note_id = $1", noteID) // Костыль, если удаляем всё
 	if err != nil {
-		return fmt.Errorf("delete blocks: %w", err)
+		return err
 	}
 
 	_, err = tx.Exec(ctx, deleteNoteQuery, noteID)
 	if err != nil {
-		return fmt.Errorf("delete note: %w", err)
+		return err
 	}
 
 	return tx.Commit(ctx)

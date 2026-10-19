@@ -15,11 +15,22 @@ type Repo struct {
 	bucket string
 }
 
-func NewRepo(client *minio.Client, bucket string) *Repo {
+func NewRepo(ctx context.Context, client *minio.Client, bucket string) (*Repo, error) {
+	exists, err := client.BucketExists(ctx, bucket)
+	if err != nil {
+		return nil, fmt.Errorf("check bucket %s: %w", bucket, err)
+	}
+
+	if !exists {
+		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+			return nil, fmt.Errorf("create bucket %s: %w", bucket, err)
+		}
+	}
+
 	return &Repo{
 		client: client,
 		bucket: bucket,
-	}
+	}, nil
 }
 
 func (r *Repo) PutFile(ctx context.Context, key string, data []byte, contentType string) error {

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments"
@@ -18,14 +19,14 @@ var allowedTypes = map[string]string{
 }
 
 type Usecase struct {
-	repo  attachments.Repo
-	files attachments.FileRepo
+	repo    attachments.Repo
+	storage attachments.FileRepo
 }
 
-func NewUsecase(repo attachments.Repo, files attachments.FileRepo) *Usecase {
+func NewUsecase(repo attachments.Repo, storage attachments.FileRepo) *Usecase {
 	return &Usecase{
-		repo:  repo,
-		files: files,
+		repo:    repo,
+		storage: storage,
 	}
 }
 
@@ -44,15 +45,15 @@ func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUI
 	attachment := models.Attachment{
 		ID:      id,
 		BlockID: blockID,
-		Path:    id.String() + ext,
+		Path:    fmt.Sprintf("%s%s", id, ext),
 	}
 
-	if err := u.files.PutFile(ctx, attachment.Path, data, contentType); err != nil {
+	if err := u.storage.PutFile(ctx, attachment.Path, data, contentType); err != nil {
 		return models.Attachment{}, err
 	}
 
 	if err := u.repo.CreateAttachment(ctx, attachment); err != nil {
-		_ = u.files.DeleteFile(ctx, attachment.Path)
+		_ = u.storage.DeleteFile(ctx, attachment.Path)
 		return models.Attachment{}, err
 	}
 
@@ -65,7 +66,7 @@ func (u *Usecase) GetAttachment(ctx context.Context, userID, attachmentID uuid.U
 		return models.File{}, err
 	}
 
-	return u.files.GetFile(ctx, attachment.Path)
+	return u.storage.GetFile(ctx, attachment.Path)
 }
 
 func (u *Usecase) DeleteAttachment(ctx context.Context, userID, attachmentID uuid.UUID) error {
@@ -78,7 +79,7 @@ func (u *Usecase) DeleteAttachment(ctx context.Context, userID, attachmentID uui
 		return err
 	}
 
-	return u.files.DeleteFile(ctx, attachment.Path)
+	return u.storage.DeleteFile(ctx, attachment.Path)
 }
 
 func (u *Usecase) readOwnAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.Attachment, error) {

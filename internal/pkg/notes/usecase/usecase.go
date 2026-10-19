@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"bnn/internal/models"
@@ -39,6 +40,19 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
+	if req.ParentNoteID != nil {
+		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
+		if err != nil {
+			if errors.Is(err, models.ErrNoteNotFound) {
+				return models.Note{}, models.ErrNoteNotFound // Вернет 404
+			}
+			return models.Note{}, err
+		}
+		if parentNote.CreatedBy != userID {
+			return models.Note{}, models.ErrNoteNotFound
+		}
+	}
+
 	now := time.Now().UTC()
 	note := models.Note{
 		ID:           uuid.NewV4(),

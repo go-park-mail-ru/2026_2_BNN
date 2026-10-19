@@ -95,9 +95,16 @@ func (h *Handler) CreateNote(ctx context.Context, req api.CreateNoteRequestObjec
 		Header:       req.Body.Header,
 		Icon:         req.Body.Icon,
 	})
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return api.CreateNote404Response{}, nil
+	}
+	if errors.Is(err, models.ErrValidation) {
+		return api.CreateNote400Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return api.CreateNote201JSONResponse(toAPINote(note)), nil
 }
 

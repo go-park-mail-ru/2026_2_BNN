@@ -215,15 +215,15 @@ func (mr *MockRepoMockRecorder) ReadNotes(ctx, userID, limit, offset any) *gomoc
 }
 
 // UpdateNote mocks base method.
-func (m *MockRepo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
+func (m *MockRepo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateNote", ctx, note, blocks)
+	ret := m.ctrl.Call(m, "UpdateNote", ctx, note, blocks, deletedBlockIDs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateNote indicates an expected call of UpdateNote.
-func (mr *MockRepoMockRecorder) UpdateNote(ctx, note, blocks any) *gomock.Call {
+func (mr *MockRepoMockRecorder) UpdateNote(ctx, note, blocks, deletedBlockIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNote", reflect.TypeOf((*MockRepo)(nil).UpdateNote), ctx, note, blocks)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNote", reflect.TypeOf((*MockRepo)(nil).UpdateNote), ctx, note, blocks, deletedBlockIDs)
 }

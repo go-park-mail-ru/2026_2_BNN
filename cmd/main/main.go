@@ -2,31 +2,45 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
+	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
+	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
+	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
+	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
+	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
+	authFiles "bnn/internal/pkg/auth/repo/s3"
 	authUsecase "bnn/internal/pkg/auth/usecase"
+	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/middleware"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
+	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
 	notesUsecase "bnn/internal/pkg/notes/usecase"
+	"bnn/internal/pkg/s3"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-
-	authapi "bnn/internal/pkg/auth/delivery/http/api"
-	"encoding/json"
 )
 
-var buckets = []string{"avatars", "attachments"}
+const (
+	shutdownTimeout    = 5 * time.Second
+	MaxRequestSize20MB = 20 << 20
+)
 
 func main() {
 	_ = godotenv.Load()
@@ -45,24 +59,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	s3, err := minio.New(mustEnv("S3_ENDPOINT"), &minio.Options{
-		Creds: credentials.NewStaticV4(mustEnv("S3_ACCESS_KEY"), mustEnv("S3_SECRET_KEY"), ""),
+	minioClient, err := s3.Connect(s3.Config{
+		Endpoint:  mustEnv("S3_ENDPOINT"),
+		AccessKey: mustEnv("S3_ACCESS_KEY"),
+		SecretKey: mustEnv("S3_SECRET_KEY"),
 	})
 	if err != nil {
 		slog.Error("Failed to create S3 client", "error", err)
 		os.Exit(1)
 	}
 
-	if err := createBuckets(ctx, s3); err != nil {
-		slog.Error("Failed to create S3 buckets", "error", err)
+	avatarStorage, err := authFiles.NewRepo(ctx, minioClient, mustEnv("S3_AVATARS_BUCKET"))
+	if err != nil {
+		slog.Error("Failed to create avatars storage", "error", err)
 		os.Exit(1)
 	}
 
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, mustEnv("JWT_SECRET")),
 	)
+
 	notesHandler := notesDelivery.NewHandler(
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
+	)
+
+	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, mustEnv("S3_ATTACHMENTS_BUCKET"))
+	if err != nil {
+		slog.Error("Failed to create attachments storage", "error", err)
+		os.Exit(1)
+	}
+
+	attachmentsHandler := attachmentsDelivery.NewHandler(
+		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage),
 	)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
@@ -72,59 +100,74 @@ func main() {
 	}
 
 	router := mux.NewRouter()
+	router.Use(cookies.Middleware)
 
-	api := router.PathPrefix("/api").Subrouter()
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.Use(authHandler.Middleware)
+	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize20MB))
 
-	authRouter := api.PathPrefix("/auth").Subrouter()
-	{
-		authRouter.HandleFunc("/signup", authHandler.SignUp).Methods(http.MethodPost)
-		authRouter.HandleFunc("/signin", authHandler.SignIn).Methods(http.MethodPost)
-		authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
-		authRouter.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
-	}
+	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
 
-	authProtectedRouter := api.PathPrefix("/auth").Subrouter()
-	authProtectedRouter.Use(authHandler.Middleware)
-	{
-		authProtectedRouter.HandleFunc("/me", authHandler.GetCurrentUser).Methods(http.MethodGet)
-	}
+	notesapi.HandlerFromMux(notesapi.NewStrictHandlerWithOptions(notesHandler, nil, notesapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
 
-	notesRouter := api.PathPrefix("/notes").Subrouter()
-	notesRouter.Use(authHandler.Middleware)
-	{
-		notesRouter.HandleFunc("/getall", notesHandler.ListNotes).Methods(http.MethodGet)
-		notesRouter.HandleFunc("/{id}", notesHandler.GetNote).Methods(http.MethodGet)
-	}
+	attachmentsapi.HandlerFromMux(attachmentsapi.NewStrictHandlerWithOptions(attachmentsHandler, nil, attachmentsapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		swagger, err := authapi.GetSwagger()
+		spec, err := authapi.GetSwagger()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpjson.ResponseError(w, r, err)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(swagger); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(spec); err != nil {
+			slog.Error("Failed to write spec", "error", err)
 		}
 	}).Methods(http.MethodGet)
 
-	router.PathPrefix("/swagger/").Handler(
-		httpSwagger.Handler(
-			httpSwagger.URL("/swagger/spec.json"), // URL, где лежит спека
-			httpSwagger.DeepLinking(true),
-			httpSwagger.DocExpansion("none"),
-		),
-	).Methods(http.MethodGet)
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("/swagger/spec.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+	)).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":5458",
 		Handler: corsMiddleware(router),
 	}
 
-	slog.Info("Starting server", "address", "http://localhost:5458")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("Server failed", "error", err)
+	go func() {
+		slog.Info("Starting server", "address", "http://localhost:5458")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("Server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-signalCh
+	slog.Info("Received signal, shutting down", "signal", sig)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Server shutdown failed", "error", err)
+		return
 	}
+
+	slog.Info("Server stopped")
 }
 
 func mustEnv(key string) string {
@@ -135,23 +178,4 @@ func mustEnv(key string) string {
 	}
 
 	return value
-}
-
-func createBuckets(ctx context.Context, s3 *minio.Client) error {
-	for _, bucket := range buckets {
-		exists, err := s3.BucketExists(ctx, bucket)
-		if err != nil {
-			return fmt.Errorf("check bucket %s: %w", bucket, err)
-		}
-
-		if exists {
-			continue
-		}
-
-		if err := s3.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
-			return fmt.Errorf("create bucket %s: %w", bucket, err)
-		}
-	}
-
-	return nil
 }

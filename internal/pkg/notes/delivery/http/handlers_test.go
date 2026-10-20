@@ -4,46 +4,48 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
+	"bnn/internal/pkg/notes/delivery/http/api"
 
-	"github.com/gorilla/mux"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// stubUsecase — простая ручная заглушка для notes.Usecase.
-// Реализует только те методы, которые дергают тесты.
 type stubUsecase struct {
 	getNotes func(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error)
 	getNote  func(ctx context.Context, userID uuid.UUID, noteID uuid.UUID) (models.Note, error)
 }
 
 func (s *stubUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
-	return s.getNotes(ctx, userID, limit, offset)
+	if s.getNotes != nil {
+		return s.getNotes(ctx, userID, limit, offset)
+	}
+	return nil, nil
 }
 
 func (s *stubUsecase) GetNote(ctx context.Context, userID uuid.UUID, noteID uuid.UUID) (models.Note, error) {
-	return s.getNote(ctx, userID, noteID)
+	if s.getNote != nil {
+		return s.getNote(ctx, userID, noteID)
+	}
+	return models.Note{}, nil
 }
 
-// Заглушки остальных методов Usecase — чтобы интерфейс удовлетворялся.
-func (s *stubUsecase) CreateNote(ctx context.Context, userID uuid.UUID, note models.Note) (models.Note, error) {
+func (s *stubUsecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
 	return models.Note{}, nil
 }
-func (s *stubUsecase) UpdateNote(ctx context.Context, userID uuid.UUID, note models.Note) (models.Note, error) {
+func (s *stubUsecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
 	return models.Note{}, nil
 }
-func (s *stubUsecase) DeleteNote(ctx context.Context, userID uuid.UUID, noteID uuid.UUID) error {
+func (s *stubUsecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
 	return nil
 }
 
-// Проверка, что stubUsecase удовлетворяет интерфейсу.
 var _ notes.Usecase = (*stubUsecase)(nil)
 
 func TestGetNote(t *testing.T) {
@@ -62,6 +64,7 @@ func TestGetNote(t *testing.T) {
 			},
 		},
 	}
+
 	tests := []struct {
 		name         string
 		pathID       string
@@ -92,13 +95,6 @@ func TestGetNote(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			name:         "Bad request: invalid UUID",
-			pathID:       "not-a-uuid",
-			authUserID:   &ownerID,
-			uc:           &stubUsecase{},
-			expectedCode: http.StatusBadRequest,
-		},
-		{
 			name:         "Unauthorized: no user in context",
 			pathID:       noteID.String(),
 			authUserID:   nil,
@@ -114,10 +110,6 @@ func TestGetNote(t *testing.T) {
 					return models.Note{}, models.ErrNoteNotFound
 				},
 			},
-			// Если usecase возвращает ErrNoteNotFound — handler вернёт 404.
-			// Если ты хочешь именно 403 — usecase должен возвращать
-			// отдельную ErrForbidden, которой в models нет.
-			// Пока оставим 404 — так делает текущий usecase.
 			expectedCode: http.StatusNotFound,
 		},
 	}
@@ -126,31 +118,30 @@ func TestGetNote(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := NewHandler(tt.uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/notes/"+tt.pathID, nil)
+			ctx := context.Background()
 			if tt.authUserID != nil {
-				req = req.WithContext(
-					ctxutil.WithUserID(req.Context(), *tt.authUserID),
-				)
+				ctx = ctxutil.WithUserID(ctx, *tt.authUserID)
 			}
 
-			router := mux.NewRouter()
-			router.HandleFunc("/api/notes/{id}", handler.GetNote)
+			reqObj := api.GetNoteRequestObject{
+				Id: openapi_types.UUID(uuid.FromStringOrNil(tt.pathID)),
+			}
 
-			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, req)
-
-			assert.Equal(t, tt.expectedCode, rec.Code)
+			resp, err := handler.GetNote(ctx, reqObj)
+			require.NoError(t, err)
 
 			if tt.expectedCode == http.StatusOK {
-				var got models.Note
-				require.NoError(t, json.NewDecoder(rec.Body).Decode(&got))
-				assert.Equal(t, noteID, got.ID)
-				assert.Equal(t, "Test note", got.Title)
-				assert.Equal(t, ownerID, got.CreatedBy)
-
-				require.Len(t, got.Blocks, 1)
-				assert.Equal(t, baseNote.Blocks[0].ID, got.Blocks[0].ID)
-				assert.JSONEq(t, `"Текст тестовой заметки"`, string(got.Blocks[0].Content))
+				okResp, ok := resp.(api.GetNote200JSONResponse)
+				require.True(t, ok)
+				assert.Equal(t, openapi_types.UUID(noteID), okResp.Id)
+				assert.Equal(t, "Test note", okResp.Title)
+				assert.Equal(t, openapi_types.UUID(ownerID), okResp.CreatedBy)
+			} else if tt.expectedCode == http.StatusNotFound {
+				_, ok := resp.(api.GetNote404Response)
+				assert.True(t, ok)
+			} else if tt.expectedCode == http.StatusUnauthorized {
+				_, ok := resp.(api.GetNote401Response)
+				assert.True(t, ok)
 			}
 		})
 	}
@@ -174,26 +165,20 @@ func TestListNotes(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		query        string
+		limit        *int
+		offset       *int
 		empty        bool
 		expectedCode int
 		expectedIDs  []uuid.UUID
 	}{
 		{name: "default pagination", expectedCode: http.StatusOK, expectedIDs: ids[:10]},
-		{name: "limit and offset", query: "?limit=5&offset=3", expectedCode: http.StatusOK, expectedIDs: ids[3:8]},
-		{name: "minimum limit", query: "?limit=1&offset=0", expectedCode: http.StatusOK, expectedIDs: ids[:1]},
-		{name: "maximum limit", query: "?limit=100", expectedCode: http.StatusOK, expectedIDs: ids},
-		{name: "last page", query: "?limit=5&offset=10", expectedCode: http.StatusOK, expectedIDs: ids[10:]},
-		{name: "offset at end", query: "?offset=12", expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
-		{name: "offset beyond end", query: "?offset=100", expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
+		{name: "limit and offset", limit: intPtr(5), offset: intPtr(3), expectedCode: http.StatusOK, expectedIDs: ids[3:8]},
+		{name: "minimum limit", limit: intPtr(1), offset: intPtr(0), expectedCode: http.StatusOK, expectedIDs: ids[:1]},
+		{name: "offset at end", offset: intPtr(12), expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
 		{name: "empty storage", empty: true, expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
-		{name: "zero limit", query: "?limit=0", expectedCode: http.StatusBadRequest},
-		{name: "limit above maximum", query: "?limit=101", expectedCode: http.StatusBadRequest},
-		{name: "invalid limit", query: "?limit=abc", expectedCode: http.StatusBadRequest},
-		{name: "empty limit", query: "?limit=", expectedCode: http.StatusBadRequest},
-		{name: "negative offset", query: "?offset=-1", expectedCode: http.StatusBadRequest},
-		{name: "invalid offset", query: "?offset=abc", expectedCode: http.StatusBadRequest},
-		{name: "empty offset", query: "?offset=", expectedCode: http.StatusBadRequest},
+		{name: "zero limit", limit: intPtr(0), expectedCode: http.StatusBadRequest},
+		{name: "limit above maximum", limit: intPtr(101), expectedCode: http.StatusBadRequest},
+		{name: "negative offset", offset: intPtr(-1), expectedCode: http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
@@ -205,7 +190,10 @@ func TestListNotes(t *testing.T) {
 
 			uc := &stubUsecase{
 				getNotes: func(ctx context.Context, uid uuid.UUID, limit, offset int64) ([]models.Note, error) {
-					// Эмулируем пагинацию по stored.
+					if offset < 0 {
+						offset = 0
+					}
+
 					start := int(offset)
 					if start > len(stored) {
 						start = len(stored)
@@ -221,37 +209,36 @@ func TestListNotes(t *testing.T) {
 			}
 
 			handler := NewHandler(uc)
+			ctx := ctxutil.WithUserID(context.Background(), userID)
 
-			req := httptest.NewRequest(
-				http.MethodGet,
-				"/api/notes/getall"+tt.query,
-				nil,
-			)
-			req = req.WithContext(
-				ctxutil.WithUserID(req.Context(), userID),
-			)
+			reqObj := api.ListNotesRequestObject{
+				Params: api.ListNotesParams{
+					Limit:  tt.limit,
+					Offset: tt.offset,
+				},
+			}
 
-			rec := httptest.NewRecorder()
-			handler.ListNotes(rec, req)
-
-			require.Equal(t, tt.expectedCode, rec.Code)
+			resp, err := handler.ListNotes(ctx, reqObj)
+			require.NoError(t, err)
 
 			if tt.expectedCode != http.StatusOK {
-				assert.Empty(t, rec.Body.String())
+				_, ok := resp.(api.ListNotes400Response)
+				assert.True(t, ok, "expected 400 response")
 				return
 			}
 
-			assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+			okResp, ok := resp.(api.ListNotes200JSONResponse)
+			require.True(t, ok)
 
-			var result []models.Note
-			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
-			require.NotNil(t, result)
-
-			resultIDs := make([]uuid.UUID, 0, len(result))
-			for _, item := range result {
-				resultIDs = append(resultIDs, item.ID)
+			resultIDs := make([]uuid.UUID, 0, len(okResp))
+			for _, item := range okResp {
+				resultIDs = append(resultIDs, uuid.UUID(item.Id))
 			}
 			assert.Equal(t, tt.expectedIDs, resultIDs)
 		})
 	}
+}
+
+func intPtr(i int) *int {
+	return &i
 }

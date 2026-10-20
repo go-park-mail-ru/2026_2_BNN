@@ -99,7 +99,6 @@ func (r *Repo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.Block
 }
 
 func (r *Repo) CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
-	// Собираем ID блоков в массив для колонки block_ids
 	blockIDs := make([]uuid.UUID, len(blocks))
 	for i, b := range blocks {
 		blockIDs[i] = b.ID
@@ -116,12 +115,10 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// 1. Обновляем блоки (вставляем новые или обновляем существующие)
 	blockIDs := make([]uuid.UUID, len(blocks))
 	for i, b := range blocks {
 		blockIDs[i] = b.ID
 
-		// Используем ON CONFLICT для upsert'а (вставить или обновить)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO blocks (id, note_id, content, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5)
@@ -132,13 +129,11 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 		}
 	}
 
-	// 2. Обновляем саму заметку (с новым порядком в block_ids)
 	_, err = tx.Exec(ctx, updateNoteQuery, note.Title, note.Header, note.Icon, blockIDs, note.UpdatedAt, note.ID)
 	if err != nil {
 		return fmt.Errorf("update note: %w", err)
 	}
 
-	// 3. Удаляем блоки, которых больше нет в массиве
 	if len(deletedBlockIDs) > 0 {
 		_, err = tx.Exec(ctx, deleteBlocksQuery, deletedBlockIDs)
 		if err != nil {
@@ -150,21 +145,6 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 }
 
 func (r *Repo) DeleteNote(ctx context.Context, noteID uuid.UUID) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	_, err = tx.Exec(ctx, deleteBlocksQuery, "DELETE FROM blocks WHERE note_id = $1", noteID) // Костыль, если удаляем всё
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(ctx, deleteNoteQuery, noteID)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	_, err := r.db.Exec(ctx, deleteNoteQuery, noteID)
+	return err
 }

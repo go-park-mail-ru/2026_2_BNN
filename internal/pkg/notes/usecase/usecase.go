@@ -44,7 +44,7 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
 		if err != nil {
 			if errors.Is(err, models.ErrNoteNotFound) {
-				return models.Note{}, models.ErrNoteNotFound // Вернет 404
+				return models.Note{}, models.ErrNoteNotFound
 			}
 			return models.Note{}, err
 		}

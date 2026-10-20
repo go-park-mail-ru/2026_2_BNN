@@ -43,3 +43,18 @@ func (c *Client) Delete(ctx context.Context, bucket, objectName string) error {
 	}
 	return nil
 }
+
+func (c *Client) EnsureBuckets(ctx context.Context, bucketNames []string) error {
+	for _, bucket := range bucketNames {
+		exists, err := c.client.BucketExists(ctx, bucket)
+		if err != nil {
+			return fmt.Errorf("check bucket %s: %w", bucket, err)
+		}
+		if !exists {
+			if err := c.client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+				return fmt.Errorf("create bucket %s: %w", bucket, err)
+			}
+		}
+	}
+	return nil
+}

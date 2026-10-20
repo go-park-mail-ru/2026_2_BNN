@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments"
@@ -17,8 +18,8 @@ import (
 )
 
 const (
-	fileField   = "file"
-	maxFileSize = 10 << 20
+	fileField       = "file"
+	maxFileSize10MB = 10 << 20
 )
 
 var errFileTooLarge = errors.New("file too large")
@@ -54,11 +55,12 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 	if errors.Is(err, models.ErrUnsupportedFileType) {
 		return api.UploadAttachment415Response{}, nil
 	}
+	resp, err := toAPIAttachment(attachment)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.UploadAttachment201JSONResponse(toAPIAttachment(attachment)), nil
+	return api.UploadAttachment201JSONResponse(resp), nil
 }
 
 func (h *Handler) GetAttachment(ctx context.Context, req api.GetAttachmentRequestObject) (api.GetAttachmentResponseObject, error) {
@@ -110,12 +112,12 @@ func readFile(form *multipart.Reader) ([]byte, error) {
 			continue
 		}
 
-		data, err := io.ReadAll(io.LimitReader(part, maxFileSize+1))
+		data, err := io.ReadAll(io.LimitReader(part, maxFileSize10MB+1))
 		if err != nil {
 			return nil, err
 		}
 
-		if len(data) > maxFileSize {
+		if len(data) > maxFileSize10MB {
 			return nil, errFileTooLarge
 		}
 
@@ -123,10 +125,15 @@ func readFile(form *multipart.Reader) ([]byte, error) {
 	}
 }
 
-func toAPIAttachment(a models.Attachment) api.Attachment {
+func toAPIAttachment(a models.Attachment) (api.Attachment, error) {
+	link, err := url.JoinPath("/api/attachments", a.ID.String())
+	if err != nil {
+		return api.Attachment{}, err
+	}
+
 	return api.Attachment{
 		Id:      openapi_types.UUID(a.ID),
 		BlockId: openapi_types.UUID(a.BlockID),
-		Url:     "/api/attachments/" + a.ID.String(),
-	}
+		Url:     link,
+	}, nil
 }

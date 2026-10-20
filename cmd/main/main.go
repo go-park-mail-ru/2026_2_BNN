@@ -83,8 +83,14 @@ func main() {
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
 	)
 
+	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, "attachments")
+	if err != nil {
+		slog.Error("Failed to create attachments storage", "error", err)
+		os.Exit(1)
+	}
+
 	attachmentsHandler := attachmentsDelivery.NewHandler(
-		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsFiles.NewRepo(minioClient, "attachments")),
+		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage),
 	)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))

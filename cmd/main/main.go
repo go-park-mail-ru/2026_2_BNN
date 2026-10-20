@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,7 +28,7 @@ import (
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
 	notesUsecase "bnn/internal/pkg/notes/usecase"
-	"bnn/internal/pkg/s3" // Наш пакет S3-обёртки
+	"bnn/internal/pkg/s3"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,6 +39,7 @@ import (
 )
 
 const shutdownTimeout = 5 * time.Second
+const MaxRequestSize = 20 << 20
 
 var buckets = []string{"avatars", "attachments"}
 
@@ -67,12 +68,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := createBuckets(ctx, minioClient); err != nil {
+	s3Client := s3.NewClient(minioClient, "/static")
+
+	if err := s3Client.EnsureBuckets(ctx, []string{"avatars", "attachments"}); err != nil {
 		slog.Error("Failed to create S3 buckets", "error", err)
 		os.Exit(1)
 	}
-
-	s3Client := s3.NewClient(minioClient, "/static")
 
 	authHandler := authDelivery.NewHandler(
 		authUsecase.NewUsecase(authRepo.NewRepo(db), s3Client, mustEnv("JWT_SECRET")),
@@ -97,7 +98,7 @@ func main() {
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
-	apiRouter.Use(middleware.MaxBytesMiddleware(20 << 20))
+	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize))
 
 	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
@@ -115,15 +116,16 @@ func main() {
 	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		data, err := os.ReadFile("docs/openapi.yaml")
+		spec, err := authapi.GetSwagger()
 		if err != nil {
-			slog.Error("Failed to read spec", "error", err)
-			http.Error(w, "Spec not found", http.StatusNotFound)
+			httpjson.ResponseError(w, r, err)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
+		if err := json.NewEncoder(w).Encode(spec); err != nil {
+			slog.Error("Failed to write spec", "error", err)
+		}
 	}).Methods(http.MethodGet)
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
@@ -170,23 +172,4 @@ func mustEnv(key string) string {
 	}
 
 	return value
-}
-
-func createBuckets(ctx context.Context, client *minio.Client) error {
-	for _, bucket := range buckets {
-		exists, err := client.BucketExists(ctx, bucket)
-		if err != nil {
-			return fmt.Errorf("check bucket %s: %w", bucket, err)
-		}
-
-		if exists {
-			continue
-		}
-
-		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
-			return fmt.Errorf("create bucket %s: %w", bucket, err)
-		}
-	}
-
-	return nil
 }

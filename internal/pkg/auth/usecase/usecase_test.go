@@ -84,9 +84,7 @@ func TestSignUp(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockRepo(ctrl)
-	mockS3 := mocks.NewMockS3(ctrl)
-
-	uc := NewUsecase(mockRepo, mockS3, "test_secret")
+	uc := NewUsecase(mockRepo, nil, "test_secret")
 
 	t.Run("Success", func(t *testing.T) {
 		login := "testuser"
@@ -118,45 +116,53 @@ func TestSignUp(t *testing.T) {
 }
 
 func TestUpdateAvatar(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockRepo(ctrl)
-	mockS3 := mocks.NewMockS3(ctrl)
-
-	uc := NewUsecase(mockRepo, mockS3, "test_secret")
 	userID := uuid.NewV4()
+	data := []byte("image")
 
-	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	tests := []struct {
+		name        string
+		contentType string
+		prepare     func(repo *mocks.MockRepo, storage *mocks.MockStorage)
+		expectedErr error
+	}{
+		{
+			name:        "ok",
+			contentType: "image/png",
+			prepare: func(repo *mocks.MockRepo, storage *mocks.MockStorage) {
+				repo.EXPECT().ReadUserByID(gomock.Any(), userID).
+					Return(models.User{ID: userID, Avatar: "/avatars/old.jpg"}, nil)
+				storage.EXPECT().PublicPath(gomock.Any()).Return("/avatars/new.png", nil)
+				storage.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
+				repo.EXPECT().UpdateAvatar(gomock.Any(), gomock.Any()).Return(nil)
+				storage.EXPECT().DeleteFile(gomock.Any(), "old.jpg").Return(nil)
+			},
+		},
+		{
+			name:        "unsupported type",
+			contentType: "text/plain; charset=utf-8",
+			prepare:     func(repo *mocks.MockRepo, storage *mocks.MockStorage) {},
+			expectedErr: models.ErrUnsupportedFileType,
+		},
+	}
 
-	t.Run("Success", func(t *testing.T) {
-		mockRepo.EXPECT().
-			ReadUserByID(gomock.Any(), userID).
-			Return(models.User{ID: userID, Avatar: "/static/avatars/old.jpg"}, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			storage := mocks.NewMockStorage(ctrl)
+			tt.prepare(repo, storage)
 
-		mockS3.EXPECT().
-			Upload(gomock.Any(), "avatars", userID.String()+".png", gomock.Any(), "image/png").
-			Return("/static/avatars/new.png", nil)
+			uc := NewUsecase(repo, storage, "test_secret")
 
-		mockRepo.EXPECT().
-			UpdateAvatar(gomock.Any(), gomock.Any()).
-			Return(nil)
+			user, err := uc.UpdateAvatar(context.Background(), userID, data, tt.contentType)
 
-		mockS3.EXPECT().
-			Delete(gomock.Any(), "avatars", "old.jpg").
-			Return(nil)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
 
-		user, err := uc.UpdateAvatar(context.Background(), userID, pngHeader)
-
-		require.NoError(t, err)
-		assert.Equal(t, "/static/avatars/new.png", user.Avatar)
-	})
-
-	t.Run("Invalid File Type", func(t *testing.T) {
-		txtBytes := []byte("this is a text file, not an image")
-
-		_, err := uc.UpdateAvatar(context.Background(), userID, txtBytes)
-
-		assert.ErrorIs(t, err, models.ErrUnsupportedMediaType)
-	})
+			require.NoError(t, err)
+			assert.Equal(t, "/avatars/new.png", user.Avatar)
+		})
+	}
 }

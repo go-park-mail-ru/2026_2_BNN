@@ -20,6 +20,7 @@ import (
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
 	authRepo "bnn/internal/pkg/auth/repo/postgres"
+	authFiles "bnn/internal/pkg/auth/repo/s3"
 	authUsecase "bnn/internal/pkg/auth/usecase"
 	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/httpjson"
@@ -38,8 +39,6 @@ import (
 
 const shutdownTimeout = 5 * time.Second
 const MaxRequestSize = 20 << 20
-
-var buckets = []string{"avatars", "attachments"}
 
 func main() {
 	_ = godotenv.Load()
@@ -68,15 +67,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	s3Client := s3.NewClient(minioClient, "/static")
-
-	if err := s3Client.EnsureBuckets(ctx, []string{"avatars"}); err != nil {
-		slog.Error("Failed to create S3 buckets", "error", err)
+	avatarStorage, err := authFiles.NewRepo(ctx, minioClient, mustEnv("S3_AVATARS_BUCKET"))
+	if err != nil {
+		slog.Error("Failed to create avatars storage", "error", err)
 		os.Exit(1)
 	}
 
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), s3Client, mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, mustEnv("JWT_SECRET")),
 	)
 
 	notesHandler := notesDelivery.NewHandler(

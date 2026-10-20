@@ -14,5 +14,4 @@ var (
 	ErrBlockNotFound        = errors.New("block not found")
 	ErrAttachmentNotFound   = errors.New("attachment not found")
 	ErrUnsupportedFileType  = errors.New("unsupported file type")
-	ErrUnsupportedMediaType = errors.New("unsupported media type")
 )

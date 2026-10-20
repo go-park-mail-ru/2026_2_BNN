@@ -5,9 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
-	"strings"
+	"path"
 	"time"
 	"unicode/utf8"
 
@@ -22,15 +20,12 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
-
-	defaultAvatar = "default_avatar.jpg"
-	avatarBucket  = "avatars"
 )
 
 type Usecase struct {
-	repo   auth.Repo
-	s3     auth.S3
-	secret []byte
+	repo    auth.Repo
+	storage auth.Storage
+	secret  []byte
 }
 
 var allowedAvatarTypes = map[string]string{
@@ -39,11 +34,11 @@ var allowedAvatarTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
-func NewUsecase(repo auth.Repo, s3 auth.S3, secret string) *Usecase {
+func NewUsecase(repo auth.Repo, storage auth.Storage, secret string) *Usecase {
 	return &Usecase{
-		repo:   repo,
-		s3:     s3,
-		secret: []byte(secret),
+		repo:    repo,
+		storage: storage,
+		secret:  []byte(secret),
 	}
 }
 
@@ -63,7 +58,6 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 		ID:           uuid.NewV4(),
 		Login:        login,
 		PasswordHash: passwordHash,
-		Avatar:       defaultAvatar,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -221,16 +215,10 @@ func validatePassword(password string) error {
 	return nil
 }
 
-func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte) (models.User, error) {
-	if len(data) == 0 {
-		return models.User{}, models.ErrValidation
-	}
-
-	contentType := http.DetectContentType(data)
+func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error) {
 	ext, ok := allowedAvatarTypes[contentType]
-	slog.Info("Avatar upload attempt", "detected_type", contentType, "length", len(data))
 	if !ok {
-		return models.User{}, models.ErrUnsupportedMediaType
+		return models.User{}, models.ErrUnsupportedFileType
 	}
 
 	user, err := u.repo.ReadUserByID(ctx, userID)
@@ -238,37 +226,25 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 		return models.User{}, err
 	}
 
-	oldAvatar := user.Avatar
-	objectName := userID.String() + ext
-
-	newURL, err := u.s3.Upload(ctx, avatarBucket, objectName, data, contentType)
+	key := fmt.Sprintf("%s%s", uuid.NewV4(), ext)
+	avatar, err := u.storage.PublicPath(key)
 	if err != nil {
-		return models.User{}, fmt.Errorf("upload avatar: %w", err)
+		return models.User{}, err
+	}
+	if err := u.storage.PutFile(ctx, key, data, contentType); err != nil {
+		return models.User{}, err
 	}
 
-	user.Avatar = newURL
+	oldAvatar := user.Avatar
+	user.Avatar = avatar
 	user.UpdatedAt = time.Now().UTC()
-
 	if err := u.repo.UpdateAvatar(ctx, user); err != nil {
-		_ = u.s3.Delete(ctx, avatarBucket, objectName) // откат
-		return models.User{}, fmt.Errorf("update avatar: %w", err)
+		_ = u.storage.DeleteFile(ctx, key)
+		return models.User{}, err
 	}
 
-	if oldAvatar != "" && oldAvatar != defaultAvatar && oldAvatar != newURL {
-		oldKey := extractObjectName(oldAvatar, avatarBucket)
-		if oldKey != "" {
-			_ = u.s3.Delete(ctx, avatarBucket, oldKey)
-		}
+	if oldAvatar != "" {
+		_ = u.storage.DeleteFile(ctx, path.Base(oldAvatar))
 	}
-
 	return user, nil
-}
-
-func extractObjectName(url, bucket string) string {
-	marker := "/" + bucket + "/"
-	idx := strings.LastIndex(url, marker)
-	if idx == -1 {
-		return ""
-	}
-	return url[idx+len(marker):]
 }

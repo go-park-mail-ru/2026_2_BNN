@@ -10,4 +10,8 @@ var (
 	ErrInvalidToken         = errors.New("invalid token")
 	ErrNoteNotFound         = errors.New("note not found")
 	ErrRefreshTokenNotFound = errors.New("refresh token not found")
+	ErrWrongPassword        = errors.New("wrong password")
+	ErrBlockNotFound        = errors.New("block not found")
+	ErrAttachmentNotFound   = errors.New("attachment not found")
+	ErrUnsupportedFileType  = errors.New("unsupported file type")
 )

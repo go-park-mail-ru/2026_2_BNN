@@ -57,6 +57,21 @@ func (mr *MockUsecaseMockRecorder) Authenticate(ctx, accessToken any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Authenticate", reflect.TypeOf((*MockUsecase)(nil).Authenticate), ctx, accessToken)
 }
 
+// ChangePassword mocks base method.
+func (m *MockUsecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChangePassword", ctx, userID, oldPassword, newPassword)
+	ret0, _ := ret[0].(models.AuthTokens)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ChangePassword indicates an expected call of ChangePassword.
+func (mr *MockUsecaseMockRecorder) ChangePassword(ctx, userID, oldPassword, newPassword any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangePassword", reflect.TypeOf((*MockUsecase)(nil).ChangePassword), ctx, userID, oldPassword, newPassword)
+}
+
 // GetUser mocks base method.
 func (m *MockUsecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -133,6 +148,21 @@ func (mr *MockUsecaseMockRecorder) SignUp(ctx, login, password any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignUp", reflect.TypeOf((*MockUsecase)(nil).SignUp), ctx, login, password)
 }
 
+// UpdateAvatar mocks base method.
+func (m *MockUsecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateAvatar", ctx, userID, data, contentType)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateAvatar indicates an expected call of UpdateAvatar.
+func (mr *MockUsecaseMockRecorder) UpdateAvatar(ctx, userID, data, contentType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockUsecase)(nil).UpdateAvatar), ctx, userID, data, contentType)
+}
+
 // MockRepo is a mock of Repo interface.
 type MockRepo struct {
 	ctrl     *gomock.Controller
@@ -200,6 +230,20 @@ func (mr *MockRepoMockRecorder) DeleteRefreshToken(ctx, tokenHash any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRefreshToken", reflect.TypeOf((*MockRepo)(nil).DeleteRefreshToken), ctx, tokenHash)
 }
 
+// DeleteUserRefreshTokens mocks base method.
+func (m *MockRepo) DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUserRefreshTokens", ctx, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteUserRefreshTokens indicates an expected call of DeleteUserRefreshTokens.
+func (mr *MockRepoMockRecorder) DeleteUserRefreshTokens(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRefreshTokens", reflect.TypeOf((*MockRepo)(nil).DeleteUserRefreshTokens), ctx, userID)
+}
+
 // ReadUserByID mocks base method.
 func (m *MockRepo) ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -228,4 +272,99 @@ func (m *MockRepo) ReadUserByLogin(ctx context.Context, login string) (models.Us
 func (mr *MockRepoMockRecorder) ReadUserByLogin(ctx, login any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByLogin", reflect.TypeOf((*MockRepo)(nil).ReadUserByLogin), ctx, login)
+}
+
+// UpdateAvatar mocks base method.
+func (m *MockRepo) UpdateAvatar(ctx context.Context, user models.User) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateAvatar", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateAvatar indicates an expected call of UpdateAvatar.
+func (mr *MockRepoMockRecorder) UpdateAvatar(ctx, user any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockRepo)(nil).UpdateAvatar), ctx, user)
+}
+
+// UpdatePassword mocks base method.
+func (m *MockRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, hash []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdatePassword", ctx, userID, hash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdatePassword indicates an expected call of UpdatePassword.
+func (mr *MockRepoMockRecorder) UpdatePassword(ctx, userID, hash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockRepo)(nil).UpdatePassword), ctx, userID, hash)
+}
+
+// MockStorage is a mock of Storage interface.
+type MockStorage struct {
+	ctrl     *gomock.Controller
+	recorder *MockStorageMockRecorder
+	isgomock struct{}
+}
+
+// MockStorageMockRecorder is the mock recorder for MockStorage.
+type MockStorageMockRecorder struct {
+	mock *MockStorage
+}
+
+// NewMockStorage creates a new mock instance.
+func NewMockStorage(ctrl *gomock.Controller) *MockStorage {
+	mock := &MockStorage{ctrl: ctrl}
+	mock.recorder = &MockStorageMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
+	return m.recorder
+}
+
+// DeleteFile mocks base method.
+func (m *MockStorage) DeleteFile(ctx context.Context, key string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteFile", ctx, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteFile indicates an expected call of DeleteFile.
+func (mr *MockStorageMockRecorder) DeleteFile(ctx, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFile", reflect.TypeOf((*MockStorage)(nil).DeleteFile), ctx, key)
+}
+
+// PublicPath mocks base method.
+func (m *MockStorage) PublicPath(key string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublicPath", key)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublicPath indicates an expected call of PublicPath.
+func (mr *MockStorageMockRecorder) PublicPath(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicPath", reflect.TypeOf((*MockStorage)(nil).PublicPath), key)
+}
+
+// PutFile mocks base method.
+func (m *MockStorage) PutFile(ctx context.Context, key string, data []byte, contentType string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutFile", ctx, key, data, contentType)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutFile indicates an expected call of PutFile.
+func (mr *MockStorageMockRecorder) PutFile(ctx, key, data, contentType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutFile", reflect.TypeOf((*MockStorage)(nil).PutFile), ctx, key, data, contentType)
 }

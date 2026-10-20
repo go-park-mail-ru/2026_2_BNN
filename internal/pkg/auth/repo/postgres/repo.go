@@ -31,6 +31,15 @@ var createRefreshTokenQuery string
 //go:embed queries/delete_refresh_token.sql
 var deleteRefreshTokenQuery string
 
+//go:embed queries/update_password.sql
+var updatePasswordQuery string
+
+//go:embed queries/delete_user_refresh_tokens.sql
+var deleteUserRefreshTokensQuery string
+
+//go:embed queries/update_user_avatar.sql
+var updateUserAvatarQuery string
+
 type Repo struct {
 	db *pgxpool.Pool
 }
@@ -101,6 +110,27 @@ func (r *Repo) DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models
 	return token, nil
 }
 
+func (r *Repo) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash []byte) error {
+	tag, err := r.db.Exec(ctx, updatePasswordQuery, passwordHash, id)
+	if err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return models.ErrUserNotFound
+	}
+
+	return nil
+}
+
+func (r *Repo) DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, deleteUserRefreshTokensQuery, userID)
+	if err != nil {
+		return fmt.Errorf("delete user refresh tokens: %w", err)
+	}
+	return nil
+}
+
 func (r *Repo) readUser(ctx context.Context, query string, arg any) (models.User, error) {
 	var user models.User
 
@@ -120,4 +150,12 @@ func (r *Repo) readUser(ctx context.Context, query string, arg any) (models.User
 	}
 
 	return user, nil
+}
+
+func (r *Repo) UpdateAvatar(ctx context.Context, user models.User) error {
+	_, err := r.db.Exec(ctx, updateUserAvatarQuery, user.Avatar, user.UpdatedAt, user.ID)
+	if err != nil {
+		return fmt.Errorf("update avatar: %w", err)
+	}
+	return nil
 }

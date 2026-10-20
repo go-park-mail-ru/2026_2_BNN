@@ -1,21 +1,23 @@
 package delivery
 
 import (
-	"log/slog"
+	"context"
+	"errors"
 	"net/http"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/auth/delivery/http/api"
+	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/httpjson"
+	"bnn/internal/pkg/upload"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
-	maxRequestBodySize = 4096
-
-	accessCookieName  = "bnn_access"
-	refreshCookieName = "bnn_refresh"
-	refreshCookiePath = "/api/auth"
+	avatarField      = "avatar"
+	maxAvatarSize5MB = 5 << 20
 )
 
 type Handler struct {
@@ -26,126 +28,159 @@ func NewHandler(uc auth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) {
-	var req models.SignUpRequest
-	if err := httpjson.Read(w, r, &req, maxRequestBodySize); err != nil {
-		slog.Warn("Failed to read signup request", "error", err)
-		w.WriteHeader(httpjson.ReadErrorStatus(err))
-		return
+func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.SignUpResponseObject, error) {
+	user, tokens, err := h.uc.SignUp(ctx, req.Body.Login, req.Body.Password)
+	if errors.Is(err, models.ErrValidation) {
+		return api.SignUp400Response{}, nil
 	}
-
-	user, tokens, err := h.uc.SignUp(r.Context(), req.Login, req.Password)
+	if errors.Is(err, models.ErrUserExists) {
+		return api.SignUp409Response{}, nil
+	}
 	if err != nil {
-		httpjson.WriteError(w, err)
-		return
+		return nil, err
 	}
 
-	setAuthCookies(w, tokens)
-	httpjson.Write(w, http.StatusCreated, user)
+	setAuthCookies(ctx, tokens)
+
+	return toSignUpResponse(user), nil
 }
 
-func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) {
-	var req models.SignInRequest
-	if err := httpjson.Read(w, r, &req, maxRequestBodySize); err != nil {
-		slog.Warn("Failed to read sign in request", "error", err)
-		w.WriteHeader(httpjson.ReadErrorStatus(err))
-		return
+func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.SignInResponseObject, error) {
+	user, tokens, err := h.uc.SignIn(ctx, req.Body.Login, req.Body.Password)
+	if errors.Is(err, models.ErrInvalidCredentials) {
+		return api.SignIn401Response{}, nil
 	}
-
-	user, tokens, err := h.uc.SignIn(r.Context(), req.Login, req.Password)
+	if errors.Is(err, models.ErrValidation) {
+		return api.SignIn400Response{}, nil
+	}
 	if err != nil {
-		httpjson.WriteError(w, err)
-		return
+		return nil, err
 	}
 
-	setAuthCookies(w, tokens)
-	httpjson.Write(w, http.StatusOK, user)
+	setAuthCookies(ctx, tokens)
+
+	return toSignInResponse(user), nil
 }
 
-func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(refreshCookieName)
+func (h *Handler) Refresh(ctx context.Context, req api.RefreshRequestObject) (api.RefreshResponseObject, error) {
+	cookie, err := cookies.Get(ctx, refreshCookieName)
 	if err != nil {
-		slog.Warn("Refresh cookie missing")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
+		return api.Refresh401Response{}, nil
 	}
 
-	tokens, err := h.uc.Refresh(r.Context(), cookie.Value)
+	tokens, err := h.uc.Refresh(ctx, cookie)
+	if errors.Is(err, models.ErrInvalidToken) {
+		return api.Refresh401Response{}, nil
+	}
 	if err != nil {
-		httpjson.WriteError(w, err)
-		return
+		return nil, err
 	}
 
-	setAuthCookies(w, tokens)
-	w.WriteHeader(http.StatusOK)
+	setAuthCookies(ctx, tokens)
+
+	return api.Refresh200Response{}, nil
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(refreshCookieName); err == nil {
-		if err := h.uc.Logout(r.Context(), cookie.Value); err != nil {
-			httpjson.WriteError(w, err)
-			return
+func (h *Handler) Logout(ctx context.Context, req api.LogoutRequestObject) (api.LogoutResponseObject, error) {
+	if cookie, err := cookies.Get(ctx, refreshCookieName); err == nil {
+		if err := h.uc.Logout(ctx, cookie); err != nil {
+			return nil, err
 		}
 	}
 
-	clearAuthCookies(w)
-	w.WriteHeader(http.StatusOK)
+	clearAuthCookies(ctx)
+
+	return api.Logout200Response{}, nil
 }
 
-func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	userID, ok := ctxutil.GetUserID(r.Context())
+func (h *Handler) GetCurrentUser(ctx context.Context, req api.GetCurrentUserRequestObject) (api.GetCurrentUserResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
+		return api.GetCurrentUser401Response{}, nil
 	}
 
-	user, err := h.uc.GetUser(r.Context(), userID)
+	user, err := h.uc.GetUser(ctx, userID)
+	if errors.Is(err, models.ErrUserNotFound) {
+		return api.GetCurrentUser404Response{}, nil
+	}
 	if err != nil {
-		httpjson.WriteError(w, err)
-		return
+		return nil, err
 	}
 
-	httpjson.Write(w, http.StatusOK, user)
+	return toGetCurrentUserResponse(user), nil
 }
 
-func setAuthCookies(w http.ResponseWriter, tokens models.AuthTokens) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     accessCookieName,
-		Value:    tokens.AccessToken,
-		Path:     "/",
-		Expires:  tokens.AccessExpiresAt,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequestObject) (api.ChangePasswordResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.ChangePassword401Response{}, nil
+	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    tokens.RefreshToken,
-		Path:     refreshCookiePath,
-		Expires:  tokens.RefreshExpiresAt,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	tokens, err := h.uc.ChangePassword(ctx, userID, req.Body.OldPassword, req.Body.NewPassword)
+	if errors.Is(err, models.ErrValidation) {
+		return api.ChangePassword400Response{}, nil
+	}
+	if errors.Is(err, models.ErrWrongPassword) {
+		return api.ChangePassword403Response{}, nil
+	}
+	if errors.Is(err, models.ErrUserNotFound) {
+		return api.ChangePassword401Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	setAuthCookies(ctx, tokens)
+
+	return api.ChangePassword204Response{}, nil
 }
 
-func clearAuthCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     accessCookieName,
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestObject) (api.UpdateAvatarResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.UpdateAvatar401Response{}, nil
+	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Path:     refreshCookiePath,
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	data, err := upload.ReadFile(req.Body, avatarField, maxAvatarSize5MB)
+	if errors.Is(err, upload.ErrFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
+		return api.UpdateAvatar413Response{}, nil
+	}
+	if err != nil {
+		return api.UpdateAvatar400Response{}, nil
+	}
+
+	user, err := h.uc.UpdateAvatar(ctx, userID, data, http.DetectContentType(data))
+	if errors.Is(err, models.ErrUnsupportedFileType) {
+		return api.UpdateAvatar415Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toUpdateAvatarResponse(user), nil
+}
+
+func toUpdateAvatarResponse(u models.User) api.UpdateAvatar200JSONResponse {
+	return api.UpdateAvatar200JSONResponse(toAPIUser(u))
+}
+
+func toSignUpResponse(u models.User) api.SignUp201JSONResponse {
+	return api.SignUp201JSONResponse(toAPIUser(u))
+}
+
+func toSignInResponse(u models.User) api.SignIn200JSONResponse {
+	return api.SignIn200JSONResponse(toAPIUser(u))
+}
+
+func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {
+	return api.GetCurrentUser200JSONResponse(toAPIUser(u))
+}
+
+func toAPIUser(u models.User) api.User {
+	return api.User{
+		Id:        openapi_types.UUID(u.ID),
+		Login:     u.Login,
+		Avatar:    u.Avatar,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
 }

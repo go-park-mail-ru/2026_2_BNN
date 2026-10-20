@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"path"
 	"time"
 	"unicode/utf8"
 
@@ -19,19 +20,25 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
-
-	defaultAvatar = "default_avatar.jpg"
 )
 
 type Usecase struct {
-	repo   auth.Repo
-	secret []byte
+	repo    auth.Repo
+	storage auth.Storage
+	secret  []byte
 }
 
-func NewUsecase(repo auth.Repo, secret string) *Usecase {
+var allowedAvatarTypes = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/webp": ".webp",
+}
+
+func NewUsecase(repo auth.Repo, storage auth.Storage, secret string) *Usecase {
 	return &Usecase{
-		repo:   repo,
-		secret: []byte(secret),
+		repo:    repo,
+		storage: storage,
+		secret:  []byte(secret),
 	}
 }
 
@@ -51,7 +58,6 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 		ID:           uuid.NewV4(),
 		Login:        login,
 		PasswordHash: passwordHash,
-		Avatar:       defaultAvatar,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -131,6 +137,36 @@ func (u *Usecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, e
 	return u.repo.ReadUserByID(ctx, userID)
 }
 
+func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error) {
+	if err := validatePassword(newPassword); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if !verifyPassword(oldPassword, user.PasswordHash) {
+		return models.AuthTokens{}, models.ErrWrongPassword
+	}
+
+	passwordHash, err := hashPassword(newPassword)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.UpdatePassword(ctx, userID, passwordHash); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	if err := u.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	return u.createTokens(ctx, userID)
+}
+
 func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
 	now := time.Now().UTC()
 	accessExpiresAt := now.Add(accessTokenTTL)
@@ -167,10 +203,48 @@ func validateCredentials(login, password string) error {
 		return fmt.Errorf("%w: invalid login length", models.ErrValidation)
 	}
 
+	return validatePassword(password)
+}
+
+func validatePassword(password string) error {
 	passwordLength := utf8.RuneCountInString(password)
 	if passwordLength < minPasswordLength || passwordLength > maxPasswordLength {
 		return fmt.Errorf("%w: invalid password length", models.ErrValidation)
 	}
 
 	return nil
+}
+
+func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error) {
+	ext, ok := allowedAvatarTypes[contentType]
+	if !ok {
+		return models.User{}, models.ErrUnsupportedFileType
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	key := fmt.Sprintf("%s%s", uuid.NewV4(), ext)
+	avatar, err := u.storage.PublicPath(key)
+	if err != nil {
+		return models.User{}, err
+	}
+	if err := u.storage.PutFile(ctx, key, data, contentType); err != nil {
+		return models.User{}, err
+	}
+
+	oldAvatar := user.Avatar
+	user.Avatar = avatar
+	user.UpdatedAt = time.Now().UTC()
+	if err := u.repo.UpdateAvatar(ctx, user); err != nil {
+		_ = u.storage.DeleteFile(ctx, key)
+		return models.User{}, err
+	}
+
+	if oldAvatar != "" {
+		_ = u.storage.DeleteFile(ctx, path.Base(oldAvatar))
+	}
+	return user, nil
 }

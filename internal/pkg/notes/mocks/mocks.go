@@ -11,6 +11,7 @@ package mocks
 
 import (
 	models "bnn/internal/models"
+	notes "bnn/internal/pkg/notes"
 	context "context"
 	reflect "reflect"
 
@@ -40,6 +41,35 @@ func NewMockUsecase(ctrl *gomock.Controller) *MockUsecase {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockUsecase) EXPECT() *MockUsecaseMockRecorder {
 	return m.recorder
+}
+
+// CreateNote mocks base method.
+func (m *MockUsecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNote", ctx, userID, req)
+	ret0, _ := ret[0].(models.Note)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateNote indicates an expected call of CreateNote.
+func (mr *MockUsecaseMockRecorder) CreateNote(ctx, userID, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNote", reflect.TypeOf((*MockUsecase)(nil).CreateNote), ctx, userID, req)
+}
+
+// DeleteNote mocks base method.
+func (m *MockUsecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNote", ctx, userID, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNote indicates an expected call of DeleteNote.
+func (mr *MockUsecaseMockRecorder) DeleteNote(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNote", reflect.TypeOf((*MockUsecase)(nil).DeleteNote), ctx, userID, noteID)
 }
 
 // GetNote mocks base method.
@@ -72,6 +102,21 @@ func (mr *MockUsecaseMockRecorder) GetNotes(ctx, userID, limit, offset any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotes", reflect.TypeOf((*MockUsecase)(nil).GetNotes), ctx, userID, limit, offset)
 }
 
+// UpdateNote mocks base method.
+func (m *MockUsecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNote", ctx, userID, noteID, req)
+	ret0, _ := ret[0].(models.Note)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateNote indicates an expected call of UpdateNote.
+func (mr *MockUsecaseMockRecorder) UpdateNote(ctx, userID, noteID, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNote", reflect.TypeOf((*MockUsecase)(nil).UpdateNote), ctx, userID, noteID, req)
+}
+
 // MockRepo is a mock of Repo interface.
 type MockRepo struct {
 	ctrl     *gomock.Controller
@@ -94,6 +139,34 @@ func NewMockRepo(ctrl *gomock.Controller) *MockRepo {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
+}
+
+// CreateNote mocks base method.
+func (m *MockRepo) CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNote", ctx, note, blocks)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateNote indicates an expected call of CreateNote.
+func (mr *MockRepoMockRecorder) CreateNote(ctx, note, blocks any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNote", reflect.TypeOf((*MockRepo)(nil).CreateNote), ctx, note, blocks)
+}
+
+// DeleteNote mocks base method.
+func (m *MockRepo) DeleteNote(ctx context.Context, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNote", ctx, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNote indicates an expected call of DeleteNote.
+func (mr *MockRepoMockRecorder) DeleteNote(ctx, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNote", reflect.TypeOf((*MockRepo)(nil).DeleteNote), ctx, noteID)
 }
 
 // ReadBlocks mocks base method.
@@ -139,4 +212,18 @@ func (m *MockRepo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offse
 func (mr *MockRepoMockRecorder) ReadNotes(ctx, userID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadNotes", reflect.TypeOf((*MockRepo)(nil).ReadNotes), ctx, userID, limit, offset)
+}
+
+// UpdateNote mocks base method.
+func (m *MockRepo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNote", ctx, note, blocks, deletedBlockIDs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNote indicates an expected call of UpdateNote.
+func (mr *MockRepoMockRecorder) UpdateNote(ctx, note, blocks, deletedBlockIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNote", reflect.TypeOf((*MockRepo)(nil).UpdateNote), ctx, note, blocks, deletedBlockIDs)
 }

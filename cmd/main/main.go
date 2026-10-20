@@ -37,8 +37,10 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-const shutdownTimeout = 5 * time.Second
-const MaxRequestSize = 20 << 20
+const (
+	shutdownTimeout    = 5 * time.Second
+	MaxRequestSize20MB = 20 << 20
+)
 
 func main() {
 	_ = godotenv.Load()
@@ -102,7 +104,7 @@ func main() {
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
-	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize))
+	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize20MB))
 
 	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,

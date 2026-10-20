@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/s3"
 
 	"github.com/minio/minio-go/v7"
 )
@@ -16,15 +17,8 @@ type Repo struct {
 }
 
 func NewRepo(ctx context.Context, client *minio.Client, bucket string) (*Repo, error) {
-	exists, err := client.BucketExists(ctx, bucket)
-	if err != nil {
-		return nil, fmt.Errorf("check bucket %s: %w", bucket, err)
-	}
-
-	if !exists {
-		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
-			return nil, fmt.Errorf("create bucket %s: %w", bucket, err)
-		}
+	if err := s3.EnsureBucket(ctx, client, bucket); err != nil {
+		return nil, err
 	}
 
 	return &Repo{

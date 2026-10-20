@@ -33,8 +33,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -60,8 +58,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	minioClient, err := minio.New(mustEnv("S3_ENDPOINT"), &minio.Options{
-		Creds: credentials.NewStaticV4(mustEnv("S3_ACCESS_KEY"), mustEnv("S3_SECRET_KEY"), ""),
+	minioClient, err := s3.Connect(s3.Config{
+		Endpoint:  mustEnv("S3_ENDPOINT"),
+		AccessKey: mustEnv("S3_ACCESS_KEY"),
+		SecretKey: mustEnv("S3_SECRET_KEY"),
 	})
 	if err != nil {
 		slog.Error("Failed to create S3 client", "error", err)
@@ -70,7 +70,7 @@ func main() {
 
 	s3Client := s3.NewClient(minioClient, "/static")
 
-	if err := s3Client.EnsureBuckets(ctx, []string{"avatars", "attachments"}); err != nil {
+	if err := s3Client.EnsureBuckets(ctx, []string{"avatars"}); err != nil {
 		slog.Error("Failed to create S3 buckets", "error", err)
 		os.Exit(1)
 	}
@@ -83,7 +83,7 @@ func main() {
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
 	)
 
-	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, "attachments")
+	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, mustEnv("S3_ATTACHMENTS_BUCKET"))
 	if err != nil {
 		slog.Error("Failed to create attachments storage", "error", err)
 		os.Exit(1)

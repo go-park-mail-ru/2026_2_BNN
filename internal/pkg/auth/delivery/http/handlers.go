@@ -3,7 +3,6 @@ package delivery
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
 
 	"bnn/internal/models"
@@ -11,11 +10,15 @@ import (
 	"bnn/internal/pkg/auth/delivery/http/api"
 	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/upload"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-const maxAvatarSize = 5 << 20
+const (
+	avatarField      = "avatar"
+	maxAvatarSize5MB = 5 << 20
+)
 
 type Handler struct {
 	uc auth.Usecase
@@ -138,44 +141,21 @@ func (h *Handler) UpdateAvatar(ctx context.Context, req api.UpdateAvatarRequestO
 		return api.UpdateAvatar401Response{}, nil
 	}
 
-	if req.Body == nil {
-		return api.UpdateAvatar400Response{}, nil
+	data, err := upload.ReadFile(req.Body, avatarField, maxAvatarSize5MB)
+	if errors.Is(err, upload.ErrFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
+		return api.UpdateAvatar413Response{}, nil
 	}
-
-	part, err := req.Body.NextPart()
 	if err != nil {
 		return api.UpdateAvatar400Response{}, nil
 	}
-	defer part.Close()
 
-	if part.FormName() != "avatar" {
-		return api.UpdateAvatar400Response{}, nil
-	}
-
-	data, err := io.ReadAll(part)
-	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			return api.UpdateAvatar413Response{}, nil
-		}
-		return api.UpdateAvatar400Response{}, nil
-	}
-
-	if len(data) > 5<<20 {
-		return api.UpdateAvatar413Response{}, nil // <-- Просто пустой статус 413
-	}
-
-	user, err := h.uc.UpdateAvatar(ctx, userID, data)
-	if errors.Is(err, models.ErrValidation) {
-		return api.UpdateAvatar400Response{}, nil
-	}
-	if errors.Is(err, models.ErrUnsupportedMediaType) {
+	user, err := h.uc.UpdateAvatar(ctx, userID, data, http.DetectContentType(data))
+	if errors.Is(err, models.ErrUnsupportedFileType) {
 		return api.UpdateAvatar415Response{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	return toUpdateAvatarResponse(user), nil
 }
 

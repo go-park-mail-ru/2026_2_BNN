@@ -3,8 +3,6 @@ package delivery
 import (
 	"context"
 	"errors"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 
@@ -12,6 +10,7 @@ import (
 	"bnn/internal/pkg/attachments"
 	"bnn/internal/pkg/attachments/delivery/http/api"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/upload"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
@@ -21,8 +20,6 @@ const (
 	fileField       = "file"
 	maxFileSize10MB = 10 << 20
 )
-
-var errFileTooLarge = errors.New("file too large")
 
 type Handler struct {
 	uc attachments.Usecase
@@ -38,8 +35,8 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 		return api.UploadAttachment401Response{}, nil
 	}
 
-	data, err := readFile(req.Body)
-	if errors.Is(err, errFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
+	data, err := upload.ReadFile(req.Body, fileField, maxFileSize10MB)
+	if errors.Is(err, upload.ErrFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
 		return api.UploadAttachment413Response{}, nil
 	}
 	if err != nil {
@@ -99,30 +96,6 @@ func (h *Handler) DeleteAttachment(ctx context.Context, req api.DeleteAttachment
 	}
 
 	return api.DeleteAttachment204Response{}, nil
-}
-
-func readFile(form *multipart.Reader) ([]byte, error) {
-	for {
-		part, err := form.NextPart()
-		if err != nil {
-			return nil, err
-		}
-
-		if part.FormName() != fileField {
-			continue
-		}
-
-		data, err := io.ReadAll(io.LimitReader(part, maxFileSize10MB+1))
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) > maxFileSize10MB {
-			return nil, errFileTooLarge
-		}
-
-		return data, nil
-	}
 }
 
 func toAPIAttachment(a models.Attachment) (api.Attachment, error) {

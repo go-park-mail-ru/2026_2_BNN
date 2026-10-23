@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"bnn/docs"
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
 	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
@@ -121,21 +121,15 @@ func main() {
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
 
-	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		spec, err := authapi.GetSwagger()
-		if err != nil {
-			httpjson.ResponseError(w, r, err)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(spec); err != nil {
+	router.HandleFunc("/swagger/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		if _, err := w.Write(docs.OpenAPI); err != nil {
 			slog.Error("Failed to write spec", "error", err)
 		}
 	}).Methods(http.MethodGet)
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
-		httpSwagger.URL("/swagger/spec.json"),
+		httpSwagger.URL("/swagger/openapi.yaml"),
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 	)).Methods(http.MethodGet)

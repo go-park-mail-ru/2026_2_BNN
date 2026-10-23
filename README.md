@@ -79,8 +79,6 @@ make cover
 
 ```mermaid
 erDiagram
-    direction LR
-
     users {
         uuid id PK
         text login UK
@@ -128,11 +126,29 @@ erDiagram
         uuid note_id PK, FK
     }
 
-    users ||--o{ refresh_tokens : has
-    users ||--o{ notes : creates
-    notes o|--o{ notes : contains
-    notes ||--o{ blocks : consists_of
-    blocks ||--o{ attachments : holds
-    users ||--o{ favorite : saves
-    notes ||--o{ favorite : appears_in
+    tags {
+        uuid id PK
+        uuid created_by FK "UNIQUE вместе с name"
+        text name "1-30 символов"
+        text color "#RRGGBBAA"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    note_tags {
+        uuid note_id PK, FK
+        uuid tag_id PK, FK
+    }
+
+    users ||--o{ refresh_tokens : "has"
+    users ||--o{ notes : "creates"
+    notes |o--o{ notes : "parent of"
+    notes ||--o{ blocks : "contains"
+    blocks ||--o{ attachments : "has"
+    users ||--o{ favorite : "marks"
+    notes ||--o{ favorite : "marked in"
+    users ||--o{ tags : "creates"
+    notes ||--o{ note_tags : "has"
+    tags ||--o{ note_tags : "attached to"
 ```
+

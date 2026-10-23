@@ -8,11 +8,7 @@ info:
     У ошибок нет тела.
 
 servers:
- # - url: /api
-  - url: http://localhost:5458/api
-    descrIption: DEV LOCAL
-  - url: http://brandnewnotes.ru/api
-    descrIption: DEV LOCAL
+ - url: /api
   
 
 tags:
@@ -22,6 +18,8 @@ tags:
     description: Заметки и блоки
   - name: attachments
     description: Файлы в блоках заметок
+  - name: tags
+    description: Теги заметок
 
 paths:
   /auth/signup:
@@ -387,6 +385,96 @@ paths:
           description: Нет куки или она истекла
         '404':
           description: Файла нет или он в чужой заметке
+  /tags:
+    get:
+      tags: [tags]
+      operationId: ListTags
+      summary: Мои теги
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Теги пользователя по названию
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          description: Нет куки или она истекла
+    post:
+      tags: [tags]
+      operationId: CreateTag
+      summary: Создать тег
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagRequest'
+      responses:
+        '201':
+          description: Тег создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: Не прошла валидация или битый JSON
+        '401':
+          description: Нет куки или она истекла
+        '409':
+          description: Тег с таким названием уже есть
+
+  /tags/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TagID'
+    put:
+      tags: [tags]
+      operationId: UpdateTag
+      summary: Изменить название и цвет
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagRequest'
+      responses:
+        '200':
+          description: Тег изменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: Не прошла валидация, битый JSON или id не UUID
+        '401':
+          description: Нет куки или она истекла
+        '404':
+          description: Тега нет или он чужой
+        '409':
+          description: Тег с таким названием уже есть
+    delete:
+      tags: [tags]
+      operationId: DeleteTag
+      summary: Удалить тег
+      description: Тег снимается со всех заметок.
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Тег удалён
+        '400':
+          description: id не UUID
+        '401':
+          description: Нет куки или она истекла
+        '404':
+          description: Тега нет или он чужой
 
 components:
   securitySchemes:
@@ -411,6 +499,13 @@ components:
         type: string
         format: uuid
     AttachmentID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TagID:
       name: id
       in: path
       required: true
@@ -601,3 +696,38 @@ components:
           type: string
           description: Откуда скачать файл
           example: /api/attachments/3f9b71d0-2a4c-4b8e-9d1f-6c5e7a8b9c0d
+    Tag:
+      type: object
+      required: [id, name, color, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: учёба
+        color:
+          type: string
+          description: '#RRGGBBAA, последние два символа это прозрачность'
+          example: '#FF880080'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TagRequest:
+      type: object
+      required: [name, color]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 30
+          example: учёба
+        color:
+          type: string
+          pattern: '^#[0-9a-fA-F]{8}$'
+          example: '#FF880080'
+          

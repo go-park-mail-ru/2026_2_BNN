@@ -21,6 +21,8 @@ type User struct {
 	Login        string    `json:"login"`
 	PasswordHash []byte    `json:"-"`
 	Avatar       string    `json:"avatar"`
+	TOTPSecret   string    `json:"-"`
+	Is2FAEnabled bool      `json:"is_2fa_enabled"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

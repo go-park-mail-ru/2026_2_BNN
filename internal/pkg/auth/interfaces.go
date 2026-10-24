@@ -19,6 +19,9 @@ type Usecase interface {
 	GetUser(ctx context.Context, userID uuid.UUID) (models.User, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error)
 	UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error)
+	Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error)
+	Enable2FA(ctx context.Context, userID uuid.UUID, code string) error
+	Disable2FA(ctx context.Context, userID uuid.UUID) error
 }
 
 type Repo interface {
@@ -31,6 +34,9 @@ type Repo interface {
 	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
 	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
 	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
+
+	Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error
+	UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error
 }
 
 type Storage interface {

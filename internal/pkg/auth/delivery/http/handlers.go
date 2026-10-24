@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -183,4 +184,51 @@ func toAPIUser(u models.User) api.User {
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
+}
+
+func (h *Handler) Generate2FA(ctx context.Context, req api.Generate2FARequestObject) (api.Generate2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Generate2FA401Response{}, nil
+	}
+
+	png, err := h.uc.Generate2FA(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Generate2FA200ImagepngResponse{
+		Body:          bytes.NewReader(png),
+		ContentLength: int64(len(png)),
+	}, nil
+}
+
+func (h *Handler) Enable2FA(ctx context.Context, req api.Enable2FARequestObject) (api.Enable2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Enable2FA401Response{}, nil
+	}
+
+	err := h.uc.Enable2FA(ctx, userID, req.Body.Code)
+	if errors.Is(err, models.ErrInvalidToken) || errors.Is(err, models.ErrValidation) {
+		return api.Enable2FA401Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Enable2FA200Response{}, nil
+}
+
+func (h *Handler) Disable2FA(ctx context.Context, req api.Disable2FARequestObject) (api.Disable2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Disable2FA401Response{}, nil
+	}
+
+	if err := h.uc.Disable2FA(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	return api.Disable2FA200Response{}, nil
 }

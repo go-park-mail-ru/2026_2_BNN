@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -72,10 +73,18 @@ type BlockID = openapi_types.UUID
 // NoteID defines model for NoteID.
 type NoteID = openapi_types.UUID
 
+// Enable2FAJSONBody defines parameters for Enable2FA.
+type Enable2FAJSONBody struct {
+	Code string `json:"code"`
+}
+
 // UpdateAvatarMultipartBody defines parameters for UpdateAvatar.
 type UpdateAvatarMultipartBody struct {
 	Avatar openapi_types.File `json:"avatar"`
 }
+
+// Enable2FAJSONRequestBody defines body for Enable2FA for application/json ContentType.
+type Enable2FAJSONRequestBody Enable2FAJSONBody
 
 // UpdateAvatarMultipartRequestBody defines body for UpdateAvatar for multipart/form-data ContentType.
 type UpdateAvatarMultipartRequestBody UpdateAvatarMultipartBody
@@ -91,6 +100,15 @@ type SignUpJSONRequestBody = SignUpRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Disable2FA Выключить 2FA
+	// (POST /auth/2fa/disable)
+	Disable2FA(w http.ResponseWriter, r *http.Request)
+	// Enable2FA Подтвердить и включить 2FA
+	// (POST /auth/2fa/enable)
+	Enable2FA(w http.ResponseWriter, r *http.Request)
+	// Generate2FA Получить QR-код для 2FA
+	// (GET /auth/2fa/generate)
+	Generate2FA(w http.ResponseWriter, r *http.Request)
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(w http.ResponseWriter, r *http.Request)
@@ -122,6 +140,48 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// Disable2FA operation middleware
+func (siw *ServerInterfaceWrapper) Disable2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Disable2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Enable2FA operation middleware
+func (siw *ServerInterfaceWrapper) Enable2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Enable2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Generate2FA operation middleware
+func (siw *ServerInterfaceWrapper) Generate2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Generate2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // UpdateAvatar operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +408,95 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/auth/avatar", wrapper.UpdateAvatar).Methods(http.MethodPut)
 
+	r.HandleFunc(options.BaseURL+"/auth/2fa/generate", wrapper.Generate2FA).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/auth/2fa/enable", wrapper.Enable2FA).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/auth/2fa/disable", wrapper.Disable2FA).Methods(http.MethodPost)
+
 	return r
+}
+
+type Disable2FARequestObject struct {
+}
+
+type Disable2FAResponseObject interface {
+	VisitDisable2FAResponse(w http.ResponseWriter) error
+}
+
+type Disable2FA200Response struct {
+}
+
+func (response Disable2FA200Response) VisitDisable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type Disable2FA401Response struct {
+}
+
+func (response Disable2FA401Response) VisitDisable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Enable2FARequestObject struct {
+	Body *Enable2FAJSONRequestBody
+}
+
+type Enable2FAResponseObject interface {
+	VisitEnable2FAResponse(w http.ResponseWriter) error
+}
+
+type Enable2FA200Response struct {
+}
+
+func (response Enable2FA200Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type Enable2FA401Response struct {
+}
+
+func (response Enable2FA401Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Generate2FARequestObject struct {
+}
+
+type Generate2FAResponseObject interface {
+	VisitGenerate2FAResponse(w http.ResponseWriter) error
+}
+
+type Generate2FA200ImagepngResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response Generate2FA200ImagepngResponse) VisitGenerate2FAResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/png")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type Generate2FA401Response struct {
+}
+
+func (response Generate2FA401Response) VisitGenerate2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
 }
 
 type UpdateAvatarRequestObject struct {
@@ -622,6 +770,15 @@ func (response SignUp413Response) VisitSignUpResponse(w http.ResponseWriter) err
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Disable2FA Выключить 2FA
+	// (POST /auth/2fa/disable)
+	Disable2FA(ctx context.Context, request Disable2FARequestObject) (Disable2FAResponseObject, error)
+	// Enable2FA Подтвердить и включить 2FA
+	// (POST /auth/2fa/enable)
+	Enable2FA(ctx context.Context, request Enable2FARequestObject) (Enable2FAResponseObject, error)
+	// Generate2FA Получить QR-код для 2FA
+	// (GET /auth/2fa/generate)
+	Generate2FA(ctx context.Context, request Generate2FARequestObject) (Generate2FAResponseObject, error)
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(ctx context.Context, request UpdateAvatarRequestObject) (UpdateAvatarResponseObject, error)
@@ -682,6 +839,85 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// Disable2FA operation middleware
+func (sh *strictHandler) Disable2FA(w http.ResponseWriter, r *http.Request) {
+	var request Disable2FARequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Disable2FA(ctx, request.(Disable2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Disable2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Disable2FAResponseObject); ok {
+		if err := validResponse.VisitDisable2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Enable2FA operation middleware
+func (sh *strictHandler) Enable2FA(w http.ResponseWriter, r *http.Request) {
+	var request Enable2FARequestObject
+
+	var body Enable2FAJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Enable2FA(ctx, request.(Enable2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Enable2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Enable2FAResponseObject); ok {
+		if err := validResponse.VisitEnable2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Generate2FA operation middleware
+func (sh *strictHandler) Generate2FA(w http.ResponseWriter, r *http.Request) {
+	var request Generate2FARequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Generate2FA(ctx, request.(Generate2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Generate2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Generate2FAResponseObject); ok {
+		if err := validResponse.VisitGenerate2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // UpdateAvatar operation middleware
@@ -885,38 +1121,41 @@ func (sh *strictHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"JUMsOdBfG1iN4gmcZ+zIQNXb6P1rAA==",
+	"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",
+	"fq3JqhcewkXKjhSp2uvt/wwA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

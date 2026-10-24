@@ -176,6 +176,60 @@ paths:
         '415':
           description: Формат не jpeg, png или webp
 
+  /auth/2fa/generate:
+    get:
+      tags: [auth]
+      operationId: Generate2FA
+      summary: Получить QR-код для 2FA
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: PNG с QR-кодом
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Не авторизован
+
+  /auth/2fa/enable:
+    post:
+      tags: [auth]
+      operationId: Enable2FA
+      summary: Подтвердить и включить 2FA
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        '200':
+          description: 2FA включена
+        '401':
+          description: Неверный код
+
+  /auth/2fa/disable:
+    post:
+      tags: [auth]
+      operationId: Disable2FA
+      summary: Выключить 2FA
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: 2FA выключена
+        '401':
+          description: Не авторизован
+
   /notes/all:
     get:
       tags: [notes]

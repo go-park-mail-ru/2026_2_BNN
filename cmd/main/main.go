@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -122,16 +121,16 @@ func main() {
 	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		spec, err := authapi.GetSwagger()
+		// Читаем файл при каждом запросе (удобно при локальной разработке)
+		data, err := os.ReadFile("docs/openapi.yaml")
 		if err != nil {
-			httpjson.ResponseError(w, r, err)
+			slog.Error("Failed to read spec", "error", err)
+			http.Error(w, "Spec not found", http.StatusNotFound)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(spec); err != nil {
-			slog.Error("Failed to write spec", "error", err)
-		}
+		w.Header().Set("Content-Type", "application/x-yaml")
+		w.Write(data)
 	}).Methods(http.MethodGet)
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
@@ -139,7 +138,7 @@ func main() {
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 	)).Methods(http.MethodGet)
-
+	
 	server := http.Server{
 		Addr:    ":5458",
 		Handler: corsMiddleware(router),

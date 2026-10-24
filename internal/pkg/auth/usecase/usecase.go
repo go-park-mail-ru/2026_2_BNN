@@ -13,6 +13,12 @@ import (
 	"bnn/internal/pkg/auth"
 
 	uuid "github.com/satori/go.uuid"
+
+	"encoding/base32"
+	"net/url"
+
+	"github.com/dgryski/dgoogauth"
+	"github.com/skip2/go-qrcode"
 )
 
 const (
@@ -20,6 +26,7 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
+	issuerName        = "BNN_Notes"
 )
 
 type Usecase struct {
@@ -247,4 +254,67 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 		_ = u.storage.DeleteFile(ctx, path.Base(oldAvatar))
 	}
 	return user, nil
+}
+
+func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error) {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	secretBytes := make([]byte, 20)
+	if _, err := rand.Read(secretBytes); err != nil {
+		return nil, fmt.Errorf("generate secret: %w", err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secretBytes)
+
+	if err := u.repo.UpdateTOTPSecret(ctx, userID, secret); err != nil {
+		return nil, err
+	}
+
+	u2, _ := url.Parse("otpauth://totp")
+	u2.Path += fmt.Sprintf("/%s:%s", url.PathEscape(issuerName), url.PathEscape(user.Login))
+
+	params := url.Values{}
+	params.Add("secret", secret)
+	params.Add("issuer", issuerName)
+	u2.RawQuery = params.Encode()
+
+	png, err := qrcode.Encode(u2.String(), qrcode.Medium, 256)
+	if err != nil {
+		return nil, fmt.Errorf("generate qr: %w", err)
+	}
+
+	return png, nil
+}
+
+func (u *Usecase) Enable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if user.TOTPSecret == "" {
+		return models.ErrValidation
+	}
+
+	otpConfig := &dgoogauth.OTPConfig{
+		Secret:      user.TOTPSecret,
+		WindowSize:  3,
+		HotpCounter: 0,
+	}
+
+	valid, err := otpConfig.Authenticate(code)
+	if err != nil || !valid {
+		return models.ErrInvalidToken
+	}
+
+	return u.repo.Set2FAStatus(ctx, userID, true)
+}
+
+func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID) error {
+	if err := u.repo.Set2FAStatus(ctx, userID, false); err != nil {
+		return err
+	}
+	return u.repo.UpdateTOTPSecret(ctx, userID, "")
 }

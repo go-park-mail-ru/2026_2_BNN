@@ -107,7 +107,7 @@ CREATE TABLE block_version (
     PRIMARY KEY (block_id, version),
     block_id   UUID                                  NOT NULL,
     version    INTEGER                               NOT NULL,
-    content    TEXT                                  NOT NULL,
+    content    JSONB                                 NOT NULL,
     created_by UUID                                  NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     FOREIGN KEY (block_id) REFERENCES block (id)

@@ -126,11 +126,21 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 	}
 
 	note, err := h.uc.UpdateNote(ctx, userID, uuid.UUID(req.Id), notes.UpdateNoteRequest{
-		Title:  req.Body.Title,
-		Header: req.Body.Header,
-		Icon:   req.Body.Icon,
-		Blocks: blocks,
+		Title:   req.Body.Title,
+		Header:  req.Body.Header,
+		Icon:    req.Body.Icon,
+		Version: req.Body.Version,
+		Blocks:  blocks,
 	})
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return api.UpdateNote404Response{}, nil
+	}
+	if errors.Is(err, models.ErrNoteConflict) {
+		return api.UpdateNote409Response{}, nil
+	}
+	if errors.Is(err, models.ErrValidation) {
+		return api.UpdateNote400Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +195,7 @@ func toAPINote(n models.Note) api.Note {
 		Title:        n.Title,
 		Header:       header,
 		Icon:         icon,
+		Version:      n.Version,
 		Blocks:       blocks,
 		CreatedAt:    n.CreatedAt,
 		UpdatedAt:    n.UpdatedAt,

@@ -43,7 +43,6 @@ var revokeSessionQuery string
 //go:embed queries/revoke_user_sessions.sql
 var revokeUserSessionsQuery string
 
-
 var txOptions = pgx.TxOptions{IsoLevel: pgx.ReadCommitted}
 
 type Repo struct {

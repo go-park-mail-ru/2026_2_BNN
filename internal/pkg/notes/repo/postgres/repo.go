@@ -62,8 +62,11 @@ var createNoteBlockQuery string
 //go:embed queries/delete_orphan_blocks.sql
 var deleteOrphanBlocksQuery string
 
-//go:embed queries/lock_own_note.sql
-var lockOwnNoteQuery string
+//go:embed queries/lock_own_subtree.sql
+var lockOwnSubtreeQuery string
+
+//go:embed queries/read_notes_block_ids.sql
+var readNotesBlockIDsQuery string
 
 //go:embed queries/delete_note.sql
 var deleteNoteQuery string
@@ -245,24 +248,23 @@ func (r *Repo) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req not
 	return note, nil
 }
 
-// DeleteNote удаляет заметку владельца и её блоки, которые больше нигде не используются.
+// DeleteNote удаляет заметку владельца вместе со всеми вложенными заметками
+// (ON DELETE CASCADE) и блоки поддерева, которые больше нигде не используются.
 func (r *Repo) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
 	err := pgx.BeginTxFunc(ctx, r.db, writeTxOptions, func(tx pgx.Tx) error {
-		// Блокировка нужна, чтобы параллельное сохранение не добавило блоки,
-		// пока мы собираем их список.
-		var id uuid.UUID
-		if err := tx.QueryRow(ctx, lockOwnNoteQuery, noteID, userID).Scan(&id); err != nil {
-			return err
-		}
-
-		oldIDs, err := readNoteBlockIDs(ctx, tx, noteID)
+		// Блокируем всё поддерево: иначе параллельное сохранение вложенной
+		// заметки добавит блоки, пока мы собираем их список.
+		noteIDs, err := lockOwnSubtree(ctx, tx, userID, noteID)
 		if err != nil {
 			return err
 		}
+		if len(noteIDs) == 0 {
+			return models.ErrNoteNotFound
+		}
 
-		blockIDs := make([]uuid.UUID, 0, len(oldIDs))
-		for id := range oldIDs {
-			blockIDs = append(blockIDs, id)
+		blockIDs, err := readNotesBlockIDs(ctx, tx, noteIDs)
+		if err != nil {
+			return err
 		}
 
 		batch := &pgx.Batch{}
@@ -271,14 +273,52 @@ func (r *Repo) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
 
 		return tx.SendBatch(ctx, batch).Close()
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return models.ErrNoteNotFound
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return err
 	}
 	if err != nil {
 		return fmt.Errorf("delete note: %w", err)
 	}
 
 	return nil
+}
+
+func lockOwnSubtree(ctx context.Context, tx pgx.Tx, userID, noteID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, lockOwnSubtreeQuery, noteID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, rows.Err()
+}
+
+func readNotesBlockIDs(ctx context.Context, tx pgx.Tx, noteIDs []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, readNotesBlockIDsQuery, noteIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, rows.Err()
 }
 
 func conflictOrNotFound(ctx context.Context, tx pgx.Tx, userID, noteID uuid.UUID) error {

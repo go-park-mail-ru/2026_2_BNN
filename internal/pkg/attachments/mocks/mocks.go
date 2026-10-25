@@ -110,62 +110,63 @@ func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
-// CreateAttachment mocks base method.
-func (m *MockRepo) CreateAttachment(ctx context.Context, attachment models.Attachment) error {
+// CanEditBlock mocks base method.
+func (m *MockRepo) CanEditBlock(ctx context.Context, userID, blockID uuid.UUID) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAttachment", ctx, attachment)
+	ret := m.ctrl.Call(m, "CanEditBlock", ctx, userID, blockID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CanEditBlock indicates an expected call of CanEditBlock.
+func (mr *MockRepoMockRecorder) CanEditBlock(ctx, userID, blockID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanEditBlock", reflect.TypeOf((*MockRepo)(nil).CanEditBlock), ctx, userID, blockID)
+}
+
+// CreateAttachment mocks base method.
+func (m *MockRepo) CreateAttachment(ctx context.Context, userID uuid.UUID, attachment models.Attachment) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAttachment", ctx, userID, attachment)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateAttachment indicates an expected call of CreateAttachment.
-func (mr *MockRepoMockRecorder) CreateAttachment(ctx, attachment any) *gomock.Call {
+func (mr *MockRepoMockRecorder) CreateAttachment(ctx, userID, attachment any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAttachment", reflect.TypeOf((*MockRepo)(nil).CreateAttachment), ctx, attachment)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAttachment", reflect.TypeOf((*MockRepo)(nil).CreateAttachment), ctx, userID, attachment)
 }
 
 // DeleteAttachment mocks base method.
-func (m *MockRepo) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
+func (m *MockRepo) DeleteAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAttachment", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "DeleteAttachment", ctx, userID, attachmentID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeleteAttachment indicates an expected call of DeleteAttachment.
-func (mr *MockRepoMockRecorder) DeleteAttachment(ctx, id any) *gomock.Call {
+func (mr *MockRepoMockRecorder) DeleteAttachment(ctx, userID, attachmentID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAttachment", reflect.TypeOf((*MockRepo)(nil).DeleteAttachment), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAttachment", reflect.TypeOf((*MockRepo)(nil).DeleteAttachment), ctx, userID, attachmentID)
 }
 
-// ReadAttachment mocks base method.
-func (m *MockRepo) ReadAttachment(ctx context.Context, id uuid.UUID) (models.Attachment, error) {
+// ReadAttachmentPath mocks base method.
+func (m *MockRepo) ReadAttachmentPath(ctx context.Context, userID, attachmentID uuid.UUID) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadAttachment", ctx, id)
-	ret0, _ := ret[0].(models.Attachment)
+	ret := m.ctrl.Call(m, "ReadAttachmentPath", ctx, userID, attachmentID)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReadAttachment indicates an expected call of ReadAttachment.
-func (mr *MockRepoMockRecorder) ReadAttachment(ctx, id any) *gomock.Call {
+// ReadAttachmentPath indicates an expected call of ReadAttachmentPath.
+func (mr *MockRepoMockRecorder) ReadAttachmentPath(ctx, userID, attachmentID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAttachment", reflect.TypeOf((*MockRepo)(nil).ReadAttachment), ctx, id)
-}
-
-// ReadBlockOwner mocks base method.
-func (m *MockRepo) ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadBlockOwner", ctx, blockID)
-	ret0, _ := ret[0].(uuid.UUID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReadBlockOwner indicates an expected call of ReadBlockOwner.
-func (mr *MockRepoMockRecorder) ReadBlockOwner(ctx, blockID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlockOwner", reflect.TypeOf((*MockRepo)(nil).ReadBlockOwner), ctx, blockID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAttachmentPath", reflect.TypeOf((*MockRepo)(nil).ReadAttachmentPath), ctx, userID, attachmentID)
 }
 
 // MockFileRepo is a mock of FileRepo interface.

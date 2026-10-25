@@ -1,7 +1,7 @@
--- Учётные записи для локальной проверки.
+-- Учётные записи для локальной проверки. Не миграция: запускать вручную через psql.
 -- password_hash — bcrypt от строки password.
 
-INSERT INTO "user" (
+INSERT INTO users (
     id,
     login,
     password_hash

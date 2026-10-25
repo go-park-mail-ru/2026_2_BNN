@@ -11,7 +11,7 @@ build/             Dockerfile
 cmd/main/          точка входа, роутинг
 internal/models/   структуры данных
 internal/pkg/      auth, notes, ctxutil, httpjson, middleware
-migrations/        миграции БД
+db/                схема и миграции БД, см. db/README.md
 postman/           коллекция запросов
 nginx.conf         конфиг nginx
 Makefile           тесты, покрытие, генерация моков
@@ -77,78 +77,4 @@ make cover
 
 ## Схема БД
 
-```mermaid
-erDiagram
-    users {
-        uuid id PK
-        text login UK
-        bytea password_hash
-        text avatar
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    refresh_tokens {
-        bytea token_hash PK
-        uuid user_id FK
-        timestamptz expires_at
-        timestamptz created_at
-    }
-
-    notes {
-        uuid id PK
-        uuid parent_note_id FK
-        uuid created_by FK
-        varchar(255) title
-        text header
-        text icon
-        uuid[] block_ids
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    blocks {
-        uuid id PK
-        uuid note_id FK
-        jsonb content
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    attachments {
-        uuid id PK
-        uuid block_id FK
-        text path UK
-    }
-
-    favorite {
-        uuid user_id PK, FK
-        uuid note_id PK, FK
-    }
-
-    tags {
-        uuid id PK
-        uuid created_by FK "UNIQUE вместе с name"
-        text name "1-30 символов"
-        text color "#RRGGBBAA"
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    note_tags {
-        uuid note_id PK, FK
-        uuid tag_id PK, FK
-    }
-
-    users ||--o{ refresh_tokens : "has"
-    users ||--o{ notes : "creates"
-    notes |o--o{ notes : "parent of"
-    notes ||--o{ blocks : "contains"
-    blocks ||--o{ attachments : "has"
-    users ||--o{ favorite : "marks"
-    notes ||--o{ favorite : "marked in"
-    users ||--o{ tags : "creates"
-    notes ||--o{ note_tags : "has"
-    tags ||--o{ note_tags : "attached to"
-```
-
+Описание — в [db/README.md](db/README.md), ER-диаграммы — в [db/normalized](db/normalized).

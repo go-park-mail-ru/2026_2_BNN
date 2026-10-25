@@ -1,1 +1,0 @@
-DELETE FROM blocks WHERE id = ANY($1);

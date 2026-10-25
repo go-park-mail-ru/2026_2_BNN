@@ -1,2 +1,8 @@
-INSERT INTO blocks (id, note_id, content, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5);
+WITH inserted AS (
+    INSERT INTO block (id, content)
+    VALUES ($1, $2)
+    RETURNING id, content
+)
+INSERT INTO block_version (block_id, version, content, created_by)
+SELECT id, 1, content, $3
+FROM inserted;

@@ -1,1 +1,3 @@
-DELETE FROM notes WHERE id = $1;
+DELETE FROM note
+WHERE id = $1
+  AND created_by = $2;

@@ -76,6 +76,9 @@ type Note struct {
 	// Title Example: Моя заметка
 	Title     string    `json:"title"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	// Version Растёт при каждом сохранении. Присылать в PUT /notes/{id}
+	Version int `json:"version"`
 }
 
 // UpdateNoteRequest defines model for UpdateNoteRequest.
@@ -86,6 +89,9 @@ type UpdateNoteRequest struct {
 
 	// Title Example: Новая заметка
 	Title string `json:"title"`
+
+	// Version Версия, которую видел клиент. Если в базе уже другая, будет 409
+	Version int `json:"version"`
 }
 
 // AttachmentID defines model for AttachmentID.
@@ -626,6 +632,14 @@ type UpdateNote404Response struct {
 
 func (response UpdateNote404Response) VisitUpdateNoteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(404)
+	return nil
+}
+
+type UpdateNote409Response struct {
+}
+
+func (response UpdateNote409Response) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(409)
 	return nil
 }
 

@@ -14,6 +14,7 @@ type Note struct {
 	Title        string     `json:"title"`
 	Header       string     `json:"header,omitempty"`
 	Icon         string     `json:"icon,omitempty"`
+	Version      int        `json:"version"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 }

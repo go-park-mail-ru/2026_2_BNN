@@ -14,4 +14,5 @@ var (
 	ErrBlockNotFound        = errors.New("block not found")
 	ErrAttachmentNotFound   = errors.New("attachment not found")
 	ErrUnsupportedFileType  = errors.New("unsupported file type")
+	ErrNoteConflict         = errors.New("note was changed by someone else")
 )

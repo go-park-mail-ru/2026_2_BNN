@@ -31,8 +31,14 @@ func NewUsecase(repo attachments.Repo, storage attachments.FileRepo) *Usecase {
 }
 
 func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUID, data []byte, contentType string) (models.Attachment, error) {
-	if err := u.checkBlockOwner(ctx, userID, blockID); err != nil {
+	// Проверка до загрузки в S3, чтобы не грузить файл зря.
+	// Окончательно права проверяет транзакция в CreateAttachment.
+	canEdit, err := u.repo.CanEditBlock(ctx, userID, blockID)
+	if err != nil {
 		return models.Attachment{}, err
+	}
+	if !canEdit {
+		return models.Attachment{}, models.ErrBlockNotFound
 	}
 
 	ext, ok := allowedTypes[contentType]
@@ -52,7 +58,7 @@ func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUI
 		return models.Attachment{}, err
 	}
 
-	if err := u.repo.CreateAttachment(ctx, attachment); err != nil {
+	if err := u.repo.CreateAttachment(ctx, userID, attachment); err != nil {
 		_ = u.storage.DeleteFile(ctx, attachment.Path)
 		return models.Attachment{}, err
 	}
@@ -61,49 +67,19 @@ func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUI
 }
 
 func (u *Usecase) GetAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.File, error) {
-	attachment, err := u.readOwnAttachment(ctx, userID, attachmentID)
+	path, err := u.repo.ReadAttachmentPath(ctx, userID, attachmentID)
 	if err != nil {
 		return models.File{}, err
 	}
 
-	return u.storage.GetFile(ctx, attachment.Path)
+	return u.storage.GetFile(ctx, path)
 }
 
 func (u *Usecase) DeleteAttachment(ctx context.Context, userID, attachmentID uuid.UUID) error {
-	attachment, err := u.readOwnAttachment(ctx, userID, attachmentID)
+	path, err := u.repo.DeleteAttachment(ctx, userID, attachmentID)
 	if err != nil {
 		return err
 	}
 
-	if err := u.repo.DeleteAttachment(ctx, attachmentID); err != nil {
-		return err
-	}
-
-	return u.storage.DeleteFile(ctx, attachment.Path)
-}
-
-func (u *Usecase) readOwnAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.Attachment, error) {
-	attachment, err := u.repo.ReadAttachment(ctx, attachmentID)
-	if err != nil {
-		return models.Attachment{}, err
-	}
-
-	if err := u.checkBlockOwner(ctx, userID, attachment.BlockID); err != nil {
-		return models.Attachment{}, models.ErrAttachmentNotFound
-	}
-
-	return attachment, nil
-}
-
-func (u *Usecase) checkBlockOwner(ctx context.Context, userID, blockID uuid.UUID) error {
-	ownerID, err := u.repo.ReadBlockOwner(ctx, blockID)
-	if err != nil {
-		return err
-	}
-
-	if ownerID != userID {
-		return models.ErrBlockNotFound
-	}
-
-	return nil
+	return u.storage.DeleteFile(ctx, path)
 }

@@ -34,9 +34,7 @@ func TestChangePassword(t *testing.T) {
 			newPassword: "newpassword",
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(user, nil)
-				repo.EXPECT().UpdatePassword(gomock.Any(), userID, gomock.Any()).Return(nil)
-				repo.EXPECT().DeleteUserRefreshTokens(gomock.Any(), userID).Return(nil)
-				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().UpdatePassword(gomock.Any(), userID, user.PasswordHash, gomock.Any(), gomock.Any()).Return(nil)
 			},
 		},
 		{
@@ -91,12 +89,7 @@ func TestSignUp(t *testing.T) {
 		password := "password123"
 
 		mockRepo.EXPECT().
-			CreateUser(gomock.Any(), gomock.Any()).
-			Return(nil).
-			Times(1)
-
-		mockRepo.EXPECT().
-			CreateRefreshToken(gomock.Any(), gomock.Any()).
+			CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil).
 			Times(1)
 
@@ -133,7 +126,7 @@ func TestUpdateAvatar(t *testing.T) {
 					Return(models.User{ID: userID, Avatar: "/avatars/old.jpg"}, nil)
 				storage.EXPECT().PublicPath(gomock.Any()).Return("/avatars/new.png", nil)
 				storage.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
-				repo.EXPECT().UpdateAvatar(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().UpdateAvatar(gomock.Any(), userID, "/avatars/new.png").Return(nil)
 				storage.EXPECT().DeleteFile(gomock.Any(), "old.jpg").Return(nil)
 			},
 		},

@@ -62,11 +62,12 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 		UpdatedAt:    now,
 	}
 
-	if err := u.repo.CreateUser(ctx, user); err != nil {
+	refreshToken, session := newSession(user.ID)
+	if err := u.repo.CreateUser(ctx, user, session); err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	tokens, err := u.authTokens(user.ID, refreshToken, session)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
@@ -91,7 +92,12 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	refreshToken, session := newSession(user.ID)
+	if err := u.repo.CreateSession(ctx, session); err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	tokens, err := u.authTokens(user.ID, refreshToken, session)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
@@ -99,8 +105,10 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 	return user, tokens, nil
 }
 
-func (u *Usecase) Refresh(ctx context.Context, refreshToken string) (models.AuthTokens, error) {
-	token, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
+func (u *Usecase) Refresh(ctx context.Context, oldRefreshToken string) (models.AuthTokens, error) {
+	refreshToken, session := newSession(uuid.Nil)
+
+	userID, err := u.repo.RotateSession(ctx, hashRefreshToken(oldRefreshToken), session)
 	if errors.Is(err, models.ErrRefreshTokenNotFound) {
 		return models.AuthTokens{}, models.ErrInvalidToken
 	}
@@ -108,20 +116,11 @@ func (u *Usecase) Refresh(ctx context.Context, refreshToken string) (models.Auth
 		return models.AuthTokens{}, err
 	}
 
-	if time.Now().After(token.ExpiresAt) {
-		return models.AuthTokens{}, models.ErrInvalidToken
-	}
-
-	return u.createTokens(ctx, token.UserID)
+	return u.authTokens(userID, refreshToken, session)
 }
 
 func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
-	_, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
-	if errors.Is(err, models.ErrRefreshTokenNotFound) {
-		return nil
-	}
-
-	return err
+	return u.repo.RevokeSession(ctx, hashRefreshToken(refreshToken))
 }
 
 func (u *Usecase) Authenticate(_ context.Context, accessToken string) (uuid.UUID, error) {
@@ -156,44 +155,37 @@ func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassw
 		return models.AuthTokens{}, err
 	}
 
-	if err := u.repo.UpdatePassword(ctx, userID, passwordHash); err != nil {
+	refreshToken, session := newSession(userID)
+	if err := u.repo.UpdatePassword(ctx, userID, user.PasswordHash, passwordHash, session); err != nil {
 		return models.AuthTokens{}, err
 	}
 
-	if err := u.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
-		return models.AuthTokens{}, err
-	}
-
-	return u.createTokens(ctx, userID)
+	return u.authTokens(userID, refreshToken, session)
 }
 
-func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
-	now := time.Now().UTC()
-	accessExpiresAt := now.Add(accessTokenTTL)
-	refreshExpiresAt := now.Add(refreshTokenTTL)
+func newSession(userID uuid.UUID) (string, models.RefreshToken) {
+	refreshToken := rand.Text()
+
+	return refreshToken, models.RefreshToken{
+		TokenHash: hashRefreshToken(refreshToken),
+		UserID:    userID,
+		ExpiresAt: time.Now().UTC().Add(refreshTokenTTL),
+	}
+}
+
+func (u *Usecase) authTokens(userID uuid.UUID, refreshToken string, session models.RefreshToken) (models.AuthTokens, error) {
+	accessExpiresAt := time.Now().UTC().Add(accessTokenTTL)
 
 	accessToken, err := u.newAccessToken(userID, accessExpiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
 	}
 
-	refreshToken := rand.Text()
-
-	err = u.repo.CreateRefreshToken(ctx, models.RefreshToken{
-		TokenHash: hashRefreshToken(refreshToken),
-		UserID:    userID,
-		ExpiresAt: refreshExpiresAt,
-		CreatedAt: now,
-	})
-	if err != nil {
-		return models.AuthTokens{}, err
-	}
-
 	return models.AuthTokens{
 		AccessToken:      accessToken,
 		AccessExpiresAt:  accessExpiresAt,
 		RefreshToken:     refreshToken,
-		RefreshExpiresAt: refreshExpiresAt,
+		RefreshExpiresAt: session.ExpiresAt,
 	}, nil
 }
 
@@ -238,7 +230,7 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 	oldAvatar := user.Avatar
 	user.Avatar = avatar
 	user.UpdatedAt = time.Now().UTC()
-	if err := u.repo.UpdateAvatar(ctx, user); err != nil {
+	if err := u.repo.UpdateAvatar(ctx, userID, avatar); err != nil {
 		_ = u.storage.DeleteFile(ctx, key)
 		return models.User{}, err
 	}

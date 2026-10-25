@@ -4,8 +4,8 @@
 
 CREATE TABLE user_session (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES "user" (id) ON DELETE CASCADE ON UPDATE RESTRICT,
-    token_hash TEXT NOT NULL UNIQUE CHECK (char_length(btrim(token_hash)) > 0),
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE ON UPDATE RESTRICT,
+    token_hash BYTEA NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL,
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +30,7 @@ CREATE UNIQUE INDEX user_visit_one_open_per_session
 
 CREATE TABLE note_member (
     note_id UUID NOT NULL REFERENCES note (id) ON DELETE CASCADE ON UPDATE RESTRICT,
-    user_id UUID NOT NULL REFERENCES "user" (id) ON DELETE CASCADE ON UPDATE RESTRICT,
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE ON UPDATE RESTRICT,
     role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
     joined_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     removed_at TIMESTAMPTZ,
@@ -42,8 +42,8 @@ CREATE INDEX note_member_user_idx ON note_member (user_id);
 CREATE TABLE note_invitation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     note_id UUID NOT NULL REFERENCES note (id) ON DELETE CASCADE ON UPDATE RESTRICT,
-    invited_by UUID NOT NULL REFERENCES "user" (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    invited_user_id UUID NOT NULL REFERENCES "user" (id) ON DELETE CASCADE ON UPDATE RESTRICT,
+    invited_by UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    invited_user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE ON UPDATE RESTRICT,
     role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'accepted', 'declined', 'revoked', 'expired')),
@@ -70,7 +70,7 @@ CREATE TABLE chat (
 CREATE TABLE chat_message (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID NOT NULL REFERENCES chat (id) ON DELETE CASCADE ON UPDATE RESTRICT,
-    sender_id UUID NOT NULL REFERENCES "user" (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    sender_id UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     content TEXT NOT NULL CHECK (char_length(btrim(content)) > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

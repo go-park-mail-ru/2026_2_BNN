@@ -1,5 +1,7 @@
 -- Нет DEFAULT у login, password_hash, avatar, title, header, icon, content,
--- path, position, version и внешних ключей: значение задаёт приложение.
+-- path, position, block_version.version и внешних ключей: значение задаёт приложение.
+-- note.version начинается с 1 и растёт при каждом изменении заметки:
+-- по нему работает оптимистическая блокировка.
 -- avatar, title, header и icon могут быть NULL.
 -- parent_note_id может быть NULL, остальные внешние ключи — нет.
 --
@@ -31,20 +33,20 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE "user" (
+CREATE TABLE users (
     PRIMARY KEY (id),
     id            UUID        DEFAULT gen_random_uuid() NOT NULL,
     login         TEXT                                  NOT NULL UNIQUE,
-                  CONSTRAINT user_login_not_empty
-                  CHECK (char_length(btrim(login)) > 0),
-    password_hash TEXT                                  NOT NULL,
+                  CONSTRAINT users_login_length
+                  CHECK (char_length(login) BETWEEN 3 AND 20),
+    password_hash BYTEA                                 NOT NULL,
     avatar        TEXT,
     created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE TRIGGER user_set_updated_at
-    BEFORE UPDATE ON "user"
+CREATE TRIGGER users_set_updated_at
+    BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
@@ -58,12 +60,15 @@ CREATE TABLE note (
     title          TEXT,
     header         TEXT,
     icon           TEXT,
+    version        INTEGER     DEFAULT 1                 NOT NULL,
+                   CONSTRAINT note_version_positive
+                   CHECK (version >= 1),
     created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     FOREIGN KEY (parent_note_id) REFERENCES note (id)
         ON DELETE SET NULL
         ON UPDATE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES "user" (id)
+    FOREIGN KEY (created_by) REFERENCES users (id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT
 );
@@ -77,7 +82,7 @@ CREATE TABLE favorite (
     PRIMARY KEY (user_id, note_id),
     user_id UUID NOT NULL,
     note_id UUID NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES "user" (id)
+    FOREIGN KEY (user_id) REFERENCES users (id)
         ON DELETE CASCADE
         ON UPDATE RESTRICT,
     FOREIGN KEY (note_id) REFERENCES note (id)
@@ -88,7 +93,7 @@ CREATE TABLE favorite (
 CREATE TABLE block (
     PRIMARY KEY (id),
     id         UUID        DEFAULT gen_random_uuid() NOT NULL,
-    content    TEXT                                  NOT NULL,
+    content    JSONB                                 NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -108,7 +113,7 @@ CREATE TABLE block_version (
     FOREIGN KEY (block_id) REFERENCES block (id)
         ON DELETE CASCADE
         ON UPDATE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES "user" (id)
+    FOREIGN KEY (created_by) REFERENCES users (id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT,
     CONSTRAINT block_version_number_positive

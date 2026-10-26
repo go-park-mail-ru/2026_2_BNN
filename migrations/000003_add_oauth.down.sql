@@ -1,0 +1,5 @@
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_login_length;
+ALTER TABLE users ADD CONSTRAINT users_login_length CHECK (char_length(login) BETWEEN 3 AND 20);
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+ALTER TABLE users DROP COLUMN IF EXISTS email;
+ALTER TABLE users DROP COLUMN IF EXISTS is_external;

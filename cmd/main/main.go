@@ -9,12 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"uuid"
 
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
 	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
 	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
+	"bnn/internal/pkg/auth"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
@@ -74,8 +76,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	oauthConfig := auth.NewOAuthConfig(
+		os.Getenv("GITHUB_CLIENT_ID"),
+		os.Getenv("GITHUB_CLIENT_SECRET"),
+		os.Getenv("VK_CLIENT_ID"),
+		os.Getenv("VK_CLIENT_SECRET"),
+		os.Getenv("APP_BASE_URL"),
+	)
+
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, oauthConfig, mustEnv("JWT_SECRET")),
 	)
 
 	notesHandler := notesDelivery.NewHandler(
@@ -101,6 +111,60 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
 
+	router.HandleFunc("/api/auth/github/login", func(w http.ResponseWriter, r *http.Request) {
+		state := uuid.NewV4().String()
+		http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode})
+		url := authHandler.GetOAuthURL("github", state)
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/api/auth/github/callback", func(w http.ResponseWriter, r *http.Request) {
+		stateCookie, err := r.Cookie("oauth_state")
+		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
+			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+			return
+		}
+		user, tokens, err := authHandler.HandleOAuthCallback(r.Context(), "github", r.URL.Query().Get("code"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = user
+		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: false})
+		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: false})
+		http.Redirect(w, r, "http://localhost:3000/profile", http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/api/auth/vk/login", func(w http.ResponseWriter, r *http.Request) {
+		state := uuid.NewV4().String()
+		http.SetCookie(w, &http.Cookie{
+			Name: "vk_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode,
+		})
+
+		url := authHandler.GetOAuthURL("vk", state)
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/api/auth/vk/callback", func(w http.ResponseWriter, r *http.Request) {
+		stateCookie, err := r.Cookie("vk_state")
+		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
+			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+			return
+		}
+
+		user, tokens, err := authHandler.HandleOAuthCallback(r.Context(), "vk", r.URL.Query().Get("code"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = user
+
+		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: false})
+		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: false})
+
+		http.Redirect(w, r, "http://localhost:3000/profile", http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
+
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
 	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize20MB))
@@ -121,7 +185,6 @@ func main() {
 	}), apiRouter)
 
 	router.HandleFunc("/swagger/spec.json", func(w http.ResponseWriter, r *http.Request) {
-		// Читаем файл при каждом запросе (удобно при локальной разработке)
 		data, err := os.ReadFile("docs/openapi.yaml")
 		if err != nil {
 			slog.Error("Failed to read spec", "error", err)
@@ -138,7 +201,7 @@ func main() {
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 	)).Methods(http.MethodGet)
-	
+
 	server := http.Server{
 		Addr:    ":5458",
 		Handler: corsMiddleware(router),

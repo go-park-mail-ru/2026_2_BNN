@@ -232,3 +232,19 @@ func (h *Handler) Disable2FA(ctx context.Context, req api.Disable2FARequestObjec
 
 	return api.Disable2FA200Response{}, nil
 }
+
+func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObject) (api.GitHubLoginResponseObject, error) {
+	return nil, errors.New("use /api/auth/github/login router directly")
+}
+
+func (h *Handler) GitHubCallback(ctx context.Context, req api.GitHubCallbackRequestObject) (api.GitHubCallbackResponseObject, error) {
+	return nil, errors.New("use /api/auth/github/callback router directly")
+}
+
+func (h *Handler) GetOAuthURL(provider string, state string) string {
+	return h.uc.GetOAuthURL(provider, state)
+}
+
+func (h *Handler) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
+	return h.uc.HandleOAuthCallback(ctx, provider, code)
+}

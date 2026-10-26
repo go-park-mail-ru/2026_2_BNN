@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -83,6 +85,15 @@ type UpdateAvatarMultipartBody struct {
 	Avatar openapi_types.File `json:"avatar"`
 }
 
+// GitHubCallbackParams defines parameters for GitHubCallback.
+type GitHubCallbackParams struct {
+	// Code Код авторизации от GitHub
+	Code string `form:"code" json:"code"`
+
+	// State Строка для защиты от CSRF
+	State string `form:"state" json:"state"`
+}
+
 // Enable2FAJSONRequestBody defines body for Enable2FA for application/json ContentType.
 type Enable2FAJSONRequestBody Enable2FAJSONBody
 
@@ -100,6 +111,9 @@ type SignUpJSONRequestBody = SignUpRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GitHubLogin Вход через GitHub
+	// (GET /auth/2fa/disable)
+	GitHubLogin(w http.ResponseWriter, r *http.Request)
 	// Disable2FA Выключить 2FA
 	// (POST /auth/2fa/disable)
 	Disable2FA(w http.ResponseWriter, r *http.Request)
@@ -112,6 +126,9 @@ type ServerInterface interface {
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(w http.ResponseWriter, r *http.Request)
+	// GitHubCallback Callback от GitHub
+	// (GET /auth/github/callback)
+	GitHubCallback(w http.ResponseWriter, r *http.Request, params GitHubCallbackParams)
 	// Logout Выход
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
@@ -140,6 +157,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GitHubLogin operation middleware
+func (siw *ServerInterfaceWrapper) GitHubLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GitHubLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Disable2FA operation middleware
 func (siw *ServerInterfaceWrapper) Disable2FA(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +219,52 @@ func (siw *ServerInterfaceWrapper) UpdateAvatar(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAvatar(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GitHubCallback operation middleware
+func (siw *ServerInterfaceWrapper) GitHubCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GitHubCallbackParams
+
+	// ------------- Required query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GitHubCallback(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -412,9 +489,36 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/auth/2fa/enable", wrapper.Enable2FA).Methods(http.MethodPost)
 
+	r.HandleFunc(options.BaseURL+"/auth/2fa/disable", wrapper.GitHubLogin).Methods(http.MethodGet)
+
 	r.HandleFunc(options.BaseURL+"/auth/2fa/disable", wrapper.Disable2FA).Methods(http.MethodPost)
 
+	r.HandleFunc(options.BaseURL+"/auth/github/callback", wrapper.GitHubCallback).Methods(http.MethodGet)
+
 	return r
+}
+
+type GitHubLoginRequestObject struct {
+}
+
+type GitHubLoginResponseObject interface {
+	VisitGitHubLoginResponse(w http.ResponseWriter) error
+}
+
+type GitHubLogin307Response struct {
+}
+
+func (response GitHubLogin307Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
+	w.WriteHeader(307)
+	return nil
+}
+
+type GitHubLogin500Response struct {
+}
+
+func (response GitHubLogin500Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
 }
 
 type Disable2FARequestObject struct {
@@ -550,6 +654,38 @@ type UpdateAvatar415Response struct {
 
 func (response UpdateAvatar415Response) VisitUpdateAvatarResponse(w http.ResponseWriter) error {
 	w.WriteHeader(415)
+	return nil
+}
+
+type GitHubCallbackRequestObject struct {
+	Params GitHubCallbackParams
+}
+
+type GitHubCallbackResponseObject interface {
+	VisitGitHubCallbackResponse(w http.ResponseWriter) error
+}
+
+type GitHubCallback307Response struct {
+}
+
+func (response GitHubCallback307Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(307)
+	return nil
+}
+
+type GitHubCallback400Response struct {
+}
+
+func (response GitHubCallback400Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type GitHubCallback500Response struct {
+}
+
+func (response GitHubCallback500Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
 	return nil
 }
 
@@ -770,6 +906,9 @@ func (response SignUp413Response) VisitSignUpResponse(w http.ResponseWriter) err
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GitHubLogin Вход через GitHub
+	// (GET /auth/2fa/disable)
+	GitHubLogin(ctx context.Context, request GitHubLoginRequestObject) (GitHubLoginResponseObject, error)
 	// Disable2FA Выключить 2FA
 	// (POST /auth/2fa/disable)
 	Disable2FA(ctx context.Context, request Disable2FARequestObject) (Disable2FAResponseObject, error)
@@ -782,6 +921,9 @@ type StrictServerInterface interface {
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(ctx context.Context, request UpdateAvatarRequestObject) (UpdateAvatarResponseObject, error)
+	// GitHubCallback Callback от GitHub
+	// (GET /auth/github/callback)
+	GitHubCallback(ctx context.Context, request GitHubCallbackRequestObject) (GitHubCallbackResponseObject, error)
 	// Logout Выход
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
@@ -839,6 +981,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GitHubLogin operation middleware
+func (sh *strictHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
+	var request GitHubLoginRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GitHubLogin(ctx, request.(GitHubLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GitHubLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GitHubLoginResponseObject); ok {
+		if err := validResponse.VisitGitHubLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Disable2FA operation middleware
@@ -944,6 +1110,32 @@ func (sh *strictHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAvatarResponseObject); ok {
 		if err := validResponse.VisitUpdateAvatarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GitHubCallback operation middleware
+func (sh *strictHandler) GitHubCallback(w http.ResponseWriter, r *http.Request, params GitHubCallbackParams) {
+	var request GitHubCallbackRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GitHubCallback(ctx, request.(GitHubCallbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GitHubCallback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GitHubCallbackResponseObject); ok {
+		if err := validResponse.VisitGitHubCallbackResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1121,41 +1313,46 @@ func (sh *strictHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"fq3JqhcewkXKjhSp2uvt/wwA",
+	"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",
+	"tvpKg1UvPIReTI4YqBrrjf8NAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

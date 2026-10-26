@@ -63,7 +63,7 @@ func TestChangePassword(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			tt.prepare(repo)
 
-			u := NewUsecase(repo, nil, "secret")
+			u := NewUsecase(repo, nil, nil, "secret")
 
 			tokens, err := u.ChangePassword(context.Background(), userID, tt.oldPassword, tt.newPassword)
 
@@ -84,7 +84,7 @@ func TestSignUp(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockRepo(ctrl)
-	uc := NewUsecase(mockRepo, nil, "test_secret")
+	uc := NewUsecase(mockRepo, nil, nil, "test_secret")
 
 	t.Run("Success", func(t *testing.T) {
 		login := "testuser"
@@ -152,7 +152,7 @@ func TestUpdateAvatar(t *testing.T) {
 			storage := mocks.NewMockStorage(ctrl)
 			tt.prepare(repo, storage)
 
-			uc := NewUsecase(repo, storage, "test_secret")
+			uc := NewUsecase(repo, storage, nil, "test_secret")
 
 			user, err := uc.UpdateAvatar(context.Background(), userID, data, tt.contentType)
 

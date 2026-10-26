@@ -22,6 +22,8 @@ type Usecase interface {
 	Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error)
 	Enable2FA(ctx context.Context, userID uuid.UUID, code string) error
 	Disable2FA(ctx context.Context, userID uuid.UUID) error
+	GetOAuthURL(provider string, state string) string
+	HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error)
 }
 
 type Repo interface {
@@ -37,6 +39,8 @@ type Repo interface {
 
 	Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error
 	UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error
+
+	ReadUserByEmail(ctx context.Context, email string) (models.User, error)
 }
 
 type Storage interface {

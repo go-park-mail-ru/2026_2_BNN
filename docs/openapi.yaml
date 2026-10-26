@@ -230,6 +230,45 @@ paths:
         '401':
           description: Не авторизован
 
+    /auth/github/login:
+    get:
+      tags: [auth]
+      operationId: GitHubLogin
+      summary: Вход через GitHub
+      description: Перенаправляет пользователя на страницу авторизации GitHub.
+      responses:
+        '307':
+          description: Временный редирект на GitHub
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /auth/github/callback:
+    get:
+      tags: [auth]
+      operationId: GitHubCallback
+      summary: Callback от GitHub
+      description: Обрабатывает код авторизации от GitHub, создает пользователя (если нужно) и ставит куки.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Код авторизации от GitHub
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          description: Строка для защиты от CSRF
+          schema:
+            type: string
+      responses:
+        '307':
+          description: Временный редирект на фронтенд после успешного входа
+        '400':
+          description: Неверный state или отсутствует код
+        '500':
+          description: Внутренняя ошибка сервера
+
   /notes/all:
     get:
       tags: [notes]

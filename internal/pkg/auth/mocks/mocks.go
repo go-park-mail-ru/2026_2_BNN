@@ -115,6 +115,20 @@ func (mr *MockUsecaseMockRecorder) Generate2FA(ctx, userID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate2FA", reflect.TypeOf((*MockUsecase)(nil).Generate2FA), ctx, userID)
 }
 
+// GetOAuthURL mocks base method.
+func (m *MockUsecase) GetOAuthURL(provider, state string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOAuthURL", provider, state)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetOAuthURL indicates an expected call of GetOAuthURL.
+func (mr *MockUsecaseMockRecorder) GetOAuthURL(provider, state any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuthURL", reflect.TypeOf((*MockUsecase)(nil).GetOAuthURL), provider, state)
+}
+
 // GetUser mocks base method.
 func (m *MockUsecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -128,6 +142,22 @@ func (m *MockUsecase) GetUser(ctx context.Context, userID uuid.UUID) (models.Use
 func (mr *MockUsecaseMockRecorder) GetUser(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockUsecase)(nil).GetUser), ctx, userID)
+}
+
+// HandleOAuthCallback mocks base method.
+func (m *MockUsecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleOAuthCallback", ctx, provider, code)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(models.AuthTokens)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// HandleOAuthCallback indicates an expected call of HandleOAuthCallback.
+func (mr *MockUsecaseMockRecorder) HandleOAuthCallback(ctx, provider, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleOAuthCallback", reflect.TypeOf((*MockUsecase)(nil).HandleOAuthCallback), ctx, provider, code)
 }
 
 // Logout mocks base method.
@@ -285,6 +315,21 @@ func (m *MockRepo) DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID
 func (mr *MockRepoMockRecorder) DeleteUserRefreshTokens(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRefreshTokens", reflect.TypeOf((*MockRepo)(nil).DeleteUserRefreshTokens), ctx, userID)
+}
+
+// ReadUserByEmail mocks base method.
+func (m *MockRepo) ReadUserByEmail(ctx context.Context, email string) (models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadUserByEmail", ctx, email)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadUserByEmail indicates an expected call of ReadUserByEmail.
+func (mr *MockRepoMockRecorder) ReadUserByEmail(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByEmail", reflect.TypeOf((*MockRepo)(nil).ReadUserByEmail), ctx, email)
 }
 
 // ReadUserByID mocks base method.

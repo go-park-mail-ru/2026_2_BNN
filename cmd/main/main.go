@@ -31,6 +31,11 @@ import (
 	notesUsecase "bnn/internal/pkg/notes/usecase"
 	"bnn/internal/pkg/s3"
 
+	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
+	tagsapi "bnn/internal/pkg/tags/delivery/http/api"
+	tagsRepo "bnn/internal/pkg/tags/repo/postgres"
+	tagsUsecase "bnn/internal/pkg/tags/usecase"
+
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -93,6 +98,10 @@ func main() {
 		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage),
 	)
 
+	tagsHandler := tagsDelivery.NewHandler(
+		tagsUsecase.NewUsecase(tagsRepo.NewRepo(db)),
+	)
+
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
 		slog.Error("Failed to create CORS middleware", "error", err)
@@ -117,6 +126,11 @@ func main() {
 	}), apiRouter)
 
 	attachmentsapi.HandlerFromMux(attachmentsapi.NewStrictHandlerWithOptions(attachmentsHandler, nil, attachmentsapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), apiRouter)
+
+	tagsapi.HandlerFromMux(tagsapi.NewStrictHandlerWithOptions(tagsHandler, nil, tagsapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)

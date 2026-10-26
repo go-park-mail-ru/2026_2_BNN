@@ -14,4 +14,6 @@ var (
 	ErrBlockNotFound        = errors.New("block not found")
 	ErrAttachmentNotFound   = errors.New("attachment not found")
 	ErrUnsupportedFileType  = errors.New("unsupported file type")
+	ErrTagNotFound          = errors.New("tag not found")
+	ErrTagExists            = errors.New("tag already exists")
 )

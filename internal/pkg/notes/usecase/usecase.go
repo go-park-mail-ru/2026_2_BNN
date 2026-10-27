@@ -27,12 +27,6 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
-	if req.ParentNoteID != nil {
-		if _, err := u.repo.ReadNote(ctx, userID, *req.ParentNoteID); err != nil {
-			return models.Note{}, err
-		}
-	}
-
 	now := time.Now().UTC()
 	note := models.Note{
 		ID:           uuid.NewV4(),

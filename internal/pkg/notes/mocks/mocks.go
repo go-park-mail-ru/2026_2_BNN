@@ -169,21 +169,6 @@ func (mr *MockRepoMockRecorder) DeleteNote(ctx, userID, noteID any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNote", reflect.TypeOf((*MockRepo)(nil).DeleteNote), ctx, userID, noteID)
 }
 
-// ReadNote mocks base method.
-func (m *MockRepo) ReadNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadNote", ctx, userID, noteID)
-	ret0, _ := ret[0].(models.Note)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReadNote indicates an expected call of ReadNote.
-func (mr *MockRepoMockRecorder) ReadNote(ctx, userID, noteID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadNote", reflect.TypeOf((*MockRepo)(nil).ReadNote), ctx, userID, noteID)
-}
-
 // ReadNoteWithBlocks mocks base method.
 func (m *MockRepo) ReadNoteWithBlocks(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
 	m.ctrl.T.Helper()

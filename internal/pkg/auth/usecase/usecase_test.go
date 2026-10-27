@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth/mocks"
@@ -111,6 +112,7 @@ func TestSignUp(t *testing.T) {
 func TestUpdateAvatar(t *testing.T) {
 	userID := uuid.NewV4()
 	data := []byte("image")
+	updatedAt := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name        string
@@ -126,7 +128,7 @@ func TestUpdateAvatar(t *testing.T) {
 					Return(models.User{ID: userID, Avatar: "/avatars/old.jpg"}, nil)
 				storage.EXPECT().PublicPath(gomock.Any()).Return("/avatars/new.png", nil)
 				storage.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
-				repo.EXPECT().UpdateAvatar(gomock.Any(), userID, "/avatars/new.png").Return(nil)
+				repo.EXPECT().UpdateAvatar(gomock.Any(), userID, "/avatars/new.png").Return(updatedAt, nil)
 				storage.EXPECT().DeleteFile(gomock.Any(), "old.jpg").Return(nil)
 			},
 		},
@@ -156,6 +158,7 @@ func TestUpdateAvatar(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, "/avatars/new.png", user.Avatar)
+			assert.Equal(t, updatedAt, user.UpdatedAt)
 		})
 	}
 }

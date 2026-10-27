@@ -88,18 +88,6 @@ func NewRepo(db *pgxpool.Pool) *Repo {
 	return &Repo{db: db}
 }
 
-func (r *Repo) ReadNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
-	note, err := scanNote(r.db.QueryRow(ctx, readNoteQuery, noteID, userID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return models.Note{}, models.ErrNoteNotFound
-	}
-	if err != nil {
-		return models.Note{}, fmt.Errorf("read note: %w", err)
-	}
-
-	return note, nil
-}
-
 func (r *Repo) ReadNoteWithBlocks(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
 	var note models.Note
 
@@ -144,22 +132,33 @@ func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset in
 }
 
 // CreateNote создаёт заметку, членство автора с ролью editor и чат заметки
-// одной транзакцией, как требует relations.md.
+// одной транзакцией, как требует relations.md. Если родитель указан,
+// пользователь должен быть его editor, иначе ErrNoteNotFound.
 func (r *Repo) CreateNote(ctx context.Context, note models.Note) error {
 	err := pgx.BeginTxFunc(ctx, r.db, writeTxOptions, func(tx pgx.Tx) error {
-		batch := &pgx.Batch{}
-		batch.Queue(createNoteQuery,
+		tag, err := tx.Exec(ctx, createNoteQuery,
 			note.ID, note.ParentNoteID, note.CreatedBy,
 			note.Title, note.Header, note.Icon,
 			note.CreatedAt, note.UpdatedAt,
 		)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return models.ErrNoteNotFound
+		}
+
+		batch := &pgx.Batch{}
 		batch.Queue(createOwnerMemberQuery, note.ID, note.CreatedBy)
 		batch.Queue(createChatQuery, note.ID)
 
 		return tx.SendBatch(ctx, batch).Close()
 	})
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return err
+	}
 	if err != nil {
-		// Родителя удалили между проверкой в usecase и вставкой.
+		// Родителя удалили во время вставки.
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolationCode && pgErr.ConstraintName == parentNoteForeignKey {
 			return models.ErrNoteNotFound
@@ -199,33 +198,31 @@ func (r *Repo) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req not
 		}
 
 		batch := &pgx.Batch{}
-		note.Blocks = make([]models.Block, 0, len(req.Blocks))
+		blockIDs := make([]uuid.UUID, 0, len(req.Blocks))
 
 		for _, b := range req.Blocks {
-			block := models.Block{Content: b.Content, CreatedAt: note.UpdatedAt, UpdatedAt: note.UpdatedAt}
-
 			if b.ID == nil {
-				block.ID = uuid.NewV4()
-				batch.Queue(createBlockQuery, block.ID, block.Content, userID)
-			} else {
-				// Чужой блок или повтор id в запросе.
-				if _, ok := oldIDs[*b.ID]; !ok {
-					return fmt.Errorf("%w: block %s is not in note", models.ErrValidation, *b.ID)
-				}
-				delete(oldIDs, *b.ID)
-
-				block.ID = *b.ID
-				batch.Queue(updateBlockQuery, block.ID, block.Content, userID)
+				id := uuid.NewV4()
+				batch.Queue(createBlockQuery, id, b.Content, userID)
+				blockIDs = append(blockIDs, id)
+				continue
 			}
 
-			note.Blocks = append(note.Blocks, block)
+			// Чужой блок или повтор id в запросе.
+			if _, ok := oldIDs[*b.ID]; !ok {
+				return fmt.Errorf("%w: block %s is not in note", models.ErrValidation, *b.ID)
+			}
+			delete(oldIDs, *b.ID)
+
+			batch.Queue(updateBlockQuery, *b.ID, b.Content, userID)
+			blockIDs = append(blockIDs, *b.ID)
 		}
 
 		// Порядок переписывается целиком: по одному обновлять position
 		// не даёт UNIQUE (note_id, position).
 		batch.Queue(deleteNoteBlocksQuery, note.ID)
-		for position, block := range note.Blocks {
-			batch.Queue(createNoteBlockQuery, note.ID, block.ID, position)
+		for position, id := range blockIDs {
+			batch.Queue(createNoteBlockQuery, note.ID, id, position)
 		}
 
 		if len(oldIDs) > 0 {
@@ -236,7 +233,13 @@ func (r *Repo) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req not
 			batch.Queue(deleteOrphanBlocksQuery, removedIDs)
 		}
 
-		return tx.SendBatch(ctx, batch).Close()
+		if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+			return err
+		}
+
+		// Время создания и изменения блоков ставит БД, поэтому в ответ — то, что записано.
+		note.Blocks, err = readBlocks(ctx, tx, note.ID)
+		return err
 	})
 	if errors.Is(err, models.ErrNoteNotFound) || errors.Is(err, models.ErrNoteConflict) || errors.Is(err, models.ErrValidation) {
 		return models.Note{}, err

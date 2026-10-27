@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"bnn/internal/models"
 
@@ -25,11 +26,13 @@ type Repo interface {
 	CreateUser(ctx context.Context, user models.User, session models.RefreshToken) error
 	ReadUserByLogin(ctx context.Context, login string) (models.User, error)
 	ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error)
-	UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) error
+	UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) (time.Time, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, newHash []byte, session models.RefreshToken) error
 
 	CreateSession(ctx context.Context, session models.RefreshToken) error
-	RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) (uuid.UUID, error)
+	ReadSessionUserByToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error)
+	ReadActiveSessionUser(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error)
+	RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) error
 	RevokeSession(ctx context.Context, tokenHash []byte) error
 }
 

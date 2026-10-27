@@ -26,6 +26,7 @@ type User struct {
 }
 
 type RefreshToken struct {
+	ID        uuid.UUID
 	TokenHash []byte
 	UserID    uuid.UUID
 	ExpiresAt time.Time

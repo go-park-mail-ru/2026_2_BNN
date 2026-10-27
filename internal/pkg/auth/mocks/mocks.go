@@ -13,6 +13,7 @@ import (
 	models "bnn/internal/models"
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	uuid "github.com/satori/go.uuid"
 	gomock "go.uber.org/mock/gomock"
@@ -215,6 +216,36 @@ func (mr *MockRepoMockRecorder) CreateUser(ctx, user, session any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockRepo)(nil).CreateUser), ctx, user, session)
 }
 
+// ReadActiveSessionUser mocks base method.
+func (m *MockRepo) ReadActiveSessionUser(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadActiveSessionUser", ctx, sessionID)
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadActiveSessionUser indicates an expected call of ReadActiveSessionUser.
+func (mr *MockRepoMockRecorder) ReadActiveSessionUser(ctx, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadActiveSessionUser", reflect.TypeOf((*MockRepo)(nil).ReadActiveSessionUser), ctx, sessionID)
+}
+
+// ReadSessionUserByToken mocks base method.
+func (m *MockRepo) ReadSessionUserByToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadSessionUserByToken", ctx, tokenHash)
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadSessionUserByToken indicates an expected call of ReadSessionUserByToken.
+func (mr *MockRepoMockRecorder) ReadSessionUserByToken(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadSessionUserByToken", reflect.TypeOf((*MockRepo)(nil).ReadSessionUserByToken), ctx, tokenHash)
+}
+
 // ReadUserByID mocks base method.
 func (m *MockRepo) ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -260,12 +291,11 @@ func (mr *MockRepoMockRecorder) RevokeSession(ctx, tokenHash any) *gomock.Call {
 }
 
 // RotateSession mocks base method.
-func (m *MockRepo) RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) (uuid.UUID, error) {
+func (m *MockRepo) RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RotateSession", ctx, oldTokenHash, session)
-	ret0, _ := ret[0].(uuid.UUID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // RotateSession indicates an expected call of RotateSession.
@@ -275,11 +305,12 @@ func (mr *MockRepoMockRecorder) RotateSession(ctx, oldTokenHash, session any) *g
 }
 
 // UpdateAvatar mocks base method.
-func (m *MockRepo) UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) error {
+func (m *MockRepo) UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) (time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateAvatar", ctx, userID, avatar)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateAvatar indicates an expected call of UpdateAvatar.

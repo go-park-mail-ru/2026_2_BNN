@@ -19,7 +19,6 @@ type Usecase interface {
 }
 
 type Repo interface {
-	ReadNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error)
 	ReadNoteWithBlocks(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error)
 	ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error)
 

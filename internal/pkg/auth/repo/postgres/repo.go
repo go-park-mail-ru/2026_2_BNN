@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"time"
 
 	"bnn/internal/models"
 
@@ -37,6 +38,12 @@ var updateUserAvatarQuery string
 //go:embed queries/create_session.sql
 var createSessionQuery string
 
+//go:embed queries/read_session_user_by_token.sql
+var readSessionUserByTokenQuery string
+
+//go:embed queries/read_active_session_user.sql
+var readActiveSessionUserQuery string
+
 //go:embed queries/revoke_session.sql
 var revokeSessionQuery string
 
@@ -66,7 +73,7 @@ func (r *Repo) CreateUser(ctx context.Context, user models.User, session models.
 			return err
 		}
 
-		_, err = tx.Exec(ctx, createSessionQuery, user.ID, session.TokenHash, session.ExpiresAt)
+		_, err = tx.Exec(ctx, createSessionQuery, session.ID, user.ID, session.TokenHash, session.ExpiresAt)
 		return err
 	})
 	if err != nil {
@@ -89,17 +96,18 @@ func (r *Repo) ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, err
 	return r.readUser(ctx, readUserByIDQuery, id)
 }
 
-func (r *Repo) UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) error {
-	tag, err := r.db.Exec(ctx, updateUserAvatarQuery, avatar, userID)
+func (r *Repo) UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) (time.Time, error) {
+	var updatedAt time.Time
+
+	err := r.db.QueryRow(ctx, updateUserAvatarQuery, avatar, userID).Scan(&updatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return time.Time{}, models.ErrUserNotFound
+	}
 	if err != nil {
-		return fmt.Errorf("update avatar: %w", err)
+		return time.Time{}, fmt.Errorf("update avatar: %w", err)
 	}
 
-	if tag.RowsAffected() == 0 {
-		return models.ErrUserNotFound
-	}
-
-	return nil
+	return updatedAt, nil
 }
 
 func (r *Repo) UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, newHash []byte, session models.RefreshToken) error {
@@ -116,7 +124,7 @@ func (r *Repo) UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, ne
 			return err
 		}
 
-		_, err = tx.Exec(ctx, createSessionQuery, userID, session.TokenHash, session.ExpiresAt)
+		_, err = tx.Exec(ctx, createSessionQuery, session.ID, userID, session.TokenHash, session.ExpiresAt)
 		return err
 	})
 	if err != nil {
@@ -127,7 +135,7 @@ func (r *Repo) UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, ne
 }
 
 func (r *Repo) CreateSession(ctx context.Context, session models.RefreshToken) error {
-	_, err := r.db.Exec(ctx, createSessionQuery, session.UserID, session.TokenHash, session.ExpiresAt)
+	_, err := r.db.Exec(ctx, createSessionQuery, session.ID, session.UserID, session.TokenHash, session.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -135,25 +143,37 @@ func (r *Repo) CreateSession(ctx context.Context, session models.RefreshToken) e
 	return nil
 }
 
-func (r *Repo) RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) (uuid.UUID, error) {
-	var userID uuid.UUID
+func (r *Repo) ReadSessionUserByToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
+	return r.readSessionUser(ctx, readSessionUserByTokenQuery, tokenHash)
+}
 
+func (r *Repo) ReadActiveSessionUser(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error) {
+	return r.readSessionUser(ctx, readActiveSessionUserQuery, sessionID)
+}
+
+// RotateSession отзывает старую сессию и создаёт новую одной транзакцией.
+// Если старая уже отозвана, истекла или принадлежит другому пользователю, новая не создаётся.
+func (r *Repo) RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) error {
 	err := pgx.BeginTxFunc(ctx, r.db, txOptions, func(tx pgx.Tx) error {
+		var userID uuid.UUID
 		if err := tx.QueryRow(ctx, revokeSessionQuery, oldTokenHash).Scan(&userID); err != nil {
 			return err
 		}
+		if userID != session.UserID {
+			return pgx.ErrNoRows
+		}
 
-		_, err := tx.Exec(ctx, createSessionQuery, userID, session.TokenHash, session.ExpiresAt)
+		_, err := tx.Exec(ctx, createSessionQuery, session.ID, session.UserID, session.TokenHash, session.ExpiresAt)
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, models.ErrRefreshTokenNotFound
+		return models.ErrSessionNotFound
 	}
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("rotate session: %w", err)
+		return fmt.Errorf("rotate session: %w", err)
 	}
 
-	return userID, nil
+	return nil
 }
 
 func (r *Repo) RevokeSession(ctx context.Context, tokenHash []byte) error {
@@ -162,6 +182,20 @@ func (r *Repo) RevokeSession(ctx context.Context, tokenHash []byte) error {
 	}
 
 	return nil
+}
+
+func (r *Repo) readSessionUser(ctx context.Context, query string, arg any) (uuid.UUID, error) {
+	var userID uuid.UUID
+
+	err := r.db.QueryRow(ctx, query, arg).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, models.ErrSessionNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("read session: %w", err)
+	}
+
+	return userID, nil
 }
 
 func (r *Repo) readUser(ctx context.Context, query string, arg any) (models.User, error) {

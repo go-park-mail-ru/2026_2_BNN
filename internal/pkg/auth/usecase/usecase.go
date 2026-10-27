@@ -328,24 +328,17 @@ func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID) error {
 }
 
 func (u *Usecase) GetOAuthURL(provider string, state string) string {
-	switch provider {
-	case "github":
+	if provider == "github" {
 		return u.oauth.GitHub.AuthCodeURL(state)
-	case "vk":
-		return u.oauth.VK.AuthCodeURL(state) // <-- Добавлено
 	}
 	return ""
 }
 
 func (u *Usecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
-	switch provider {
-	case "github":
-		return u.handleGitHubCallback(ctx, code)
-	case "vk":
-		return u.handleVKCallback(ctx, code)
-	default:
+	if provider != "github" {
 		return models.User{}, models.AuthTokens{}, models.ErrValidation
 	}
+	return u.handleGitHubCallback(ctx, code)
 }
 
 func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models.User, models.AuthTokens, error) {
@@ -404,67 +397,6 @@ func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models
 				Login:      email,
 				Email:      email,
 				Avatar:     ghUser.AvatarURL,
-				IsExternal: true,
-				CreatedAt:  now,
-				UpdatedAt:  now,
-			}
-			if err := u.repo.CreateUser(ctx, user); err != nil {
-				return models.User{}, models.AuthTokens{}, err
-			}
-		} else {
-			return models.User{}, models.AuthTokens{}, err
-		}
-	}
-
-	tokens, err := u.createTokens(ctx, user.ID)
-	if err != nil {
-		return models.User{}, models.AuthTokens{}, err
-	}
-
-	return user, tokens, nil
-}
-
-func (u *Usecase) handleVKCallback(ctx context.Context, code string) (models.User, models.AuthTokens, error) {
-	tok, err := u.oauth.VK.Exchange(ctx, code)
-	if err != nil {
-		return models.User{}, models.AuthTokens{}, fmt.Errorf("exchange vk code: %w", err)
-	}
-
-	email, _ := tok.Extra("email").(string)
-	if email == "" {
-		return models.User{}, models.AuthTokens{}, errors.New("no email provided by vk")
-	}
-
-	client := u.oauth.VK.Client(ctx, tok)
-	resp, err := client.Get("https://api.vk.com/method/users.get?fields=photo_200&v=5.199")
-	if err != nil {
-		return models.User{}, models.AuthTokens{}, fmt.Errorf("get vk user: %w", err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	var vkResp struct {
-		Response []struct {
-			FirstName string `json:"first_name"`
-			Photo200  string `json:"photo_200"`
-		} `json:"response"`
-	}
-	json.Unmarshal(body, &vkResp)
-
-	var avatar string
-	if len(vkResp.Response) > 0 {
-		avatar = vkResp.Response[0].Photo200
-	}
-
-	user, err := u.repo.ReadUserByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, models.ErrUserNotFound) {
-			now := time.Now().UTC()
-			user = models.User{
-				ID:         uuid.NewV4(),
-				Login:      email,
-				Email:      email,
-				Avatar:     avatar,
 				IsExternal: true,
 				CreatedAt:  now,
 				UpdatedAt:  now,

@@ -76,12 +76,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	appBaseURL := os.Getenv("APP_BASE_URL")
+	if appBaseURL == "" {
+		appBaseURL = "http://localhost:5458"
+	}
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
 	oauthConfig := auth.NewOAuthConfig(
 		os.Getenv("GITHUB_CLIENT_ID"),
 		os.Getenv("GITHUB_CLIENT_SECRET"),
-		os.Getenv("VK_CLIENT_ID"),
-		os.Getenv("VK_CLIENT_SECRET"),
-		os.Getenv("APP_BASE_URL"),
+		appBaseURL,
 	)
 
 	authHandler := authDelivery.NewHandler(
@@ -113,7 +121,7 @@ func main() {
 
 	router.HandleFunc("/api/auth/github/login", func(w http.ResponseWriter, r *http.Request) {
 		state := uuid.NewV4().String()
-		http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode})
+		http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 		url := authHandler.GetOAuthURL("github", state)
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	}).Methods(http.MethodGet)
@@ -130,39 +138,9 @@ func main() {
 			return
 		}
 		_ = user
-		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: false})
-		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: false})
-		http.Redirect(w, r, "http://localhost:3000/profile", http.StatusTemporaryRedirect)
-	}).Methods(http.MethodGet)
-
-	router.HandleFunc("/api/auth/vk/login", func(w http.ResponseWriter, r *http.Request) {
-		state := uuid.NewV4().String()
-		http.SetCookie(w, &http.Cookie{
-			Name: "vk_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode,
-		})
-
-		url := authHandler.GetOAuthURL("vk", state)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-	}).Methods(http.MethodGet)
-
-	router.HandleFunc("/api/auth/vk/callback", func(w http.ResponseWriter, r *http.Request) {
-		stateCookie, err := r.Cookie("vk_state")
-		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
-			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
-			return
-		}
-
-		user, tokens, err := authHandler.HandleOAuthCallback(r.Context(), "vk", r.URL.Query().Get("code"))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		_ = user
-
-		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: false})
-		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: false})
-
-		http.Redirect(w, r, "http://localhost:3000/profile", http.StatusTemporaryRedirect)
+		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: true})
+		http.Redirect(w, r, frontendURL+"/profile", http.StatusTemporaryRedirect)
 	}).Methods(http.MethodGet)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()

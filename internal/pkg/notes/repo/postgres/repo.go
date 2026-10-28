@@ -31,14 +31,23 @@ var updateNoteQuery string
 //go:embed queries/delete_note.sql
 var deleteNoteQuery string
 
-//go:embed queries/create_block.sql
-var createBlockQuery string
-
-//go:embed queries/update_block.sql
-var updateBlockQuery string
-
 //go:embed queries/delete_blocks.sql
 var deleteBlocksQuery string
+
+//go:embed queries/upsert_block.sql
+var upsertBlockQuery string
+
+//go:embed queries/read_note_tags.sql
+var readNoteTagsQuery string
+
+//go:embed queries/read_user_tags.sql
+var readUserTagsQuery string
+
+//go:embed queries/delete_note_tags.sql
+var deleteNoteTagsQuery string
+
+//go:embed queries/create_note_tags.sql
+var createNoteTagsQuery string
 
 type Repo struct {
 	db *pgxpool.Pool
@@ -108,6 +117,34 @@ func (r *Repo) CreateNote(ctx context.Context, note models.Note, blocks []models
 	return err
 }
 
+func (r *Repo) ReadNoteTags(ctx context.Context, noteID uuid.UUID) ([]models.Tag, error) {
+	return r.readTags(ctx, readNoteTagsQuery, noteID)
+}
+
+func (r *Repo) ReadUserTags(ctx context.Context, userID uuid.UUID, tagIDs []uuid.UUID) ([]models.Tag, error) {
+	return r.readTags(ctx, readUserTagsQuery, userID, tagIDs)
+}
+
+func (r *Repo) readTags(ctx context.Context, query string, args ...any) ([]models.Tag, error) {
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read tags: %w", err)
+	}
+	defer rows.Close()
+
+	tags := make([]models.Tag, 0)
+	for rows.Next() {
+		var tag models.Tag
+		err := rows.Scan(&tag.ID, &tag.CreatedBy, &tag.Name, &tag.Color, &tag.CreatedAt, &tag.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan tag: %w", err)
+		}
+		tags = append(tags, tag)
+	}
+
+	return tags, rows.Err()
+}
+
 func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -118,12 +155,7 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 	blockIDs := make([]uuid.UUID, len(blocks))
 	for i, b := range blocks {
 		blockIDs[i] = b.ID
-
-		_, err = tx.Exec(ctx, `
-			INSERT INTO blocks (id, note_id, content, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5)
-			ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at
-		`, b.ID, note.ID, b.Content, b.CreatedAt, b.UpdatedAt)
+		_, err = tx.Exec(ctx, upsertBlockQuery, b.ID, note.ID, b.Content, b.CreatedAt, b.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("upsert block: %w", err)
 		}
@@ -139,6 +171,21 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 		if err != nil {
 			return fmt.Errorf("delete removed blocks: %w", err)
 		}
+	}
+
+	tagIDs := make([]uuid.UUID, len(note.Tags))
+	for i, t := range note.Tags {
+		tagIDs[i] = t.ID
+	}
+
+	_, err = tx.Exec(ctx, deleteNoteTagsQuery, note.ID)
+	if err != nil {
+		return fmt.Errorf("delete note tags: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, createNoteTagsQuery, note.ID, tagIDs)
+	if err != nil {
+		return fmt.Errorf("create note tags: %w", err)
 	}
 
 	return tx.Commit(ctx)

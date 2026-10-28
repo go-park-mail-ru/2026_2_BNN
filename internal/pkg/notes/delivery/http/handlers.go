@@ -121,8 +121,19 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 			uid := uuid.UUID(*b.Id)
 			id = &uid
 		}
-		contentBytes, _ := json.Marshal(b.Content)
+		contentBytes, err := json.Marshal(b.Content)
+		if err != nil {
+			return api.UpdateNote400Response{}, nil
+		}
 		blocks = append(blocks, notes.BlockInput{ID: id, Content: contentBytes})
+	}
+
+	var tagIDs []uuid.UUID
+	if req.Body.TagIds != nil {
+		tagIDs = make([]uuid.UUID, 0, len(*req.Body.TagIds))
+		for _, id := range *req.Body.TagIds {
+			tagIDs = append(tagIDs, uuid.UUID(id))
+		}
 	}
 
 	note, err := h.uc.UpdateNote(ctx, userID, uuid.UUID(req.Id), notes.UpdateNoteRequest{
@@ -130,7 +141,14 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 		Header: req.Body.Header,
 		Icon:   req.Body.Icon,
 		Blocks: blocks,
+		TagIDs: tagIDs,
 	})
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return api.UpdateNote404Response{}, nil
+	}
+	if errors.Is(err, models.ErrBlockNotFound) || errors.Is(err, models.ErrTagNotFound) {
+		return api.UpdateNote400Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +181,15 @@ func toAPINote(n models.Note) api.Note {
 		blocks = &apiBlocks
 	}
 
+	var tags *[]api.Tag
+	if n.Tags != nil {
+		apiTags := make([]api.Tag, 0, len(n.Tags))
+		for _, t := range n.Tags {
+			apiTags = append(apiTags, toAPITag(t))
+		}
+		tags = &apiTags
+	}
+
 	var parentNoteID *openapi_types.UUID
 	if n.ParentNoteID != nil {
 		id := openapi_types.UUID(*n.ParentNoteID)
@@ -186,6 +213,7 @@ func toAPINote(n models.Note) api.Note {
 		Header:       header,
 		Icon:         icon,
 		Blocks:       blocks,
+		Tags:         tags,
 		CreatedAt:    n.CreatedAt,
 		UpdatedAt:    n.UpdatedAt,
 	}
@@ -199,5 +227,15 @@ func toAPIBlock(b models.Block) api.Block {
 		Content:   content,
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
+	}
+}
+
+func toAPITag(t models.Tag) api.Tag {
+	return api.Tag{
+		Id:        openapi_types.UUID(t.ID),
+		Name:      t.Name,
+		Color:     t.Color,
+		CreatedAt: t.CreatedAt,
+		UpdatedAt: t.UpdatedAt,
 	}
 }

@@ -284,7 +284,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Note'
         '400':
-          description: Не прошла валидация, битый JSON или id не UUID
+          description: Не прошла валидация, битый JSON, id не UUID, чужой блок или тег
         '401':
           description: Нет куки или она истекла
         '404':
@@ -606,6 +606,11 @@ components:
           description: Только в ответах на одну заметку, в списке нет
           items:
             $ref: '#/components/schemas/Block'
+        tags:
+          type: array
+          description: Только в ответах на одну заметку, в списке нет
+          items:
+            $ref: '#/components/schemas/Tag'
         created_at:
           type: string
           format: date-time
@@ -670,6 +675,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BlockInput'
+        tag_ids:
+          type: array
+          description: Нет поля — теги не меняются, пустой массив — снять все теги
+          items:
+            type: string
+            format: uuid
 
     BlockInput:
       type: object

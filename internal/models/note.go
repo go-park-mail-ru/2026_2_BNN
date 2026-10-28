@@ -10,6 +10,7 @@ type Note struct {
 	ID           uuid.UUID  `json:"id"`
 	ParentNoteID *uuid.UUID `json:"parent_note_id,omitempty"`
 	Blocks       []Block    `json:"blocks,omitempty"`
+	Tags         []Tag      `json:"tags,omitempty"`
 	CreatedBy    uuid.UUID  `json:"created_by"`
 	Title        string     `json:"title"`
 	Header       string     `json:"header,omitempty"`

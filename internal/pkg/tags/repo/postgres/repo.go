@@ -8,9 +8,10 @@ import (
 
 	"bnn/internal/models"
 
+	"bnn/internal/pkg/database"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -32,10 +33,10 @@ var updateTagQuery string
 var deleteTagQuery string
 
 type Repo struct {
-	db *pgxpool.Pool
+	db database.DB
 }
 
-func NewRepo(db *pgxpool.Pool) *Repo {
+func NewRepo(db database.DB) *Repo {
 	return &Repo{db: db}
 }
 

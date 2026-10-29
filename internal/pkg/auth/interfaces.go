@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"bnn/internal/models"
 
@@ -22,15 +23,17 @@ type Usecase interface {
 }
 
 type Repo interface {
-	CreateUser(ctx context.Context, user models.User) error
+	CreateUser(ctx context.Context, user models.User, session models.RefreshToken) error
 	ReadUserByLogin(ctx context.Context, login string) (models.User, error)
 	ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error)
-	UpdateAvatar(ctx context.Context, user models.User) error
-	UpdatePassword(ctx context.Context, userID uuid.UUID, hash []byte) error
+	UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) (time.Time, error)
+	UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, newHash []byte, session models.RefreshToken) error
 
-	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
-	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
-	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	CreateSession(ctx context.Context, session models.RefreshToken) error
+	ReadSessionUserByToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error)
+	ReadActiveSessionUser(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error)
+	RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) error
+	RevokeSession(ctx context.Context, tokenHash []byte) error
 }
 
 type Storage interface {

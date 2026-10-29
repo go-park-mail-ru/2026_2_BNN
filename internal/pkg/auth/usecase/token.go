@@ -13,8 +13,10 @@ const (
 	refreshTokenTTL = 30 * 24 * time.Hour
 )
 
-func (u *Usecase) newAccessToken(userID uuid.UUID, expiresAt time.Time) (string, error) {
+// В ID (jti) лежит id сессии: по нему Authenticate проверяет, что сессия не отозвана.
+func (u *Usecase) newAccessToken(userID, sessionID uuid.UUID, expiresAt time.Time) (string, error) {
 	claims := jwt.RegisteredClaims{
+		ID:        sessionID.String(),
 		Subject:   userID.String(),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
@@ -23,17 +25,27 @@ func (u *Usecase) newAccessToken(userID uuid.UUID, expiresAt time.Time) (string,
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(u.secret)
 }
 
-func (u *Usecase) parseAccessToken(token string) (uuid.UUID, error) {
+func (u *Usecase) parseAccessToken(token string) (uuid.UUID, uuid.UUID, error) {
 	var claims jwt.RegisteredClaims
 
 	_, err := jwt.ParseWithClaims(token, &claims, func(*jwt.Token) (any, error) {
 		return u.secret, nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, uuid.Nil, err
 	}
 
-	return uuid.FromString(claims.Subject)
+	userID, err := uuid.FromString(claims.Subject)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+
+	sessionID, err := uuid.FromString(claims.ID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+
+	return userID, sessionID, nil
 }
 
 func hashRefreshToken(token string) []byte {

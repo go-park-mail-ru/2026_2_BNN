@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS block_attachment;
+DROP TABLE IF EXISTS attachment;
+DROP TABLE IF EXISTS note_block;
+DROP TABLE IF EXISTS block_version;
+DROP TABLE IF EXISTS block;
+DROP TABLE IF EXISTS favorite;
+DROP TABLE IF EXISTS note;
+DROP TABLE IF EXISTS users;
+
+DROP FUNCTION IF EXISTS set_updated_at();

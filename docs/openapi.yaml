@@ -291,6 +291,8 @@ paths:
           description: Заметки нет или она чужая
         '413':
           description: Тело запроса больше 1 МБ
+        '409':
+          description: Заметку уже изменили, нужно перечитать её
     delete:
       tags: [notes]
       operationId: DeleteNote
@@ -580,7 +582,7 @@ components:
 
     Note:
       type: object
-      required: [id, created_by, title, created_at, updated_at]
+      required: [id, created_by, title, version, created_at, updated_at]
       properties:
         id:
           type: string
@@ -601,6 +603,10 @@ components:
         icon:
           type: string
           description: Нет в ответе, если пустой
+        version:
+          type: integer
+          minimum: 1
+          description: Растёт при каждом сохранении. Присылать в PUT /notes/{id}
         blocks:
           type: array
           description: Только в ответах на одну заметку, в списке нет
@@ -656,7 +662,7 @@ components:
 
     UpdateNoteRequest:
       type: object
-      required: [title, blocks]
+      required: [title, version, blocks]
       properties:
         title:
           type: string
@@ -666,6 +672,10 @@ components:
           type: string
         icon:
           type: string
+        version:
+          type: integer
+          minimum: 1
+          description: Версия, которую видел клиент. Если в базе уже другая, будет 409
         blocks:
           type: array
           items:

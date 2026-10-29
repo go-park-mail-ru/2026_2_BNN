@@ -13,6 +13,7 @@ import (
 	models "bnn/internal/models"
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	uuid "github.com/satori/go.uuid"
 	gomock "go.uber.org/mock/gomock"
@@ -187,61 +188,62 @@ func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
-// CreateRefreshToken mocks base method.
-func (m *MockRepo) CreateRefreshToken(ctx context.Context, token models.RefreshToken) error {
+// CreateSession mocks base method.
+func (m *MockRepo) CreateSession(ctx context.Context, session models.RefreshToken) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRefreshToken", ctx, token)
+	ret := m.ctrl.Call(m, "CreateSession", ctx, session)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CreateRefreshToken indicates an expected call of CreateRefreshToken.
-func (mr *MockRepoMockRecorder) CreateRefreshToken(ctx, token any) *gomock.Call {
+// CreateSession indicates an expected call of CreateSession.
+func (mr *MockRepoMockRecorder) CreateSession(ctx, session any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRefreshToken", reflect.TypeOf((*MockRepo)(nil).CreateRefreshToken), ctx, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockRepo)(nil).CreateSession), ctx, session)
 }
 
 // CreateUser mocks base method.
-func (m *MockRepo) CreateUser(ctx context.Context, user models.User) error {
+func (m *MockRepo) CreateUser(ctx context.Context, user models.User, session models.RefreshToken) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateUser", ctx, user)
+	ret := m.ctrl.Call(m, "CreateUser", ctx, user, session)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateUser indicates an expected call of CreateUser.
-func (mr *MockRepoMockRecorder) CreateUser(ctx, user any) *gomock.Call {
+func (mr *MockRepoMockRecorder) CreateUser(ctx, user, session any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockRepo)(nil).CreateUser), ctx, user)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockRepo)(nil).CreateUser), ctx, user, session)
 }
 
-// DeleteRefreshToken mocks base method.
-func (m *MockRepo) DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
+// ReadActiveSessionUser mocks base method.
+func (m *MockRepo) ReadActiveSessionUser(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRefreshToken", ctx, tokenHash)
-	ret0, _ := ret[0].(models.RefreshToken)
+	ret := m.ctrl.Call(m, "ReadActiveSessionUser", ctx, sessionID)
+	ret0, _ := ret[0].(uuid.UUID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteRefreshToken indicates an expected call of DeleteRefreshToken.
-func (mr *MockRepoMockRecorder) DeleteRefreshToken(ctx, tokenHash any) *gomock.Call {
+// ReadActiveSessionUser indicates an expected call of ReadActiveSessionUser.
+func (mr *MockRepoMockRecorder) ReadActiveSessionUser(ctx, sessionID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRefreshToken", reflect.TypeOf((*MockRepo)(nil).DeleteRefreshToken), ctx, tokenHash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadActiveSessionUser", reflect.TypeOf((*MockRepo)(nil).ReadActiveSessionUser), ctx, sessionID)
 }
 
-// DeleteUserRefreshTokens mocks base method.
-func (m *MockRepo) DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+// ReadSessionUserByToken mocks base method.
+func (m *MockRepo) ReadSessionUserByToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserRefreshTokens", ctx, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "ReadSessionUserByToken", ctx, tokenHash)
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// DeleteUserRefreshTokens indicates an expected call of DeleteUserRefreshTokens.
-func (mr *MockRepoMockRecorder) DeleteUserRefreshTokens(ctx, userID any) *gomock.Call {
+// ReadSessionUserByToken indicates an expected call of ReadSessionUserByToken.
+func (mr *MockRepoMockRecorder) ReadSessionUserByToken(ctx, tokenHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRefreshTokens", reflect.TypeOf((*MockRepo)(nil).DeleteUserRefreshTokens), ctx, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadSessionUserByToken", reflect.TypeOf((*MockRepo)(nil).ReadSessionUserByToken), ctx, tokenHash)
 }
 
 // ReadUserByID mocks base method.
@@ -274,32 +276,61 @@ func (mr *MockRepoMockRecorder) ReadUserByLogin(ctx, login any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByLogin", reflect.TypeOf((*MockRepo)(nil).ReadUserByLogin), ctx, login)
 }
 
-// UpdateAvatar mocks base method.
-func (m *MockRepo) UpdateAvatar(ctx context.Context, user models.User) error {
+// RevokeSession mocks base method.
+func (m *MockRepo) RevokeSession(ctx context.Context, tokenHash []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateAvatar", ctx, user)
+	ret := m.ctrl.Call(m, "RevokeSession", ctx, tokenHash)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateAvatar indicates an expected call of UpdateAvatar.
-func (mr *MockRepoMockRecorder) UpdateAvatar(ctx, user any) *gomock.Call {
+// RevokeSession indicates an expected call of RevokeSession.
+func (mr *MockRepoMockRecorder) RevokeSession(ctx, tokenHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockRepo)(nil).UpdateAvatar), ctx, user)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeSession", reflect.TypeOf((*MockRepo)(nil).RevokeSession), ctx, tokenHash)
+}
+
+// RotateSession mocks base method.
+func (m *MockRepo) RotateSession(ctx context.Context, oldTokenHash []byte, session models.RefreshToken) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RotateSession", ctx, oldTokenHash, session)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RotateSession indicates an expected call of RotateSession.
+func (mr *MockRepoMockRecorder) RotateSession(ctx, oldTokenHash, session any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RotateSession", reflect.TypeOf((*MockRepo)(nil).RotateSession), ctx, oldTokenHash, session)
+}
+
+// UpdateAvatar mocks base method.
+func (m *MockRepo) UpdateAvatar(ctx context.Context, userID uuid.UUID, avatar string) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateAvatar", ctx, userID, avatar)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateAvatar indicates an expected call of UpdateAvatar.
+func (mr *MockRepoMockRecorder) UpdateAvatar(ctx, userID, avatar any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockRepo)(nil).UpdateAvatar), ctx, userID, avatar)
 }
 
 // UpdatePassword mocks base method.
-func (m *MockRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, hash []byte) error {
+func (m *MockRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, oldHash, newHash []byte, session models.RefreshToken) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePassword", ctx, userID, hash)
+	ret := m.ctrl.Call(m, "UpdatePassword", ctx, userID, oldHash, newHash, session)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdatePassword indicates an expected call of UpdatePassword.
-func (mr *MockRepoMockRecorder) UpdatePassword(ctx, userID, hash any) *gomock.Call {
+func (mr *MockRepoMockRecorder) UpdatePassword(ctx, userID, oldHash, newHash, session any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockRepo)(nil).UpdatePassword), ctx, userID, hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockRepo)(nil).UpdatePassword), ctx, userID, oldHash, newHash, session)
 }
 
 // MockStorage is a mock of Storage interface.

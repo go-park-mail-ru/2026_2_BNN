@@ -1,3 +1,4 @@
 UPDATE users
-SET password_hash = $1, updated_at = now()
-WHERE id = $2;
+SET password_hash = $1
+WHERE id = $2
+  AND password_hash = $3;

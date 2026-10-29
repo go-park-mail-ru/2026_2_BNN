@@ -62,12 +62,12 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 		UpdatedAt:    now,
 	}
 
-	if err := u.repo.CreateUser(ctx, user); err != nil {
+	tokens, session, err := u.newTokens(user.ID)
+	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
-	if err != nil {
+	if err := u.repo.CreateUser(ctx, user, session); err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
 
@@ -91,42 +91,66 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	tokens, session, err := u.newTokens(user.ID)
 	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	if err := u.repo.CreateSession(ctx, session); err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
 
 	return user, tokens, nil
 }
 
-func (u *Usecase) Refresh(ctx context.Context, refreshToken string) (models.AuthTokens, error) {
-	token, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
-	if errors.Is(err, models.ErrRefreshTokenNotFound) {
+// Refresh сначала готовит новые токены и только потом меняет сессию в БД:
+// если подготовка упадёт, старая сессия останется рабочей.
+func (u *Usecase) Refresh(ctx context.Context, oldRefreshToken string) (models.AuthTokens, error) {
+	oldTokenHash := hashRefreshToken(oldRefreshToken)
+
+	userID, err := u.repo.ReadSessionUserByToken(ctx, oldTokenHash)
+	if errors.Is(err, models.ErrSessionNotFound) {
 		return models.AuthTokens{}, models.ErrInvalidToken
 	}
 	if err != nil {
 		return models.AuthTokens{}, err
 	}
 
-	if time.Now().After(token.ExpiresAt) {
-		return models.AuthTokens{}, models.ErrInvalidToken
+	tokens, session, err := u.newTokens(userID)
+	if err != nil {
+		return models.AuthTokens{}, err
 	}
 
-	return u.createTokens(ctx, token.UserID)
+	err = u.repo.RotateSession(ctx, oldTokenHash, session)
+	if errors.Is(err, models.ErrSessionNotFound) {
+		return models.AuthTokens{}, models.ErrInvalidToken
+	}
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	return tokens, nil
 }
 
 func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
-	_, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
-	if errors.Is(err, models.ErrRefreshTokenNotFound) {
-		return nil
-	}
-
-	return err
+	return u.repo.RevokeSession(ctx, hashRefreshToken(refreshToken))
 }
 
-func (u *Usecase) Authenticate(_ context.Context, accessToken string) (uuid.UUID, error) {
-	userID, err := u.parseAccessToken(accessToken)
+// Authenticate проверяет подпись access-токена и то, что его сессия не отозвана и не истекла.
+func (u *Usecase) Authenticate(ctx context.Context, accessToken string) (uuid.UUID, error) {
+	userID, sessionID, err := u.parseAccessToken(accessToken)
 	if err != nil {
+		return uuid.Nil, models.ErrInvalidToken
+	}
+
+	sessionUserID, err := u.repo.ReadActiveSessionUser(ctx, sessionID)
+	if errors.Is(err, models.ErrSessionNotFound) {
+		return uuid.Nil, models.ErrInvalidToken
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if sessionUserID != userID {
 		return uuid.Nil, models.ErrInvalidToken
 	}
 
@@ -156,45 +180,43 @@ func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassw
 		return models.AuthTokens{}, err
 	}
 
-	if err := u.repo.UpdatePassword(ctx, userID, passwordHash); err != nil {
+	tokens, session, err := u.newTokens(userID)
+	if err != nil {
 		return models.AuthTokens{}, err
 	}
 
-	if err := u.repo.DeleteUserRefreshTokens(ctx, userID); err != nil {
+	if err := u.repo.UpdatePassword(ctx, userID, user.PasswordHash, passwordHash, session); err != nil {
 		return models.AuthTokens{}, err
 	}
 
-	return u.createTokens(ctx, userID)
+	return tokens, nil
 }
 
-func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.AuthTokens, error) {
+// newTokens готовит access- и refresh-токены и строку user_session для них.
+// В БД ничего не пишет: сессию сохраняет репозиторий, когда токены уже готовы.
+func (u *Usecase) newTokens(userID uuid.UUID) (models.AuthTokens, models.RefreshToken, error) {
 	now := time.Now().UTC()
-	accessExpiresAt := now.Add(accessTokenTTL)
-	refreshExpiresAt := now.Add(refreshTokenTTL)
-
-	accessToken, err := u.newAccessToken(userID, accessExpiresAt)
-	if err != nil {
-		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
-	}
-
 	refreshToken := rand.Text()
 
-	err = u.repo.CreateRefreshToken(ctx, models.RefreshToken{
+	session := models.RefreshToken{
+		ID:        uuid.NewV4(),
 		TokenHash: hashRefreshToken(refreshToken),
 		UserID:    userID,
-		ExpiresAt: refreshExpiresAt,
-		CreatedAt: now,
-	})
+		ExpiresAt: now.Add(refreshTokenTTL),
+	}
+
+	accessExpiresAt := now.Add(accessTokenTTL)
+	accessToken, err := u.newAccessToken(userID, session.ID, accessExpiresAt)
 	if err != nil {
-		return models.AuthTokens{}, err
+		return models.AuthTokens{}, models.RefreshToken{}, fmt.Errorf("create access token: %w", err)
 	}
 
 	return models.AuthTokens{
 		AccessToken:      accessToken,
 		AccessExpiresAt:  accessExpiresAt,
 		RefreshToken:     refreshToken,
-		RefreshExpiresAt: refreshExpiresAt,
-	}, nil
+		RefreshExpiresAt: session.ExpiresAt,
+	}, session, nil
 }
 
 func validateCredentials(login, password string) error {
@@ -235,13 +257,15 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 		return models.User{}, err
 	}
 
-	oldAvatar := user.Avatar
-	user.Avatar = avatar
-	user.UpdatedAt = time.Now().UTC()
-	if err := u.repo.UpdateAvatar(ctx, user); err != nil {
+	updatedAt, err := u.repo.UpdateAvatar(ctx, userID, avatar)
+	if err != nil {
 		_ = u.storage.DeleteFile(ctx, key)
 		return models.User{}, err
 	}
+
+	oldAvatar := user.Avatar
+	user.Avatar = avatar
+	user.UpdatedAt = updatedAt
 
 	if oldAvatar != "" {
 		_ = u.storage.DeleteFile(ctx, path.Base(oldAvatar))

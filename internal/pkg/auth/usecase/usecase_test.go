@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth/mocks"
@@ -34,9 +35,7 @@ func TestChangePassword(t *testing.T) {
 			newPassword: "newpassword",
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(user, nil)
-				repo.EXPECT().UpdatePassword(gomock.Any(), userID, gomock.Any()).Return(nil)
-				repo.EXPECT().DeleteUserRefreshTokens(gomock.Any(), userID).Return(nil)
-				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().UpdatePassword(gomock.Any(), userID, user.PasswordHash, gomock.Any(), gomock.Any()).Return(nil)
 			},
 		},
 		{
@@ -91,12 +90,7 @@ func TestSignUp(t *testing.T) {
 		password := "password123"
 
 		mockRepo.EXPECT().
-			CreateUser(gomock.Any(), gomock.Any()).
-			Return(nil).
-			Times(1)
-
-		mockRepo.EXPECT().
-			CreateRefreshToken(gomock.Any(), gomock.Any()).
+			CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil).
 			Times(1)
 
@@ -118,6 +112,7 @@ func TestSignUp(t *testing.T) {
 func TestUpdateAvatar(t *testing.T) {
 	userID := uuid.NewV4()
 	data := []byte("image")
+	updatedAt := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name        string
@@ -133,7 +128,7 @@ func TestUpdateAvatar(t *testing.T) {
 					Return(models.User{ID: userID, Avatar: "/avatars/old.jpg"}, nil)
 				storage.EXPECT().PublicPath(gomock.Any()).Return("/avatars/new.png", nil)
 				storage.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
-				repo.EXPECT().UpdateAvatar(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().UpdateAvatar(gomock.Any(), userID, "/avatars/new.png").Return(updatedAt, nil)
 				storage.EXPECT().DeleteFile(gomock.Any(), "old.jpg").Return(nil)
 			},
 		},
@@ -163,6 +158,7 @@ func TestUpdateAvatar(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, "/avatars/new.png", user.Avatar)
+			assert.Equal(t, updatedAt, user.UpdatedAt)
 		})
 	}
 }

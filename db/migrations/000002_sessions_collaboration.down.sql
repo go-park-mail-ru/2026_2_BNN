@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS chat_message;
+DROP TABLE IF EXISTS chat;
+DROP TABLE IF EXISTS note_invitation;
+DROP TABLE IF EXISTS note_member;
+DROP TABLE IF EXISTS user_visit;
+DROP TABLE IF EXISTS user_session;

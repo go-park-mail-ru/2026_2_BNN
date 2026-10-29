@@ -28,16 +28,16 @@ func TestUploadAttachment(t *testing.T) {
 			name:        "ok",
 			contentType: "image/png",
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().CanEditBlock(gomock.Any(), userID, blockID).Return(true, nil)
 				files.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
-				repo.EXPECT().CreateAttachment(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().CreateAttachment(gomock.Any(), userID, gomock.Any()).Return(nil)
 			},
 		},
 		{
 			name:        "foreign block",
 			contentType: "image/png",
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(uuid.NewV4(), nil)
+				repo.EXPECT().CanEditBlock(gomock.Any(), userID, blockID).Return(false, nil)
 			},
 			expectedErr: models.ErrBlockNotFound,
 		},
@@ -45,7 +45,7 @@ func TestUploadAttachment(t *testing.T) {
 			name:        "unsupported type",
 			contentType: "text/plain; charset=utf-8",
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().CanEditBlock(gomock.Any(), userID, blockID).Return(true, nil)
 			},
 			expectedErr: models.ErrUnsupportedFileType,
 		},

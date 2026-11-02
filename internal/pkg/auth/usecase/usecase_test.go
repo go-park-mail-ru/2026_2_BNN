@@ -77,7 +77,7 @@ func TestSignUp(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			tt.prepare(repo)
 
-			user, tokens, err := NewUsecase(repo, nil, secret).SignUp(context.Background(), tt.login, tt.password)
+			user, tokens, err := NewUsecase(repo, nil, nil, secret).SignUp(context.Background(), tt.login, tt.password)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -160,7 +160,7 @@ func TestSignIn(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			tt.prepare(repo)
 
-			got, tokens, err := NewUsecase(repo, nil, secret).SignIn(context.Background(), "seyran", tt.password)
+			got, tokens, err := NewUsecase(repo, nil, nil, secret).SignIn(context.Background(), "seyran", tt.password)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -221,7 +221,7 @@ func TestRefresh(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			tt.prepare(repo)
 
-			u := NewUsecase(repo, nil, secret)
+			u := NewUsecase(repo, nil, nil, secret)
 			tokens, err := u.Refresh(context.Background(), "old-refresh")
 
 			if tt.expectedErr != nil {
@@ -258,7 +258,7 @@ func TestLogout(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			repo.EXPECT().DeleteRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, tt.repoErr)
 
-			err := NewUsecase(repo, nil, secret).Logout(context.Background(), "refresh")
+			err := NewUsecase(repo, nil, nil, secret).Logout(context.Background(), "refresh")
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -272,7 +272,7 @@ func TestLogout(t *testing.T) {
 
 func TestAuthenticate(t *testing.T) {
 	userID := uuid.NewV4()
-	u := NewUsecase(nil, nil, secret)
+	u := NewUsecase(nil, nil, nil, secret)
 
 	valid, err := u.newAccessToken(userID, time.Now().Add(time.Minute))
 	require.NoError(t, err)
@@ -280,7 +280,7 @@ func TestAuthenticate(t *testing.T) {
 	expired, err := u.newAccessToken(userID, time.Now().Add(-time.Minute))
 	require.NoError(t, err)
 
-	foreign, err := NewUsecase(nil, nil, "other_secret").newAccessToken(userID, time.Now().Add(time.Minute))
+	foreign, err := NewUsecase(nil, nil, nil, "other_secret").newAccessToken(userID, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -317,7 +317,7 @@ func TestGetUser(t *testing.T) {
 
 	repo.EXPECT().ReadUserByID(gomock.Any(), user.ID).Return(user, nil)
 
-	got, err := NewUsecase(repo, nil, secret).GetUser(context.Background(), user.ID)
+	got, err := NewUsecase(repo, nil, nil, secret).GetUser(context.Background(), user.ID)
 
 	require.NoError(t, err)
 	assert.Equal(t, user, got)
@@ -407,7 +407,7 @@ func TestChangePassword(t *testing.T) {
 			repo := mocks.NewMockRepo(ctrl)
 			tt.prepare(repo)
 
-			tokens, err := NewUsecase(repo, nil, secret).ChangePassword(context.Background(), userID, tt.oldPassword, tt.newPassword)
+			tokens, err := NewUsecase(repo, nil, nil, secret).ChangePassword(context.Background(), userID, tt.oldPassword, tt.newPassword)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -511,7 +511,7 @@ func TestUpdateAvatar(t *testing.T) {
 			storage := mocks.NewMockStorage(ctrl)
 			tt.prepare(repo, storage)
 
-			user, err := NewUsecase(repo, storage, secret).UpdateAvatar(context.Background(), userID, data, tt.contentType)
+			user, err := NewUsecase(repo, storage, nil, secret).UpdateAvatar(context.Background(), userID, data, tt.contentType)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)

@@ -10,12 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+
 	"bnn/docs"
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
 	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
 	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
+	"bnn/internal/pkg/auth"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
@@ -80,8 +83,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	appBaseURL := os.Getenv("APP_BASE_URL")
+	if appBaseURL == "" {
+		appBaseURL = "http://localhost:5458"
+	}
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	oauthConfig := auth.NewOAuthConfig(
+		os.Getenv("GITHUB_CLIENT_ID"),
+		os.Getenv("GITHUB_CLIENT_SECRET"),
+		appBaseURL,
+	)
+
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, oauthConfig, mustEnv("JWT_SECRET")),
 	)
 
 	notesHandler := notesDelivery.NewHandler(
@@ -110,6 +129,30 @@ func main() {
 
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
+
+	router.HandleFunc("/api/auth/github/login", func(w http.ResponseWriter, r *http.Request) {
+		state := uuid.NewV4().String()
+		http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+		url := authHandler.GetOAuthURL("github", state)
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/api/auth/github/callback", func(w http.ResponseWriter, r *http.Request) {
+		stateCookie, err := r.Cookie("oauth_state")
+		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
+			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+			return
+		}
+		user, tokens, err := authHandler.HandleOAuthCallback(r.Context(), "github", r.URL.Query().Get("code"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = user
+		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: true})
+		http.Redirect(w, r, frontendURL+"/profile", http.StatusTemporaryRedirect)
+	}).Methods(http.MethodGet)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)

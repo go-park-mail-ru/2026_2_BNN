@@ -9,9 +9,11 @@ import (
 )
 
 const (
-	accessCookieName  = "bnn_access"
-	refreshCookieName = "bnn_refresh"
-	refreshCookiePath = "/api/auth"
+	accessCookieName    = "bnn_access"
+	refreshCookieName   = "bnn_refresh"
+	refreshCookiePath   = "/api/auth"
+	twoFactorCookieName = "bnn_2fa"
+	twoFactorCookiePath = "/api/auth/2fa"
 )
 
 func setAuthCookies(ctx context.Context, tokens models.AuthTokens) {
@@ -49,6 +51,29 @@ func clearAuthCookies(ctx context.Context) {
 	cookies.Set(ctx, &http.Cookie{
 		Name:     refreshCookieName,
 		Path:     refreshCookiePath,
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func setTwoFactorCookie(ctx context.Context, tokens models.AuthTokens) {
+	cookies.Set(ctx, &http.Cookie{
+		Name:     twoFactorCookieName,
+		Value:    tokens.TwoFactorToken,
+		Path:     twoFactorCookiePath,
+		Expires:  tokens.TwoFactorExpiresAt,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearTwoFactorCookie(ctx context.Context) {
+	cookies.Set(ctx, &http.Cookie{
+		Name:     twoFactorCookieName,
+		Path:     twoFactorCookiePath,
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   true,

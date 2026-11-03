@@ -7,14 +7,32 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for UserOauthProvider.
+const (
+	Github UserOauthProvider = "github"
+)
+
+// Valid indicates whether the value is a known member of the UserOauthProvider enum.
+func (e UserOauthProvider) Valid() bool {
+	switch e {
+	case Github:
+		return true
+	default:
+		return false
+	}
+}
 
 // ChangePasswordRequest defines model for ChangePasswordRequest.
 type ChangePasswordRequest struct {
@@ -27,7 +45,9 @@ type ChangePasswordRequest struct {
 
 // SignInRequest defines model for SignInRequest.
 type SignInRequest struct {
-	// Login Example: seyran
+	// Login Логин или email, если аккаунт создан через GitHub
+	//
+	// Example: seyran
 	Login string `json:"login"`
 
 	// Password Example: password123
@@ -43,6 +63,14 @@ type SignUpRequest struct {
 	Password string `json:"password"`
 }
 
+// TwoFactorCodeRequest defines model for TwoFactorCodeRequest.
+type TwoFactorCodeRequest struct {
+	// Code 6 цифр из приложения-аутентификатора
+	//
+	// Example: 123456
+	Code string `json:"code"`
+}
+
 // User defines model for User.
 type User struct {
 	// Avatar Путь к картинке или пустая строка, если аватарки нет
@@ -52,10 +80,19 @@ type User struct {
 	CreatedAt time.Time          `json:"created_at"`
 	Id        openapi_types.UUID `json:"id"`
 
+	// Is2faEnabled Включена ли двухфакторная аутентификация
+	Is2faEnabled bool `json:"is_2fa_enabled"`
+
 	// Login Example: seyran
-	Login     string    `json:"login"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Login string `json:"login"`
+
+	// OauthProvider Через какой сервис создан аккаунт. null, если аккаунт с паролем
+	OauthProvider *UserOauthProvider `json:"oauth_provider"`
+	UpdatedAt     time.Time          `json:"updated_at"`
 }
+
+// UserOauthProvider Через какой сервис создан аккаунт. null, если аккаунт с паролем
+type UserOauthProvider string
 
 // AttachmentID defines model for AttachmentID.
 type AttachmentID = openapi_types.UUID
@@ -74,6 +111,24 @@ type UpdateAvatarMultipartBody struct {
 	Avatar openapi_types.File `json:"avatar"`
 }
 
+// GitHubCallbackParams defines parameters for GitHubCallback.
+type GitHubCallbackParams struct {
+	// Code Код авторизации от GitHub
+	Code string `form:"code" json:"code"`
+
+	// State Строка для защиты от CSRF
+	State string `form:"state" json:"state"`
+}
+
+// Disable2FAJSONRequestBody defines body for Disable2FA for application/json ContentType.
+type Disable2FAJSONRequestBody = TwoFactorCodeRequest
+
+// Enable2FAJSONRequestBody defines body for Enable2FA for application/json ContentType.
+type Enable2FAJSONRequestBody = TwoFactorCodeRequest
+
+// Verify2FAJSONRequestBody defines body for Verify2FA for application/json ContentType.
+type Verify2FAJSONRequestBody = TwoFactorCodeRequest
+
 // UpdateAvatarMultipartRequestBody defines body for UpdateAvatar for multipart/form-data ContentType.
 type UpdateAvatarMultipartRequestBody UpdateAvatarMultipartBody
 
@@ -88,9 +143,27 @@ type SignUpJSONRequestBody = SignUpRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Disable2FA Выключить 2FA
+	// (POST /auth/2fa/disable)
+	Disable2FA(w http.ResponseWriter, r *http.Request)
+	// Enable2FA Подтвердить и включить 2FA
+	// (POST /auth/2fa/enable)
+	Enable2FA(w http.ResponseWriter, r *http.Request)
+	// Generate2FA Получить QR-код для 2FA
+	// (GET /auth/2fa/generate)
+	Generate2FA(w http.ResponseWriter, r *http.Request)
+	// Verify2FA Второй шаг входа, код из приложения
+	// (POST /auth/2fa/verify)
+	Verify2FA(w http.ResponseWriter, r *http.Request)
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(w http.ResponseWriter, r *http.Request)
+	// GitHubCallback Callback от GitHub
+	// (GET /auth/github/callback)
+	GitHubCallback(w http.ResponseWriter, r *http.Request, params GitHubCallbackParams)
+	// GitHubLogin Вход через GitHub
+	// (GET /auth/github/login)
+	GitHubLogin(w http.ResponseWriter, r *http.Request)
 	// Logout Выход
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
@@ -120,11 +193,127 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// Disable2FA operation middleware
+func (siw *ServerInterfaceWrapper) Disable2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Disable2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Enable2FA operation middleware
+func (siw *ServerInterfaceWrapper) Enable2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Enable2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Generate2FA operation middleware
+func (siw *ServerInterfaceWrapper) Generate2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Generate2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Verify2FA operation middleware
+func (siw *ServerInterfaceWrapper) Verify2FA(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Verify2FA(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateAvatar operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAvatar(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GitHubCallback operation middleware
+func (siw *ServerInterfaceWrapper) GitHubCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GitHubCallbackParams
+
+	// ------------- Required query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GitHubCallback(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GitHubLogin operation middleware
+func (siw *ServerInterfaceWrapper) GitHubLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GitHubLogin(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -345,7 +534,180 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/auth/avatar", wrapper.UpdateAvatar).Methods(http.MethodPut)
 
+	r.HandleFunc(options.BaseURL+"/auth/2fa/generate", wrapper.Generate2FA).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/auth/2fa/enable", wrapper.Enable2FA).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/auth/2fa/disable", wrapper.Disable2FA).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/auth/2fa/verify", wrapper.Verify2FA).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/auth/github/login", wrapper.GitHubLogin).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/auth/github/callback", wrapper.GitHubCallback).Methods(http.MethodGet)
+
 	return r
+}
+
+type Disable2FARequestObject struct {
+	Body *Disable2FAJSONRequestBody
+}
+
+type Disable2FAResponseObject interface {
+	VisitDisable2FAResponse(w http.ResponseWriter) error
+}
+
+type Disable2FA200Response struct {
+}
+
+func (response Disable2FA200Response) VisitDisable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type Disable2FA401Response struct {
+}
+
+func (response Disable2FA401Response) VisitDisable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Disable2FA403Response struct {
+}
+
+func (response Disable2FA403Response) VisitDisable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type Enable2FARequestObject struct {
+	Body *Enable2FAJSONRequestBody
+}
+
+type Enable2FAResponseObject interface {
+	VisitEnable2FAResponse(w http.ResponseWriter) error
+}
+
+type Enable2FA200Response struct {
+}
+
+func (response Enable2FA200Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type Enable2FA400Response struct {
+}
+
+func (response Enable2FA400Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type Enable2FA401Response struct {
+}
+
+func (response Enable2FA401Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Enable2FA403Response struct {
+}
+
+func (response Enable2FA403Response) VisitEnable2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type Generate2FARequestObject struct {
+}
+
+type Generate2FAResponseObject interface {
+	VisitGenerate2FAResponse(w http.ResponseWriter) error
+}
+
+type Generate2FA200ImagepngResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response Generate2FA200ImagepngResponse) VisitGenerate2FAResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/png")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type Generate2FA401Response struct {
+}
+
+func (response Generate2FA401Response) VisitGenerate2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Generate2FA409Response struct {
+}
+
+func (response Generate2FA409Response) VisitGenerate2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(409)
+	return nil
+}
+
+type Verify2FARequestObject struct {
+	Body *Verify2FAJSONRequestBody
+}
+
+type Verify2FAResponseObject interface {
+	VisitVerify2FAResponse(w http.ResponseWriter) error
+}
+
+type Verify2FA200JSONResponse User
+
+func (response Verify2FA200JSONResponse) VisitVerify2FAResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Verify2FA400Response struct {
+}
+
+func (response Verify2FA400Response) VisitVerify2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type Verify2FA401Response struct {
+}
+
+func (response Verify2FA401Response) VisitVerify2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type Verify2FA403Response struct {
+}
+
+func (response Verify2FA403Response) VisitVerify2FAResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
 }
 
 type UpdateAvatarRequestObject struct {
@@ -399,6 +761,61 @@ type UpdateAvatar415Response struct {
 
 func (response UpdateAvatar415Response) VisitUpdateAvatarResponse(w http.ResponseWriter) error {
 	w.WriteHeader(415)
+	return nil
+}
+
+type GitHubCallbackRequestObject struct {
+	Params GitHubCallbackParams
+}
+
+type GitHubCallbackResponseObject interface {
+	VisitGitHubCallbackResponse(w http.ResponseWriter) error
+}
+
+type GitHubCallback307Response struct {
+}
+
+func (response GitHubCallback307Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(307)
+	return nil
+}
+
+type GitHubCallback400Response struct {
+}
+
+func (response GitHubCallback400Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type GitHubCallback500Response struct {
+}
+
+func (response GitHubCallback500Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
+}
+
+type GitHubLoginRequestObject struct {
+}
+
+type GitHubLoginResponseObject interface {
+	VisitGitHubLoginResponse(w http.ResponseWriter) error
+}
+
+type GitHubLogin307Response struct {
+}
+
+func (response GitHubLogin307Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
+	w.WriteHeader(307)
+	return nil
+}
+
+type GitHubLogin500Response struct {
+}
+
+func (response GitHubLogin500Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
 	return nil
 }
 
@@ -547,6 +964,14 @@ func (response SignIn200JSONResponse) VisitSignInResponse(w http.ResponseWriter)
 	return err
 }
 
+type SignIn202Response struct {
+}
+
+func (response SignIn202Response) VisitSignInResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
 type SignIn400Response struct {
 }
 
@@ -560,6 +985,14 @@ type SignIn401Response struct {
 
 func (response SignIn401Response) VisitSignInResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
+	return nil
+}
+
+type SignIn403Response struct {
+}
+
+func (response SignIn403Response) VisitSignInResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
 	return nil
 }
 
@@ -619,9 +1052,27 @@ func (response SignUp413Response) VisitSignUpResponse(w http.ResponseWriter) err
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Disable2FA Выключить 2FA
+	// (POST /auth/2fa/disable)
+	Disable2FA(ctx context.Context, request Disable2FARequestObject) (Disable2FAResponseObject, error)
+	// Enable2FA Подтвердить и включить 2FA
+	// (POST /auth/2fa/enable)
+	Enable2FA(ctx context.Context, request Enable2FARequestObject) (Enable2FAResponseObject, error)
+	// Generate2FA Получить QR-код для 2FA
+	// (GET /auth/2fa/generate)
+	Generate2FA(ctx context.Context, request Generate2FARequestObject) (Generate2FAResponseObject, error)
+	// Verify2FA Второй шаг входа, код из приложения
+	// (POST /auth/2fa/verify)
+	Verify2FA(ctx context.Context, request Verify2FARequestObject) (Verify2FAResponseObject, error)
 	// UpdateAvatar Загрузить аватарку
 	// (PUT /auth/avatar)
 	UpdateAvatar(ctx context.Context, request UpdateAvatarRequestObject) (UpdateAvatarResponseObject, error)
+	// GitHubCallback Callback от GitHub
+	// (GET /auth/github/callback)
+	GitHubCallback(ctx context.Context, request GitHubCallbackRequestObject) (GitHubCallbackResponseObject, error)
+	// GitHubLogin Вход через GitHub
+	// (GET /auth/github/login)
+	GitHubLogin(ctx context.Context, request GitHubLoginRequestObject) (GitHubLoginResponseObject, error)
 	// Logout Выход
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
@@ -681,6 +1132,123 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// Disable2FA operation middleware
+func (sh *strictHandler) Disable2FA(w http.ResponseWriter, r *http.Request) {
+	var request Disable2FARequestObject
+
+	var body Disable2FAJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Disable2FA(ctx, request.(Disable2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Disable2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Disable2FAResponseObject); ok {
+		if err := validResponse.VisitDisable2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Enable2FA operation middleware
+func (sh *strictHandler) Enable2FA(w http.ResponseWriter, r *http.Request) {
+	var request Enable2FARequestObject
+
+	var body Enable2FAJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Enable2FA(ctx, request.(Enable2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Enable2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Enable2FAResponseObject); ok {
+		if err := validResponse.VisitEnable2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Generate2FA operation middleware
+func (sh *strictHandler) Generate2FA(w http.ResponseWriter, r *http.Request) {
+	var request Generate2FARequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Generate2FA(ctx, request.(Generate2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Generate2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Generate2FAResponseObject); ok {
+		if err := validResponse.VisitGenerate2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Verify2FA operation middleware
+func (sh *strictHandler) Verify2FA(w http.ResponseWriter, r *http.Request) {
+	var request Verify2FARequestObject
+
+	var body Verify2FAJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Verify2FA(ctx, request.(Verify2FARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Verify2FA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(Verify2FAResponseObject); ok {
+		if err := validResponse.VisitVerify2FAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // UpdateAvatar operation middleware
 func (sh *strictHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	var request UpdateAvatarRequestObject
@@ -705,6 +1273,56 @@ func (sh *strictHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAvatarResponseObject); ok {
 		if err := validResponse.VisitUpdateAvatarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GitHubCallback operation middleware
+func (sh *strictHandler) GitHubCallback(w http.ResponseWriter, r *http.Request, params GitHubCallbackParams) {
+	var request GitHubCallbackRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GitHubCallback(ctx, request.(GitHubCallbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GitHubCallback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GitHubCallbackResponseObject); ok {
+		if err := validResponse.VisitGitHubCallbackResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GitHubLogin operation middleware
+func (sh *strictHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
+	var request GitHubLoginRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GitHubLogin(ctx, request.(GitHubLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GitHubLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GitHubLoginResponseObject); ok {
+		if err := validResponse.VisitGitHubLoginResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

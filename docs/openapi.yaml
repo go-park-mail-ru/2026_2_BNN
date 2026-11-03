@@ -65,10 +65,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '202':
+          description: Пароль верный, но включена 2FA. Ставится кука bnn_2fa на 5 минут, дальше отправить код в /auth/2fa/verify
         '400':
-          description: Не прошла валидация или битый JSON
+          description: Битый JSON
         '401':
           description: Неверный логин или пароль
+        '403':
+          description: Аккаунт создан через GitHub, войти можно только через GitHub
         '413':
           description: Тело запроса больше 4096 байт
 
@@ -131,7 +135,7 @@ paths:
         '204':
           description: Пароль изменён, ставятся новые куки bnn_access и bnn_refresh
         '400':
-          description: Новый пароль не прошёл валидацию или битый JSON
+          description: Новый пароль не прошёл валидацию, битый JSON или аккаунт создан через GitHub и пароля у него нет
         '401':
           description: Нет куки или она истекла
         '403':
@@ -173,6 +177,136 @@ paths:
           description: Файл больше 5 МБ
         '415':
           description: Формат не jpeg, png или webp
+
+  /auth/2fa/generate:
+    get:
+      tags: [auth]
+      operationId: Generate2FA
+      summary: Получить QR-код для 2FA
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: PNG с QR-кодом
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Нет куки или она истекла
+        '409':
+          description: 2FA уже включена, сначала выключить
+
+  /auth/2fa/enable:
+    post:
+      tags: [auth]
+      operationId: Enable2FA
+      summary: Подтвердить и включить 2FA
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '200':
+          description: 2FA включена
+        '400':
+          description: QR-код ещё не получали или битый JSON
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Неверный код
+
+  /auth/2fa/disable:
+    post:
+      tags: [auth]
+      operationId: Disable2FA
+      summary: Выключить 2FA
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '200':
+          description: 2FA выключена
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Неверный код или 2FA не включена
+
+  /auth/2fa/verify:
+    post:
+      tags: [auth]
+      operationId: Verify2FA
+      summary: Второй шаг входа, код из приложения
+      description: Нужна кука bnn_2fa, которую ставит /auth/signin или вход через GitHub.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '200':
+          description: Вход выполнен, ставятся куки bnn_access и bnn_refresh
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Битый JSON
+        '401':
+          description: Нет куки bnn_2fa или прошло больше 5 минут, нужно войти заново
+        '403':
+          description: Неверный код
+
+
+  /auth/github/login:
+    get:
+      tags: [auth]
+      operationId: GitHubLogin
+      summary: Вход через GitHub
+      description: Перенаправляет пользователя на страницу авторизации GitHub.
+      responses:
+        '307':
+          description: Временный редирект на GitHub
+        '500':
+            description: Внутренняя ошибка сервера
+
+  /auth/github/callback:
+    get:
+      tags: [auth]
+      operationId: GitHubCallback
+      summary: Callback от GitHub
+      description: Обрабатывает код авторизации от GitHub, создает пользователя (если нужно) и ставит куки.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Код авторизации от GitHub
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          description: Строка для защиты от CSRF
+          schema:
+            type: string
+      responses:
+        '307':
+          description: Временный редирект на фронтенд после успешного входа
+        '400':
+          description: Неверный state или отсутствует код
+        '500':
+          description: Внутренняя ошибка сервера
 
   /notes/all:
     get:
@@ -284,7 +418,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Note'
         '400':
-          description: Не прошла валидация, битый JSON или id не UUID
+          description: Не прошла валидация, битый JSON, id не UUID, чужой блок или тег
         '401':
           description: Нет куки или она истекла
         '404':
@@ -535,13 +669,10 @@ components:
       properties:
         login:
           type: string
-          minLength: 3
-          maxLength: 20
+          description: Логин или email, если аккаунт создан через GitHub
           example: seyran
         password:
           type: string
-          minLength: 8
-          maxLength: 128
           example: password123
 
     ChangePasswordRequest:
@@ -559,7 +690,7 @@ components:
 
     User:
       type: object
-      required: [id, login, avatar, created_at, updated_at]
+      required: [id, login, avatar, is_2fa_enabled, oauth_provider, created_at, updated_at]
       properties:
         id:
           type: string
@@ -571,6 +702,14 @@ components:
           type: string
           description: Путь к картинке или пустая строка, если аватарки нет
           example: /avatars/8e1d4c2a-6b3f-4f0e-9a1d-2c7e5b8f1a30.jpg
+        is_2fa_enabled:
+          type: boolean
+          description: Включена ли двухфакторная аутентификация
+        oauth_provider:
+          type: string
+          nullable: true
+          enum: [github]
+          description: Через какой сервис создан аккаунт. null, если аккаунт с паролем
         created_at:
           type: string
           format: date-time
@@ -606,6 +745,11 @@ components:
           description: Только в ответах на одну заметку, в списке нет
           items:
             $ref: '#/components/schemas/Block'
+        tags:
+          type: array
+          description: Только в ответах на одну заметку, в списке нет
+          items:
+            $ref: '#/components/schemas/Tag'
         created_at:
           type: string
           format: date-time
@@ -670,6 +814,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BlockInput'
+        tag_ids:
+          type: array
+          description: Нет поля — теги не меняются, пустой массив — снять все теги
+          items:
+            type: string
+            format: uuid
 
     BlockInput:
       type: object
@@ -730,4 +880,13 @@ components:
           type: string
           pattern: '^#[0-9a-fA-F]{8}$'
           example: '#FF880080'
+    
+    TwoFactorCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 6 цифр из приложения-аутентификатора
+          example: '123456'
           

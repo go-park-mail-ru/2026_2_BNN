@@ -31,7 +31,12 @@ func (u *Usecase) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models
 	if err != nil {
 		return models.Note{}, err
 	}
+	tags, err := u.repo.ReadNoteTags(ctx, noteID)
+	if err != nil {
+		return models.Note{}, err
+	}
 	note.Blocks = blocks
+	note.Tags = tags
 	return note, nil
 }
 
@@ -93,12 +98,25 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		note.Icon = *req.Icon
 	}
 
+	oldBlocks, err := u.repo.ReadBlocks(ctx, noteID)
+	if err != nil {
+		return models.Note{}, err
+	}
+
+	oldIDs := make(map[uuid.UUID]bool, len(oldBlocks))
+	for _, b := range oldBlocks {
+		oldIDs[b.ID] = true
+	}
+
 	var blocksToSave []models.Block
 	var finalBlockIDs []uuid.UUID
 
 	for _, b := range req.Blocks {
 		id := uuid.NewV4()
 		if b.ID != nil {
+			if !oldIDs[*b.ID] {
+				return models.Note{}, models.ErrBlockNotFound
+			}
 			id = *b.ID
 		}
 
@@ -109,11 +127,6 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 			UpdatedAt: note.UpdatedAt,
 		})
 		finalBlockIDs = append(finalBlockIDs, id)
-	}
-
-	oldBlocks, err := u.repo.ReadBlocks(ctx, noteID)
-	if err != nil {
-		return models.Note{}, err
 	}
 
 	var deletedIDs []uuid.UUID
@@ -130,12 +143,34 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		}
 	}
 
+	tags, err := u.noteTags(ctx, userID, noteID, req.TagIDs)
+	if err != nil {
+		return models.Note{}, err
+	}
+
 	note.Blocks = blocksToSave
+	note.Tags = tags
 	if err := u.repo.UpdateNote(ctx, note, blocksToSave, deletedIDs); err != nil {
 		return models.Note{}, err
 	}
 
 	return note, nil
+}
+
+func (u *Usecase) noteTags(ctx context.Context, userID, noteID uuid.UUID, tagIDs []uuid.UUID) ([]models.Tag, error) {
+	if tagIDs == nil {
+		return u.repo.ReadNoteTags(ctx, noteID)
+	}
+
+	tags, err := u.repo.ReadUserTags(ctx, userID, tagIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(tags) != len(tagIDs) {
+		return nil, models.ErrTagNotFound
+	}
+
+	return tags, nil
 }
 
 func (u *Usecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {

@@ -3,240 +3,438 @@ package delivery
 import (
 	"context"
 	"encoding/json"
-	"net/http"
+	"errors"
 	"testing"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
 	"bnn/internal/pkg/notes/delivery/http/api"
+	"bnn/internal/pkg/notes/mocks"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
-
-type stubUsecase struct {
-	getNotes func(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error)
-	getNote  func(ctx context.Context, userID uuid.UUID, noteID uuid.UUID) (models.Note, error)
-}
-
-func (s *stubUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
-	if s.getNotes != nil {
-		return s.getNotes(ctx, userID, limit, offset)
-	}
-	return nil, nil
-}
-
-func (s *stubUsecase) GetNote(ctx context.Context, userID uuid.UUID, noteID uuid.UUID) (models.Note, error) {
-	if s.getNote != nil {
-		return s.getNote(ctx, userID, noteID)
-	}
-	return models.Note{}, nil
-}
-
-func (s *stubUsecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
-	return models.Note{}, nil
-}
-func (s *stubUsecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
-	return models.Note{}, nil
-}
-func (s *stubUsecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
-	return nil
-}
-
-var _ notes.Usecase = (*stubUsecase)(nil)
-
-func TestGetNote(t *testing.T) {
-	ownerID := uuid.NewV4()
-	otherUserID := uuid.NewV4()
-	noteID := uuid.NewV4()
-
-	baseNote := models.Note{
-		ID:        noteID,
-		Title:     "Test note",
-		CreatedBy: ownerID,
-		Blocks: []models.Block{
-			{
-				ID:      uuid.NewV4(),
-				Content: json.RawMessage(`"Текст тестовой заметки"`),
-			},
-		},
-	}
-
-	tests := []struct {
-		name         string
-		pathID       string
-		authUserID   *uuid.UUID
-		uc           *stubUsecase
-		expectedCode int
-	}{
-		{
-			name:       "OK: owner gets own note",
-			pathID:     noteID.String(),
-			authUserID: &ownerID,
-			uc: &stubUsecase{
-				getNote: func(ctx context.Context, userID uuid.UUID, id uuid.UUID) (models.Note, error) {
-					return baseNote, nil
-				},
-			},
-			expectedCode: http.StatusOK,
-		},
-		{
-			name:       "Note not found",
-			pathID:     uuid.NewV4().String(),
-			authUserID: &ownerID,
-			uc: &stubUsecase{
-				getNote: func(ctx context.Context, userID uuid.UUID, id uuid.UUID) (models.Note, error) {
-					return models.Note{}, models.ErrNoteNotFound
-				},
-			},
-			expectedCode: http.StatusNotFound,
-		},
-		{
-			name:         "Unauthorized: no user in context",
-			pathID:       noteID.String(),
-			authUserID:   nil,
-			uc:           &stubUsecase{},
-			expectedCode: http.StatusUnauthorized,
-		},
-		{
-			name:       "Forbidden: other user's note",
-			pathID:     noteID.String(),
-			authUserID: &otherUserID,
-			uc: &stubUsecase{
-				getNote: func(ctx context.Context, userID uuid.UUID, id uuid.UUID) (models.Note, error) {
-					return models.Note{}, models.ErrNoteNotFound
-				},
-			},
-			expectedCode: http.StatusNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := NewHandler(tt.uc)
-
-			ctx := context.Background()
-			if tt.authUserID != nil {
-				ctx = ctxutil.WithUserID(ctx, *tt.authUserID)
-			}
-
-			reqObj := api.GetNoteRequestObject{
-				Id: openapi_types.UUID(uuid.FromStringOrNil(tt.pathID)),
-			}
-
-			resp, err := handler.GetNote(ctx, reqObj)
-			require.NoError(t, err)
-
-			if tt.expectedCode == http.StatusOK {
-				okResp, ok := resp.(api.GetNote200JSONResponse)
-				require.True(t, ok)
-				assert.Equal(t, openapi_types.UUID(noteID), okResp.Id)
-				assert.Equal(t, "Test note", okResp.Title)
-				assert.Equal(t, openapi_types.UUID(ownerID), okResp.CreatedBy)
-			} else if tt.expectedCode == http.StatusNotFound {
-				_, ok := resp.(api.GetNote404Response)
-				assert.True(t, ok)
-			} else if tt.expectedCode == http.StatusUnauthorized {
-				_, ok := resp.(api.GetNote401Response)
-				assert.True(t, ok)
-			}
-		})
-	}
-}
 
 func TestListNotes(t *testing.T) {
 	userID := uuid.NewV4()
-
-	fixtures := make([]models.Note, 12)
-	ids := make([]uuid.UUID, 12)
-
-	for i := range fixtures {
-		ids[i] = uuid.NewV4()
-		fixtures[i] = models.Note{
-			ID:        ids[i],
-			Title:     "Test note",
-			CreatedBy: userID,
-			Blocks:    []models.Block{},
-		}
-	}
+	note := models.Note{ID: uuid.NewV4(), CreatedBy: userID, Title: "Заметка"}
 
 	tests := []struct {
-		name         string
-		limit        *int
-		offset       *int
-		empty        bool
-		expectedCode int
-		expectedIDs  []uuid.UUID
+		name     string
+		limit    *int
+		offset   *int
+		prepare  func(uc *mocks.MockUsecase)
+		expected api.ListNotesResponseObject
 	}{
-		{name: "default pagination", expectedCode: http.StatusOK, expectedIDs: ids[:10]},
-		{name: "limit and offset", limit: intPtr(5), offset: intPtr(3), expectedCode: http.StatusOK, expectedIDs: ids[3:8]},
-		{name: "minimum limit", limit: intPtr(1), offset: intPtr(0), expectedCode: http.StatusOK, expectedIDs: ids[:1]},
-		{name: "offset at end", offset: intPtr(12), expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
-		{name: "empty storage", empty: true, expectedCode: http.StatusOK, expectedIDs: []uuid.UUID{}},
-		{name: "zero limit", limit: intPtr(0), expectedCode: http.StatusBadRequest},
-		{name: "limit above maximum", limit: intPtr(101), expectedCode: http.StatusBadRequest},
-		{name: "negative offset", offset: intPtr(-1), expectedCode: http.StatusBadRequest},
+		{
+			name: "default pagination",
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().GetNotes(gomock.Any(), userID, int64(10), int64(0)).Return([]models.Note{note}, nil)
+			},
+			expected: api.ListNotes200JSONResponse{toAPINote(note)},
+		},
+		{
+			name:   "limit and offset",
+			limit:  intPtr(5),
+			offset: intPtr(3),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().GetNotes(gomock.Any(), userID, int64(5), int64(3)).Return([]models.Note{note}, nil)
+			},
+			expected: api.ListNotes200JSONResponse{toAPINote(note)},
+		},
+		{
+			name:  "maximum limit",
+			limit: intPtr(100),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().GetNotes(gomock.Any(), userID, int64(100), int64(0)).Return([]models.Note{}, nil)
+			},
+			expected: api.ListNotes200JSONResponse{},
+		},
+		{
+			name:     "zero limit",
+			limit:    intPtr(0),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.ListNotes400Response{},
+		},
+		{
+			name:     "limit above maximum",
+			limit:    intPtr(101),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.ListNotes400Response{},
+		},
+		{
+			name:     "negative offset",
+			offset:   intPtr(-1),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.ListNotes400Response{},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stored := fixtures
-			if tt.empty {
-				stored = []models.Note{}
-			}
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
 
-			uc := &stubUsecase{
-				getNotes: func(ctx context.Context, uid uuid.UUID, limit, offset int64) ([]models.Note, error) {
-					if offset < 0 {
-						offset = 0
-					}
+			req := api.ListNotesRequestObject{Params: api.ListNotesParams{Limit: tt.limit, Offset: tt.offset}}
+			resp, err := NewHandler(uc).ListNotes(ctxutil.WithUserID(context.Background(), userID), req)
 
-					start := int(offset)
-					if start > len(stored) {
-						start = len(stored)
-					}
-					end := start + int(limit)
-					if end > len(stored) {
-						end = len(stored)
-					}
-					result := make([]models.Note, end-start)
-					copy(result, stored[start:end])
-					return result, nil
-				},
-			}
-
-			handler := NewHandler(uc)
-			ctx := ctxutil.WithUserID(context.Background(), userID)
-
-			reqObj := api.ListNotesRequestObject{
-				Params: api.ListNotesParams{
-					Limit:  tt.limit,
-					Offset: tt.offset,
-				},
-			}
-
-			resp, err := handler.ListNotes(ctx, reqObj)
 			require.NoError(t, err)
-
-			if tt.expectedCode != http.StatusOK {
-				_, ok := resp.(api.ListNotes400Response)
-				assert.True(t, ok, "expected 400 response")
-				return
-			}
-
-			okResp, ok := resp.(api.ListNotes200JSONResponse)
-			require.True(t, ok)
-
-			resultIDs := make([]uuid.UUID, 0, len(okResp))
-			for _, item := range okResp {
-				resultIDs = append(resultIDs, uuid.UUID(item.Id))
-			}
-			assert.Equal(t, tt.expectedIDs, resultIDs)
+			assert.Equal(t, tt.expected, resp)
 		})
 	}
+}
+
+func TestGetNote(t *testing.T) {
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	parentID := uuid.NewV4()
+	blockID := uuid.NewV4()
+	tagID := uuid.NewV4()
+	now := time.Now().UTC()
+
+	note := models.Note{
+		ID:           noteID,
+		ParentNoteID: &parentID,
+		CreatedBy:    userID,
+		Title:        "Заметка",
+		Header:       "Шапка",
+		Icon:         "📒",
+		Blocks:       []models.Block{{ID: blockID, Content: json.RawMessage(`{"text":"Привет"}`), CreatedAt: now, UpdatedAt: now}},
+		Tags:         []models.Tag{{ID: tagID, Name: "учёба", Color: "#FF880080", CreatedAt: now, UpdatedAt: now}},
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	apiParentID := openapi_types.UUID(parentID)
+	header := "Шапка"
+	icon := "📒"
+	expected := api.GetNote200JSONResponse(api.Note{
+		Id:           openapi_types.UUID(noteID),
+		ParentNoteId: &apiParentID,
+		CreatedBy:    openapi_types.UUID(userID),
+		Title:        "Заметка",
+		Header:       &header,
+		Icon:         &icon,
+		Blocks:       &[]api.Block{{Id: openapi_types.UUID(blockID), Content: map[string]interface{}{"text": "Привет"}, CreatedAt: now, UpdatedAt: now}},
+		Tags:         &[]api.Tag{{Id: openapi_types.UUID(tagID), Name: "учёба", Color: "#FF880080", CreatedAt: now, UpdatedAt: now}},
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		prepare  func(uc *mocks.MockUsecase)
+		expected api.GetNoteResponseObject
+	}{
+		{
+			name: "ok",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().GetNote(gomock.Any(), userID, noteID).Return(note, nil)
+			},
+			expected: expected,
+		},
+		{
+			name: "not found",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().GetNote(gomock.Any(), userID, noteID).Return(models.Note{}, models.ErrNoteNotFound)
+			},
+			expected: api.GetNote404Response{},
+		},
+		{
+			name:     "no user",
+			ctx:      context.Background(),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.GetNote401Response{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
+
+			resp, err := NewHandler(uc).GetNote(tt.ctx, api.GetNoteRequestObject{Id: openapi_types.UUID(noteID)})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		})
+	}
+}
+
+func TestCreateNote(t *testing.T) {
+	userID := uuid.NewV4()
+	parentID := uuid.NewV4()
+	apiParentID := openapi_types.UUID(parentID)
+	title := "Новая заметка"
+	body := &api.CreateNoteJSONRequestBody{Title: &title, ParentNoteId: &apiParentID}
+
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		prepare  func(uc *mocks.MockUsecase)
+		expected api.CreateNoteResponseObject
+	}{
+		{
+			name: "ok",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				req := notes.CreateNoteRequest{Title: title, ParentNoteID: &parentID}
+				uc.EXPECT().CreateNote(gomock.Any(), userID, req).Return(models.Note{Title: title}, nil)
+			},
+			expected: api.CreateNote201JSONResponse(api.Note{Title: title}),
+		},
+		{
+			name:     "no user",
+			ctx:      context.Background(),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.CreateNote401Response{},
+		},
+		{
+			name: "parent not found",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().CreateNote(gomock.Any(), userID, gomock.Any()).Return(models.Note{}, models.ErrNoteNotFound)
+			},
+			expected: api.CreateNote404Response{},
+		},
+		{
+			name: "validation",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().CreateNote(gomock.Any(), userID, gomock.Any()).Return(models.Note{}, models.ErrValidation)
+			},
+			expected: api.CreateNote400Response{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
+
+			resp, err := NewHandler(uc).CreateNote(tt.ctx, api.CreateNoteRequestObject{Body: body})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		})
+	}
+}
+
+func TestUpdateNote(t *testing.T) {
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	tagID := uuid.NewV4()
+
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		tagIDs   *[]openapi_types.UUID
+		prepare  func(uc *mocks.MockUsecase)
+		expected api.UpdateNoteResponseObject
+	}{
+		{
+			name:   "ok with tags",
+			ctx:    ctxutil.WithUserID(context.Background(), userID),
+			tagIDs: &[]openapi_types.UUID{openapi_types.UUID(tagID)},
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).
+					DoAndReturn(func(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+						assert.Equal(t, []uuid.UUID{tagID}, req.TagIDs)
+						return models.Note{Title: "t", Tags: []models.Tag{{ID: tagID, Name: "учёба"}}}, nil
+					})
+			},
+			expected: api.UpdateNote200JSONResponse(api.Note{
+				Title: "t",
+				Tags:  &[]api.Tag{{Id: openapi_types.UUID(tagID), Name: "учёба"}},
+			}),
+		},
+		{
+			name: "tag_ids not sent",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).
+					DoAndReturn(func(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+						assert.Nil(t, req.TagIDs)
+						return models.Note{Title: "t"}, nil
+					})
+			},
+			expected: api.UpdateNote200JSONResponse(api.Note{Title: "t"}),
+		},
+		{
+			name:   "empty tag_ids",
+			ctx:    ctxutil.WithUserID(context.Background(), userID),
+			tagIDs: &[]openapi_types.UUID{},
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).
+					DoAndReturn(func(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+						assert.NotNil(t, req.TagIDs)
+						assert.Empty(t, req.TagIDs)
+						return models.Note{Title: "t", Tags: []models.Tag{}}, nil
+					})
+			},
+			expected: api.UpdateNote200JSONResponse(api.Note{Title: "t", Tags: &[]api.Tag{}}),
+		},
+		{
+			name:     "no user",
+			ctx:      context.Background(),
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.UpdateNote401Response{},
+		},
+		{
+			name: "note not found",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).Return(models.Note{}, models.ErrNoteNotFound)
+			},
+			expected: api.UpdateNote404Response{},
+		},
+		{
+			name: "foreign block",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).Return(models.Note{}, models.ErrBlockNotFound)
+			},
+			expected: api.UpdateNote400Response{},
+		},
+		{
+			name: "foreign tag",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().UpdateNote(gomock.Any(), userID, noteID, gomock.Any()).Return(models.Note{}, models.ErrTagNotFound)
+			},
+			expected: api.UpdateNote400Response{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
+
+			req := api.UpdateNoteRequestObject{
+				Id:   openapi_types.UUID(noteID),
+				Body: &api.UpdateNoteJSONRequestBody{Title: "t", TagIds: tt.tagIDs},
+			}
+			resp, err := NewHandler(uc).UpdateNote(tt.ctx, req)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		})
+	}
+}
+
+func TestUpdateNoteBlocks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+	userID := uuid.NewV4()
+	blockID := uuid.NewV4()
+	apiBlockID := openapi_types.UUID(blockID)
+
+	uc.EXPECT().UpdateNote(gomock.Any(), userID, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+			require.Len(t, req.Blocks, 2)
+			assert.Equal(t, &blockID, req.Blocks[0].ID)
+			assert.Nil(t, req.Blocks[1].ID)
+			assert.JSONEq(t, `{"text":"Привет"}`, string(req.Blocks[0].Content))
+			return models.Note{}, nil
+		})
+
+	req := api.UpdateNoteRequestObject{
+		Body: &api.UpdateNoteJSONRequestBody{
+			Title: "t",
+			Blocks: []api.BlockInput{
+				{Id: &apiBlockID, Content: map[string]interface{}{"text": "Привет"}},
+				{Content: map[string]interface{}{}},
+			},
+		},
+	}
+	_, err := NewHandler(uc).UpdateNote(ctxutil.WithUserID(context.Background(), userID), req)
+
+	require.NoError(t, err)
+}
+
+func TestDeleteNote(t *testing.T) {
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	req := api.DeleteNoteRequestObject{Id: openapi_types.UUID(noteID)}
+
+	tests := []struct {
+		name     string
+		ucErr    error
+		expected api.DeleteNoteResponseObject
+	}{
+		{name: "ok", expected: api.DeleteNote204Response{}},
+		{name: "not found", ucErr: models.ErrNoteNotFound, expected: api.DeleteNote404Response{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			uc.EXPECT().DeleteNote(gomock.Any(), userID, noteID).Return(tt.ucErr)
+
+			resp, err := NewHandler(uc).DeleteNote(ctxutil.WithUserID(context.Background(), userID), req)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		})
+	}
+}
+
+func TestHandlersNoUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h := NewHandler(mocks.NewMockUsecase(ctrl))
+	ctx := context.Background()
+
+	listResp, err := h.ListNotes(ctx, api.ListNotesRequestObject{})
+	require.NoError(t, err)
+	assert.Equal(t, api.ListNotes401Response{}, listResp)
+
+	deleteResp, err := h.DeleteNote(ctx, api.DeleteNoteRequestObject{})
+	require.NoError(t, err)
+	assert.Equal(t, api.DeleteNote401Response{}, deleteResp)
+}
+
+func TestHandlersInternalError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+	ctx := ctxutil.WithUserID(context.Background(), uuid.NewV4())
+	dbErr := errors.New("db is down")
+
+	uc.EXPECT().GetNotes(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, dbErr)
+	uc.EXPECT().GetNote(gomock.Any(), gomock.Any(), gomock.Any()).Return(models.Note{}, dbErr)
+	uc.EXPECT().CreateNote(gomock.Any(), gomock.Any(), gomock.Any()).Return(models.Note{}, dbErr)
+	uc.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(models.Note{}, dbErr)
+	uc.EXPECT().DeleteNote(gomock.Any(), gomock.Any(), gomock.Any()).Return(dbErr)
+
+	h := NewHandler(uc)
+
+	_, err := h.ListNotes(ctx, api.ListNotesRequestObject{})
+	assert.ErrorIs(t, err, dbErr)
+
+	_, err = h.GetNote(ctx, api.GetNoteRequestObject{})
+	assert.ErrorIs(t, err, dbErr)
+
+	_, err = h.CreateNote(ctx, api.CreateNoteRequestObject{Body: &api.CreateNoteJSONRequestBody{}})
+	assert.ErrorIs(t, err, dbErr)
+
+	_, err = h.UpdateNote(ctx, api.UpdateNoteRequestObject{Body: &api.UpdateNoteJSONRequestBody{}})
+	assert.ErrorIs(t, err, dbErr)
+
+	_, err = h.DeleteNote(ctx, api.DeleteNoteRequestObject{})
+	assert.ErrorIs(t, err, dbErr)
 }
 
 func intPtr(i int) *int {

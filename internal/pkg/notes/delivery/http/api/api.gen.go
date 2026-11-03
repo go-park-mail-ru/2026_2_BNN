@@ -73,8 +73,25 @@ type Note struct {
 	// ParentNoteId Есть только у вложенных заметок
 	ParentNoteId *openapi_types.UUID `json:"parent_note_id,omitempty"`
 
+	// Tags Только в ответах на одну заметку, в списке нет
+	Tags *[]Tag `json:"tags,omitempty"`
+
 	// Title Example: Моя заметка
 	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Tag defines model for Tag.
+type Tag struct {
+	// Color #RRGGBBAA, последние два символа это прозрачность
+	//
+	// Example: #FF880080
+	Color     string             `json:"color"`
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// Name Example: учёба
+	Name      string    `json:"name"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -83,6 +100,9 @@ type UpdateNoteRequest struct {
 	Blocks []BlockInput `json:"blocks"`
 	Header *string      `json:"header,omitempty"`
 	Icon   *string      `json:"icon,omitempty"`
+
+	// TagIds Нет поля — теги не меняются, пустой массив — снять все теги
+	TagIds *[]openapi_types.UUID `json:"tag_ids,omitempty"`
 
 	// Title Example: Новая заметка
 	Title string `json:"title"`

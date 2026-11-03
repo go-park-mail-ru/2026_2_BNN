@@ -1,0 +1,1 @@
+DELETE FROM note_tags WHERE note_id = $1;

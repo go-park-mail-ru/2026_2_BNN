@@ -199,6 +199,21 @@ func (mr *MockRepoMockRecorder) ReadNote(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadNote", reflect.TypeOf((*MockRepo)(nil).ReadNote), ctx, id)
 }
 
+// ReadNoteTags mocks base method.
+func (m *MockRepo) ReadNoteTags(ctx context.Context, noteID uuid.UUID) ([]models.Tag, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadNoteTags", ctx, noteID)
+	ret0, _ := ret[0].([]models.Tag)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadNoteTags indicates an expected call of ReadNoteTags.
+func (mr *MockRepoMockRecorder) ReadNoteTags(ctx, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadNoteTags", reflect.TypeOf((*MockRepo)(nil).ReadNoteTags), ctx, noteID)
+}
+
 // ReadNotes mocks base method.
 func (m *MockRepo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	m.ctrl.T.Helper()
@@ -212,6 +227,21 @@ func (m *MockRepo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offse
 func (mr *MockRepoMockRecorder) ReadNotes(ctx, userID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadNotes", reflect.TypeOf((*MockRepo)(nil).ReadNotes), ctx, userID, limit, offset)
+}
+
+// ReadUserTags mocks base method.
+func (m *MockRepo) ReadUserTags(ctx context.Context, userID uuid.UUID, tagIDs []uuid.UUID) ([]models.Tag, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadUserTags", ctx, userID, tagIDs)
+	ret0, _ := ret[0].([]models.Tag)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadUserTags indicates an expected call of ReadUserTags.
+func (mr *MockRepoMockRecorder) ReadUserTags(ctx, userID, tagIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserTags", reflect.TypeOf((*MockRepo)(nil).ReadUserTags), ctx, userID, tagIDs)
 }
 
 // UpdateNote mocks base method.

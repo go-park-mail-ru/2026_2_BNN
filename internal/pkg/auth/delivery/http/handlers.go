@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -50,11 +51,16 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 	if errors.Is(err, models.ErrInvalidCredentials) {
 		return api.SignIn401Response{}, nil
 	}
-	if errors.Is(err, models.ErrValidation) {
-		return api.SignIn400Response{}, nil
+	if errors.Is(err, models.ErrOAuthAccount) {
+		return api.SignIn403Response{}, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if tokens.TwoFactorToken != "" {
+		setTwoFactorCookie(ctx, tokens)
+		return api.SignIn202Response{}, nil
 	}
 
 	setAuthCookies(ctx, tokens)
@@ -117,7 +123,7 @@ func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequ
 	}
 
 	tokens, err := h.uc.ChangePassword(ctx, userID, req.Body.OldPassword, req.Body.NewPassword)
-	if errors.Is(err, models.ErrValidation) {
+	if errors.Is(err, models.ErrValidation) || errors.Is(err, models.ErrOAuthAccount) {
 		return api.ChangePassword400Response{}, nil
 	}
 	if errors.Is(err, models.ErrWrongPassword) {
@@ -176,11 +182,114 @@ func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {
 }
 
 func toAPIUser(u models.User) api.User {
-	return api.User{
-		Id:        openapi_types.UUID(u.ID),
-		Login:     u.Login,
-		Avatar:    u.Avatar,
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
+	var provider *api.UserOauthProvider
+	if u.IsExternal {
+		github := api.Github
+		provider = &github
 	}
+
+	return api.User{
+		Id:            openapi_types.UUID(u.ID),
+		Login:         u.Login,
+		Avatar:        u.Avatar,
+		Is2faEnabled:  u.Is2FAEnabled,
+		OauthProvider: provider,
+		CreatedAt:     u.CreatedAt,
+		UpdatedAt:     u.UpdatedAt,
+	}
+}
+func (h *Handler) Generate2FA(ctx context.Context, req api.Generate2FARequestObject) (api.Generate2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Generate2FA401Response{}, nil
+	}
+
+	png, err := h.uc.Generate2FA(ctx, userID)
+	if errors.Is(err, models.ErrTwoFactorEnabled) {
+		return api.Generate2FA409Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Generate2FA200ImagepngResponse{
+		Body:          bytes.NewReader(png),
+		ContentLength: int64(len(png)),
+	}, nil
+}
+
+func (h *Handler) Enable2FA(ctx context.Context, req api.Enable2FARequestObject) (api.Enable2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Enable2FA401Response{}, nil
+	}
+
+	err := h.uc.Enable2FA(ctx, userID, req.Body.Code)
+	if errors.Is(err, models.ErrValidation) {
+		return api.Enable2FA400Response{}, nil
+	}
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Enable2FA403Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Enable2FA200Response{}, nil
+}
+
+func (h *Handler) Disable2FA(ctx context.Context, req api.Disable2FARequestObject) (api.Disable2FAResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.Disable2FA401Response{}, nil
+	}
+
+	err := h.uc.Disable2FA(ctx, userID, req.Body.Code)
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Disable2FA403Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Disable2FA200Response{}, nil
+}
+
+func (h *Handler) Verify2FA(ctx context.Context, req api.Verify2FARequestObject) (api.Verify2FAResponseObject, error) {
+	token, err := cookies.Get(ctx, twoFactorCookieName)
+	if err != nil {
+		return api.Verify2FA401Response{}, nil
+	}
+
+	user, tokens, err := h.uc.VerifyTwoFactor(ctx, token, req.Body.Code)
+	if errors.Is(err, models.ErrInvalidToken) {
+		return api.Verify2FA401Response{}, nil
+	}
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Verify2FA403Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	clearTwoFactorCookie(ctx)
+	setAuthCookies(ctx, tokens)
+
+	return api.Verify2FA200JSONResponse(toAPIUser(user)), nil
+}
+
+func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObject) (api.GitHubLoginResponseObject, error) {
+	return nil, errors.New("use /api/auth/github/login router directly")
+}
+
+func (h *Handler) GitHubCallback(ctx context.Context, req api.GitHubCallbackRequestObject) (api.GitHubCallbackResponseObject, error) {
+	return nil, errors.New("use /api/auth/github/callback router directly")
+}
+
+func (h *Handler) GetOAuthURL(provider string, state string) string {
+	return h.uc.GetOAuthURL(provider, state)
+}
+
+func (h *Handler) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
+	return h.uc.HandleOAuthCallback(ctx, provider, code)
 }

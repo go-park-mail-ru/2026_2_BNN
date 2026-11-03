@@ -72,6 +72,63 @@ func (mr *MockUsecaseMockRecorder) ChangePassword(ctx, userID, oldPassword, newP
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangePassword", reflect.TypeOf((*MockUsecase)(nil).ChangePassword), ctx, userID, oldPassword, newPassword)
 }
 
+// Disable2FA mocks base method.
+func (m *MockUsecase) Disable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Disable2FA", ctx, userID, code)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Disable2FA indicates an expected call of Disable2FA.
+func (mr *MockUsecaseMockRecorder) Disable2FA(ctx, userID, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disable2FA", reflect.TypeOf((*MockUsecase)(nil).Disable2FA), ctx, userID, code)
+}
+
+// Enable2FA mocks base method.
+func (m *MockUsecase) Enable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Enable2FA", ctx, userID, code)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Enable2FA indicates an expected call of Enable2FA.
+func (mr *MockUsecaseMockRecorder) Enable2FA(ctx, userID, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Enable2FA", reflect.TypeOf((*MockUsecase)(nil).Enable2FA), ctx, userID, code)
+}
+
+// Generate2FA mocks base method.
+func (m *MockUsecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Generate2FA", ctx, userID)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Generate2FA indicates an expected call of Generate2FA.
+func (mr *MockUsecaseMockRecorder) Generate2FA(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate2FA", reflect.TypeOf((*MockUsecase)(nil).Generate2FA), ctx, userID)
+}
+
+// GetOAuthURL mocks base method.
+func (m *MockUsecase) GetOAuthURL(provider, state string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOAuthURL", provider, state)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetOAuthURL indicates an expected call of GetOAuthURL.
+func (mr *MockUsecaseMockRecorder) GetOAuthURL(provider, state any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuthURL", reflect.TypeOf((*MockUsecase)(nil).GetOAuthURL), provider, state)
+}
+
 // GetUser mocks base method.
 func (m *MockUsecase) GetUser(ctx context.Context, userID uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -85,6 +142,22 @@ func (m *MockUsecase) GetUser(ctx context.Context, userID uuid.UUID) (models.Use
 func (mr *MockUsecaseMockRecorder) GetUser(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockUsecase)(nil).GetUser), ctx, userID)
+}
+
+// HandleOAuthCallback mocks base method.
+func (m *MockUsecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleOAuthCallback", ctx, provider, code)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(models.AuthTokens)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// HandleOAuthCallback indicates an expected call of HandleOAuthCallback.
+func (mr *MockUsecaseMockRecorder) HandleOAuthCallback(ctx, provider, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleOAuthCallback", reflect.TypeOf((*MockUsecase)(nil).HandleOAuthCallback), ctx, provider, code)
 }
 
 // Logout mocks base method.
@@ -161,6 +234,22 @@ func (m *MockUsecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data [
 func (mr *MockUsecaseMockRecorder) UpdateAvatar(ctx, userID, data, contentType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockUsecase)(nil).UpdateAvatar), ctx, userID, data, contentType)
+}
+
+// VerifyTwoFactor mocks base method.
+func (m *MockUsecase) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyTwoFactor", ctx, twoFactorToken, code)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(models.AuthTokens)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// VerifyTwoFactor indicates an expected call of VerifyTwoFactor.
+func (mr *MockUsecaseMockRecorder) VerifyTwoFactor(ctx, twoFactorToken, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTwoFactor", reflect.TypeOf((*MockUsecase)(nil).VerifyTwoFactor), ctx, twoFactorToken, code)
 }
 
 // MockRepo is a mock of Repo interface.
@@ -244,6 +333,21 @@ func (mr *MockRepoMockRecorder) DeleteUserRefreshTokens(ctx, userID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRefreshTokens", reflect.TypeOf((*MockRepo)(nil).DeleteUserRefreshTokens), ctx, userID)
 }
 
+// ReadUserByEmail mocks base method.
+func (m *MockRepo) ReadUserByEmail(ctx context.Context, email string) (models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadUserByEmail", ctx, email)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadUserByEmail indicates an expected call of ReadUserByEmail.
+func (mr *MockRepoMockRecorder) ReadUserByEmail(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByEmail", reflect.TypeOf((*MockRepo)(nil).ReadUserByEmail), ctx, email)
+}
+
 // ReadUserByID mocks base method.
 func (m *MockRepo) ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -274,6 +378,20 @@ func (mr *MockRepoMockRecorder) ReadUserByLogin(ctx, login any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByLogin", reflect.TypeOf((*MockRepo)(nil).ReadUserByLogin), ctx, login)
 }
 
+// Set2FAStatus mocks base method.
+func (m *MockRepo) Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Set2FAStatus", ctx, userID, enabled)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Set2FAStatus indicates an expected call of Set2FAStatus.
+func (mr *MockRepoMockRecorder) Set2FAStatus(ctx, userID, enabled any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set2FAStatus", reflect.TypeOf((*MockRepo)(nil).Set2FAStatus), ctx, userID, enabled)
+}
+
 // UpdateAvatar mocks base method.
 func (m *MockRepo) UpdateAvatar(ctx context.Context, user models.User) error {
 	m.ctrl.T.Helper()
@@ -300,6 +418,20 @@ func (m *MockRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, hash []
 func (mr *MockRepoMockRecorder) UpdatePassword(ctx, userID, hash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockRepo)(nil).UpdatePassword), ctx, userID, hash)
+}
+
+// UpdateTOTPSecret mocks base method.
+func (m *MockRepo) UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateTOTPSecret", ctx, userID, secret)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateTOTPSecret indicates an expected call of UpdateTOTPSecret.
+func (mr *MockRepoMockRecorder) UpdateTOTPSecret(ctx, userID, secret any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTOTPSecret", reflect.TypeOf((*MockRepo)(nil).UpdateTOTPSecret), ctx, userID, secret)
 }
 
 // MockStorage is a mock of Storage interface.

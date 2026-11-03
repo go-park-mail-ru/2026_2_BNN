@@ -22,6 +22,8 @@ type Repo interface {
 	ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error)
 	ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error)
 	ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.Block, error)
+	ReadNoteTags(ctx context.Context, noteID uuid.UUID) ([]models.Tag, error)
+	ReadUserTags(ctx context.Context, userID uuid.UUID, tagIDs []uuid.UUID) ([]models.Tag, error)
 
 	CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error
 	UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error
@@ -40,6 +42,7 @@ type UpdateNoteRequest struct {
 	Header *string
 	Icon   *string
 	Blocks []BlockInput
+	TagIDs []uuid.UUID
 }
 
 type BlockInput struct {

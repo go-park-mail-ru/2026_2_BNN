@@ -3,8 +3,10 @@ package usecase
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"path"
 	"time"
 	"unicode/utf8"
@@ -13,6 +15,12 @@ import (
 	"bnn/internal/pkg/auth"
 
 	uuid "github.com/satori/go.uuid"
+
+	"encoding/base32"
+	"net/url"
+
+	"github.com/dgryski/dgoogauth"
+	"github.com/skip2/go-qrcode"
 )
 
 const (
@@ -20,11 +28,13 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
+	issuerName        = "BNN_Notes"
 )
 
 type Usecase struct {
 	repo    auth.Repo
 	storage auth.Storage
+	oauth   *auth.OAuthConfig
 	secret  []byte
 }
 
@@ -34,10 +44,11 @@ var allowedAvatarTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
-func NewUsecase(repo auth.Repo, storage auth.Storage, secret string) *Usecase {
+func NewUsecase(repo auth.Repo, storage auth.Storage, oauth *auth.OAuthConfig, secret string) *Usecase {
 	return &Usecase{
 		repo:    repo,
 		storage: storage,
+		oauth:   oauth,
 		secret:  []byte(secret),
 	}
 }
@@ -75,10 +86,6 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 }
 
 func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.User, models.AuthTokens, error) {
-	if err := validateCredentials(login, password); err != nil {
-		return models.User{}, models.AuthTokens{}, err
-	}
-
 	user, err := u.repo.ReadUserByLogin(ctx, login)
 	if errors.Is(err, models.ErrUserNotFound) {
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
@@ -87,11 +94,15 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 		return models.User{}, models.AuthTokens{}, err
 	}
 
+	if user.IsExternal {
+		return models.User{}, models.AuthTokens{}, models.ErrOAuthAccount
+	}
+
 	if !verifyPassword(password, user.PasswordHash) {
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	tokens, err := u.startSession(ctx, user)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
@@ -125,7 +136,7 @@ func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
 }
 
 func (u *Usecase) Authenticate(_ context.Context, accessToken string) (uuid.UUID, error) {
-	userID, err := u.parseAccessToken(accessToken)
+	userID, err := u.parseToken(accessToken, accessAudience)
 	if err != nil {
 		return uuid.Nil, models.ErrInvalidToken
 	}
@@ -145,6 +156,10 @@ func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassw
 	user, err := u.repo.ReadUserByID(ctx, userID)
 	if err != nil {
 		return models.AuthTokens{}, err
+	}
+
+	if user.IsExternal {
+		return models.AuthTokens{}, models.ErrOAuthAccount
 	}
 
 	if !verifyPassword(oldPassword, user.PasswordHash) {
@@ -172,7 +187,7 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	accessExpiresAt := now.Add(accessTokenTTL)
 	refreshExpiresAt := now.Add(refreshTokenTTL)
 
-	accessToken, err := u.newAccessToken(userID, accessExpiresAt)
+	accessToken, err := u.newToken(userID, accessAudience, accessExpiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
 	}
@@ -247,4 +262,206 @@ func (u *Usecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byt
 		_ = u.storage.DeleteFile(ctx, path.Base(oldAvatar))
 	}
 	return user, nil
+}
+
+func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error) {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Is2FAEnabled {
+		return nil, models.ErrTwoFactorEnabled
+	}
+
+	secretBytes := make([]byte, 20)
+	if _, err := rand.Read(secretBytes); err != nil {
+		return nil, fmt.Errorf("generate secret: %w", err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secretBytes)
+
+	if err := u.repo.UpdateTOTPSecret(ctx, userID, secret); err != nil {
+		return nil, err
+	}
+
+	u2, _ := url.Parse("otpauth://totp")
+	u2.Path += fmt.Sprintf("/%s:%s", url.PathEscape(issuerName), url.PathEscape(user.Login))
+
+	params := url.Values{}
+	params.Add("secret", secret)
+	params.Add("issuer", issuerName)
+	u2.RawQuery = params.Encode()
+
+	png, err := qrcode.Encode(u2.String(), qrcode.Medium, 256)
+	if err != nil {
+		return nil, fmt.Errorf("generate qr: %w", err)
+	}
+
+	return png, nil
+}
+
+func (u *Usecase) Enable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if user.TOTPSecret == "" {
+		return models.ErrValidation
+	}
+
+	if !checkCode(user.TOTPSecret, code) {
+		return models.ErrInvalidCode
+	}
+
+	return u.repo.Set2FAStatus(ctx, userID, true)
+}
+
+func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if !user.Is2FAEnabled || !checkCode(user.TOTPSecret, code) {
+		return models.ErrInvalidCode
+	}
+
+	if err := u.repo.Set2FAStatus(ctx, userID, false); err != nil {
+		return err
+	}
+	return u.repo.UpdateTOTPSecret(ctx, userID, "")
+}
+
+func (u *Usecase) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
+	userID, err := u.parseToken(twoFactorToken, twoFactorAudience)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, models.ErrInvalidToken
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	if !user.Is2FAEnabled || !checkCode(user.TOTPSecret, code) {
+		return models.User{}, models.AuthTokens{}, models.ErrInvalidCode
+	}
+
+	tokens, err := u.createTokens(ctx, user.ID)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	return user, tokens, nil
+}
+
+func (u *Usecase) startSession(ctx context.Context, user models.User) (models.AuthTokens, error) {
+	if !user.Is2FAEnabled {
+		return u.createTokens(ctx, user.ID)
+	}
+
+	expiresAt := time.Now().UTC().Add(twoFactorTokenTTL)
+	token, err := u.newToken(user.ID, twoFactorAudience, expiresAt)
+	if err != nil {
+		return models.AuthTokens{}, fmt.Errorf("create 2fa token: %w", err)
+	}
+
+	return models.AuthTokens{TwoFactorToken: token, TwoFactorExpiresAt: expiresAt}, nil
+}
+
+func checkCode(secret, code string) bool {
+	otp := &dgoogauth.OTPConfig{Secret: secret, WindowSize: 3}
+	ok, err := otp.Authenticate(code)
+	return err == nil && ok
+}
+
+func (u *Usecase) GetOAuthURL(provider string, state string) string {
+	if provider == "github" {
+		return u.oauth.GitHub.AuthCodeURL(state)
+	}
+	return ""
+}
+
+func (u *Usecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
+	if provider != "github" {
+		return models.User{}, models.AuthTokens{}, models.ErrValidation
+	}
+	return u.handleGitHubCallback(ctx, code)
+}
+
+func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models.User, models.AuthTokens, error) {
+	tok, err := u.oauth.GitHub.Exchange(ctx, code)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, fmt.Errorf("exchange github code: %w", err)
+	}
+
+	client := u.oauth.GitHub.Client(ctx, tok)
+
+	resp, err := client.Get("https://api.github.com/user")
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, fmt.Errorf("get github user: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var ghUser struct {
+		Login     string `json:"login"`
+		Email     string `json:"email"`
+		AvatarURL string `json:"avatar_url"`
+	}
+	json.Unmarshal(body, &ghUser)
+
+	email := ghUser.Email
+	if email == "" {
+		emailResp, err := client.Get("https://api.github.com/user/emails")
+		if err == nil {
+			defer emailResp.Body.Close()
+			var emails []struct {
+				Email    string `json:"email"`
+				Primary  bool   `json:"primary"`
+				Verified bool   `json:"verified"`
+			}
+			emailBody, _ := io.ReadAll(emailResp.Body)
+			json.Unmarshal(emailBody, &emails)
+			for _, e := range emails {
+				if e.Primary {
+					email = e.Email
+					break
+				}
+			}
+		}
+	}
+
+	if email == "" {
+		return models.User{}, models.AuthTokens{}, errors.New("no email provided by github")
+	}
+
+	user, err := u.repo.ReadUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, models.ErrUserNotFound) {
+			now := time.Now().UTC()
+			user = models.User{
+				ID:         uuid.NewV4(),
+				Login:      email,
+				Email:      email,
+				Avatar:     ghUser.AvatarURL,
+				IsExternal: true,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+			if err := u.repo.CreateUser(ctx, user); err != nil {
+				return models.User{}, models.AuthTokens{}, err
+			}
+		} else {
+			return models.User{}, models.AuthTokens{}, err
+		}
+	}
+
+	tokens, err := u.startSession(ctx, user)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	return user, tokens, nil
 }

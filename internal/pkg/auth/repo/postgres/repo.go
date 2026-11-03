@@ -40,6 +40,15 @@ var deleteUserRefreshTokensQuery string
 //go:embed queries/update_user_avatar.sql
 var updateUserAvatarQuery string
 
+//go:embed queries/update_totp_secret.sql
+var updateTOTPSecretQuery string
+
+//go:embed queries/update_2fa_status.sql
+var update2FAStatusQuery string
+
+//go:embed queries/read_user_by_email.sql
+var readUserByEmailQuery string
+
 type Repo struct {
 	db *pgxpool.Pool
 }
@@ -54,6 +63,10 @@ func (r *Repo) CreateUser(ctx context.Context, user models.User) error {
 		user.Login,
 		user.PasswordHash,
 		user.Avatar,
+		user.Email,
+		user.IsExternal,
+		user.TOTPSecret,
+		user.Is2FAEnabled,
 		user.CreatedAt,
 		user.UpdatedAt,
 	)
@@ -139,6 +152,10 @@ func (r *Repo) readUser(ctx context.Context, query string, arg any) (models.User
 		&user.Login,
 		&user.PasswordHash,
 		&user.Avatar,
+		&user.TOTPSecret,
+		&user.Is2FAEnabled,
+		&user.Email,
+		&user.IsExternal,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -158,4 +175,24 @@ func (r *Repo) UpdateAvatar(ctx context.Context, user models.User) error {
 		return fmt.Errorf("update avatar: %w", err)
 	}
 	return nil
+}
+
+func (r *Repo) UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error {
+	_, err := r.db.Exec(ctx, updateTOTPSecretQuery, secret, userID)
+	if err != nil {
+		return fmt.Errorf("update totp secret: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	_, err := r.db.Exec(ctx, update2FAStatusQuery, enabled, userID)
+	if err != nil {
+		return fmt.Errorf("update 2fa status: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) ReadUserByEmail(ctx context.Context, email string) (models.User, error) {
+	return r.readUser(ctx, readUserByEmailQuery, email)
 }

@@ -52,6 +52,9 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 	if errors.Is(err, models.ErrUnsupportedFileType) {
 		return api.UploadAttachment415Response{}, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 	resp, err := toAPIAttachment(attachment)
 	if err != nil {
 		return nil, err

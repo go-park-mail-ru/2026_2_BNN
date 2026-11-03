@@ -66,6 +66,10 @@ services:
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       S3_ATTACHMENTS_BUCKET: attachments
       S3_AVATARS_BUCKET: avatars
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
     restart: unless-stopped
 
   nginx:

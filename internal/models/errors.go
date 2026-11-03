@@ -17,4 +17,6 @@ var (
 	ErrTagNotFound          = errors.New("tag not found")
 	ErrTagExists            = errors.New("tag already exists")
 	ErrOAuthAccount         = errors.New("account registered via oauth")
+	ErrInvalidCode          = errors.New("invalid 2fa code")
+	ErrTwoFactorEnabled     = errors.New("2fa already enabled")
 )

@@ -559,3 +559,152 @@ func TestToAPIUser(t *testing.T) {
 		})
 	}
 }
+
+func TestSignInWithTwoFactor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+	pending := models.AuthTokens{TwoFactorToken: "pending", TwoFactorExpiresAt: time.Now().Add(5 * time.Minute)}
+	uc.EXPECT().SignIn(gomock.Any(), "seyran", "password123").Return(models.User{}, pending, nil)
+
+	var resp api.SignInResponseObject
+	var err error
+	set := withCookies(nil, func(ctx context.Context) {
+		body := &api.SignInJSONRequestBody{Login: "seyran", Password: "password123"}
+		resp, err = NewHandler(uc).SignIn(ctx, api.SignInRequestObject{Body: body})
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, api.SignIn202Response{}, resp)
+	assert.Equal(t, "pending", set[twoFactorCookieName].Value)
+	assert.NotContains(t, set, accessCookieName)
+	assert.NotContains(t, set, refreshCookieName)
+}
+
+func TestVerify2FA(t *testing.T) {
+	user := models.User{ID: uuid.NewV4(), Login: "seyran", Is2FAEnabled: true}
+	pendingCookie := []*http.Cookie{{Name: twoFactorCookieName, Value: "pending"}}
+	body := &api.Verify2FAJSONRequestBody{Code: "123456"}
+
+	tests := []struct {
+		name     string
+		cookies  []*http.Cookie
+		prepare  func(uc *mocks.MockUsecase)
+		expected api.Verify2FAResponseObject
+	}{
+		{
+			name:    "ok",
+			cookies: pendingCookie,
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().VerifyTwoFactor(gomock.Any(), "pending", "123456").Return(user, tokens, nil)
+			},
+			expected: api.Verify2FA200JSONResponse(toAPIUser(user)),
+		},
+		{
+			name:     "no cookie",
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.Verify2FA401Response{},
+		},
+		{
+			name:    "expired token",
+			cookies: pendingCookie,
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().VerifyTwoFactor(gomock.Any(), "pending", "123456").Return(models.User{}, models.AuthTokens{}, models.ErrInvalidToken)
+			},
+			expected: api.Verify2FA401Response{},
+		},
+		{
+			name:    "wrong code",
+			cookies: pendingCookie,
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().VerifyTwoFactor(gomock.Any(), "pending", "123456").Return(models.User{}, models.AuthTokens{}, models.ErrInvalidCode)
+			},
+			expected: api.Verify2FA403Response{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
+
+			var resp api.Verify2FAResponseObject
+			var err error
+			set := withCookies(tt.cookies, func(ctx context.Context) {
+				resp, err = NewHandler(uc).Verify2FA(ctx, api.Verify2FARequestObject{Body: body})
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+			if _, ok := tt.expected.(api.Verify2FA200JSONResponse); ok {
+				assert.Equal(t, "access", set[accessCookieName].Value)
+				assert.Negative(t, set[twoFactorCookieName].MaxAge)
+			}
+		})
+	}
+}
+
+func TestTwoFactorSettings(t *testing.T) {
+	userID := uuid.NewV4()
+	ctx := ctxutil.WithUserID(context.Background(), userID)
+	code := &api.TwoFactorCodeRequest{Code: "123456"}
+
+	t.Run("generate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		uc := mocks.NewMockUsecase(ctrl)
+		uc.EXPECT().Generate2FA(gomock.Any(), userID).Return([]byte("png"), nil)
+		uc.EXPECT().Generate2FA(gomock.Any(), userID).Return(nil, models.ErrTwoFactorEnabled)
+		h := NewHandler(uc)
+
+		resp, err := h.Generate2FA(ctx, api.Generate2FARequestObject{})
+		require.NoError(t, err)
+		assert.IsType(t, api.Generate2FA200ImagepngResponse{}, resp)
+
+		resp, err = h.Generate2FA(ctx, api.Generate2FARequestObject{})
+		require.NoError(t, err)
+		assert.Equal(t, api.Generate2FA409Response{}, resp)
+	})
+
+	t.Run("enable", func(t *testing.T) {
+		tests := []struct {
+			ucErr    error
+			expected api.Enable2FAResponseObject
+		}{
+			{expected: api.Enable2FA200Response{}},
+			{ucErr: models.ErrValidation, expected: api.Enable2FA400Response{}},
+			{ucErr: models.ErrInvalidCode, expected: api.Enable2FA403Response{}},
+		}
+
+		for _, tt := range tests {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			uc.EXPECT().Enable2FA(gomock.Any(), userID, "123456").Return(tt.ucErr)
+
+			resp, err := NewHandler(uc).Enable2FA(ctx, api.Enable2FARequestObject{Body: code})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		}
+	})
+
+	t.Run("disable", func(t *testing.T) {
+		tests := []struct {
+			ucErr    error
+			expected api.Disable2FAResponseObject
+		}{
+			{expected: api.Disable2FA200Response{}},
+			{ucErr: models.ErrInvalidCode, expected: api.Disable2FA403Response{}},
+		}
+
+		for _, tt := range tests {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			uc.EXPECT().Disable2FA(gomock.Any(), userID, "123456").Return(tt.ucErr)
+
+			resp, err := NewHandler(uc).Disable2FA(ctx, api.Disable2FARequestObject{Body: code})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		}
+	})
+}

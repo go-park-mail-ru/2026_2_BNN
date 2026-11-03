@@ -149,6 +149,11 @@ func main() {
 			return
 		}
 		_ = user
+		if tokens.TwoFactorToken != "" {
+			http.SetCookie(w, &http.Cookie{Name: "bnn_2fa", Value: tokens.TwoFactorToken, Path: "/api/auth/2fa", Expires: tokens.TwoFactorExpiresAt, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+			http.Redirect(w, r, frontendURL+"/login/2fa", http.StatusTemporaryRedirect)
+			return
+		}
 		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: true})
 		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: true})
 		http.Redirect(w, r, frontendURL+"/profile", http.StatusTemporaryRedirect)

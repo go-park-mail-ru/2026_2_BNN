@@ -3,12 +3,14 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth/mocks"
 
+	"github.com/dgryski/dgoogauth"
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -276,13 +278,16 @@ func TestAuthenticate(t *testing.T) {
 	userID := uuid.NewV4()
 	u := NewUsecase(nil, nil, nil, secret)
 
-	valid, err := u.newAccessToken(userID, time.Now().Add(time.Minute))
+	valid, err := u.newToken(userID, accessAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
-	expired, err := u.newAccessToken(userID, time.Now().Add(-time.Minute))
+	expired, err := u.newToken(userID, accessAudience, time.Now().Add(-time.Minute))
 	require.NoError(t, err)
 
-	foreign, err := NewUsecase(nil, nil, nil, "other_secret").newAccessToken(userID, time.Now().Add(time.Minute))
+	foreign, err := NewUsecase(nil, nil, nil, "other_secret").newToken(userID, accessAudience, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+
+	twoFactor, err := u.newToken(userID, twoFactorAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -291,6 +296,7 @@ func TestAuthenticate(t *testing.T) {
 		expectedErr error
 	}{
 		{name: "ok", token: valid},
+		{name: "2fa token", token: twoFactor, expectedErr: models.ErrInvalidToken},
 		{name: "expired", token: expired, expectedErr: models.ErrInvalidToken},
 		{name: "other secret", token: foreign, expectedErr: models.ErrInvalidToken},
 		{name: "garbage", token: "not-a-token", expectedErr: models.ErrInvalidToken},
@@ -558,6 +564,204 @@ func TestVerifyPassword(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, verifyPassword(tt.password, []byte(tt.hash)))
+		})
+	}
+}
+
+const totpSecret = "JBSWY3DPEHPK3PXP"
+
+func currentCode() string {
+	return fmt.Sprintf("%06d", dgoogauth.ComputeCode(totpSecret, time.Now().Unix()/30))
+}
+
+func TestSignInWithTwoFactor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	hash, err := hashPassword("password123")
+	require.NoError(t, err)
+	user := models.User{ID: uuid.NewV4(), Login: "seyran", PasswordHash: hash, Is2FAEnabled: true}
+
+	repo.EXPECT().ReadUserByLogin(gomock.Any(), "seyran").Return(user, nil)
+
+	u := NewUsecase(repo, nil, nil, secret)
+	_, tokens, err := u.SignIn(context.Background(), "seyran", "password123")
+
+	require.NoError(t, err)
+	assert.Empty(t, tokens.AccessToken)
+	assert.Empty(t, tokens.RefreshToken)
+	assert.NotEmpty(t, tokens.TwoFactorToken)
+
+	id, err := u.parseToken(tokens.TwoFactorToken, twoFactorAudience)
+	require.NoError(t, err)
+	assert.Equal(t, user.ID, id)
+}
+
+func TestVerifyTwoFactor(t *testing.T) {
+	userID := uuid.NewV4()
+	u := NewUsecase(nil, nil, nil, secret)
+	pending, err := u.newToken(userID, twoFactorAudience, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+	access, err := u.newToken(userID, accessAudience, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+	user := models.User{ID: userID, Is2FAEnabled: true, TOTPSecret: totpSecret}
+
+	tests := []struct {
+		name        string
+		token       string
+		code        string
+		prepare     func(repo *mocks.MockRepo)
+		expectedErr error
+	}{
+		{
+			name:  "ok",
+			token: pending,
+			code:  currentCode(),
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(user, nil)
+				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+			},
+		},
+		{
+			name:  "wrong code",
+			token: pending,
+			code:  "000000",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(user, nil)
+			},
+			expectedErr: models.ErrInvalidCode,
+		},
+		{
+			name:        "access token instead of 2fa token",
+			token:       access,
+			code:        currentCode(),
+			prepare:     func(repo *mocks.MockRepo) {},
+			expectedErr: models.ErrInvalidToken,
+		},
+		{
+			name:        "garbage token",
+			token:       "not-a-token",
+			code:        currentCode(),
+			prepare:     func(repo *mocks.MockRepo) {},
+			expectedErr: models.ErrInvalidToken,
+		},
+		{
+			name:  "read user error",
+			token: pending,
+			code:  currentCode(),
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(models.User{}, errDB)
+			},
+			expectedErr: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			tt.prepare(repo)
+
+			got, tokens, err := NewUsecase(repo, nil, nil, secret).VerifyTwoFactor(context.Background(), tt.token, tt.code)
+
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, userID, got.ID)
+			assert.NotEmpty(t, tokens.AccessToken)
+			assert.NotEmpty(t, tokens.RefreshToken)
+		})
+	}
+}
+
+func TestGenerate2FA(t *testing.T) {
+	userID := uuid.NewV4()
+
+	t.Run("ok", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := mocks.NewMockRepo(ctrl)
+		repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(models.User{ID: userID, Login: "seyran"}, nil)
+		repo.EXPECT().UpdateTOTPSecret(gomock.Any(), userID, gomock.Any()).Return(nil)
+
+		png, err := NewUsecase(repo, nil, nil, secret).Generate2FA(context.Background(), userID)
+
+		require.NoError(t, err)
+		assert.NotEmpty(t, png)
+	})
+
+	t.Run("already enabled", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := mocks.NewMockRepo(ctrl)
+		repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(models.User{ID: userID, Is2FAEnabled: true}, nil)
+
+		_, err := NewUsecase(repo, nil, nil, secret).Generate2FA(context.Background(), userID)
+
+		assert.ErrorIs(t, err, models.ErrTwoFactorEnabled)
+	})
+}
+
+func TestEnable2FA(t *testing.T) {
+	userID := uuid.NewV4()
+
+	tests := []struct {
+		name        string
+		user        models.User
+		code        string
+		enable      bool
+		expectedErr error
+	}{
+		{name: "ok", user: models.User{ID: userID, TOTPSecret: totpSecret}, code: currentCode(), enable: true},
+		{name: "no secret", user: models.User{ID: userID}, code: currentCode(), expectedErr: models.ErrValidation},
+		{name: "wrong code", user: models.User{ID: userID, TOTPSecret: totpSecret}, code: "000000", expectedErr: models.ErrInvalidCode},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(tt.user, nil)
+			if tt.enable {
+				repo.EXPECT().Set2FAStatus(gomock.Any(), userID, true).Return(nil)
+			}
+
+			err := NewUsecase(repo, nil, nil, secret).Enable2FA(context.Background(), userID, tt.code)
+
+			assert.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestDisable2FA(t *testing.T) {
+	userID := uuid.NewV4()
+	enabled := models.User{ID: userID, Is2FAEnabled: true, TOTPSecret: totpSecret}
+
+	tests := []struct {
+		name        string
+		user        models.User
+		code        string
+		disable     bool
+		expectedErr error
+	}{
+		{name: "ok", user: enabled, code: currentCode(), disable: true},
+		{name: "wrong code", user: enabled, code: "000000", expectedErr: models.ErrInvalidCode},
+		{name: "not enabled", user: models.User{ID: userID}, code: currentCode(), expectedErr: models.ErrInvalidCode},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(tt.user, nil)
+			if tt.disable {
+				repo.EXPECT().Set2FAStatus(gomock.Any(), userID, false).Return(nil)
+				repo.EXPECT().UpdateTOTPSecret(gomock.Any(), userID, "").Return(nil)
+			}
+
+			err := NewUsecase(repo, nil, nil, secret).Disable2FA(context.Background(), userID, tt.code)
+
+			assert.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

@@ -102,7 +102,7 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	tokens, err := u.startSession(ctx, user)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}
@@ -136,7 +136,7 @@ func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
 }
 
 func (u *Usecase) Authenticate(_ context.Context, accessToken string) (uuid.UUID, error) {
-	userID, err := u.parseAccessToken(accessToken)
+	userID, err := u.parseToken(accessToken, accessAudience)
 	if err != nil {
 		return uuid.Nil, models.ErrInvalidToken
 	}
@@ -187,7 +187,7 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	accessExpiresAt := now.Add(accessTokenTTL)
 	refreshExpiresAt := now.Add(refreshTokenTTL)
 
-	accessToken, err := u.newAccessToken(userID, accessExpiresAt)
+	accessToken, err := u.newToken(userID, accessAudience, accessExpiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
 	}
@@ -270,6 +270,10 @@ func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, er
 		return nil, err
 	}
 
+	if user.Is2FAEnabled {
+		return nil, models.ErrTwoFactorEnabled
+	}
+
 	secretBytes := make([]byte, 20)
 	if _, err := rand.Read(secretBytes); err != nil {
 		return nil, fmt.Errorf("generate secret: %w", err)
@@ -306,25 +310,70 @@ func (u *Usecase) Enable2FA(ctx context.Context, userID uuid.UUID, code string) 
 		return models.ErrValidation
 	}
 
-	otpConfig := &dgoogauth.OTPConfig{
-		Secret:      user.TOTPSecret,
-		WindowSize:  3,
-		HotpCounter: 0,
-	}
-
-	valid, err := otpConfig.Authenticate(code)
-	if err != nil || !valid {
-		return models.ErrInvalidToken
+	if !checkCode(user.TOTPSecret, code) {
+		return models.ErrInvalidCode
 	}
 
 	return u.repo.Set2FAStatus(ctx, userID, true)
 }
 
-func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID) error {
+func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if !user.Is2FAEnabled || !checkCode(user.TOTPSecret, code) {
+		return models.ErrInvalidCode
+	}
+
 	if err := u.repo.Set2FAStatus(ctx, userID, false); err != nil {
 		return err
 	}
 	return u.repo.UpdateTOTPSecret(ctx, userID, "")
+}
+
+func (u *Usecase) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
+	userID, err := u.parseToken(twoFactorToken, twoFactorAudience)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, models.ErrInvalidToken
+	}
+
+	user, err := u.repo.ReadUserByID(ctx, userID)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	if !user.Is2FAEnabled || !checkCode(user.TOTPSecret, code) {
+		return models.User{}, models.AuthTokens{}, models.ErrInvalidCode
+	}
+
+	tokens, err := u.createTokens(ctx, user.ID)
+	if err != nil {
+		return models.User{}, models.AuthTokens{}, err
+	}
+
+	return user, tokens, nil
+}
+
+func (u *Usecase) startSession(ctx context.Context, user models.User) (models.AuthTokens, error) {
+	if !user.Is2FAEnabled {
+		return u.createTokens(ctx, user.ID)
+	}
+
+	expiresAt := time.Now().UTC().Add(twoFactorTokenTTL)
+	token, err := u.newToken(user.ID, twoFactorAudience, expiresAt)
+	if err != nil {
+		return models.AuthTokens{}, fmt.Errorf("create 2fa token: %w", err)
+	}
+
+	return models.AuthTokens{TwoFactorToken: token, TwoFactorExpiresAt: expiresAt}, nil
+}
+
+func checkCode(secret, code string) bool {
+	otp := &dgoogauth.OTPConfig{Secret: secret, WindowSize: 3}
+	ok, err := otp.Authenticate(code)
+	return err == nil && ok
 }
 
 func (u *Usecase) GetOAuthURL(provider string, state string) string {
@@ -409,7 +458,7 @@ func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models
 		}
 	}
 
-	tokens, err := u.createTokens(ctx, user.ID)
+	tokens, err := u.startSession(ctx, user)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, err
 	}

@@ -41,4 +41,7 @@ type AuthTokens struct {
 	AccessExpiresAt  time.Time
 	RefreshToken     string
 	RefreshExpiresAt time.Time
+
+	TwoFactorToken     string
+	TwoFactorExpiresAt time.Time
 }

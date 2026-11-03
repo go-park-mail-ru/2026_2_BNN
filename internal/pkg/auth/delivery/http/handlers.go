@@ -51,8 +51,8 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 	if errors.Is(err, models.ErrInvalidCredentials) {
 		return api.SignIn401Response{}, nil
 	}
-	if errors.Is(err, models.ErrValidation) {
-		return api.SignIn400Response{}, nil
+	if errors.Is(err, models.ErrOAuthAccount) {
+		return api.SignIn403Response{}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (h *Handler) ChangePassword(ctx context.Context, req api.ChangePasswordRequ
 	}
 
 	tokens, err := h.uc.ChangePassword(ctx, userID, req.Body.OldPassword, req.Body.NewPassword)
-	if errors.Is(err, models.ErrValidation) {
+	if errors.Is(err, models.ErrValidation) || errors.Is(err, models.ErrOAuthAccount) {
 		return api.ChangePassword400Response{}, nil
 	}
 	if errors.Is(err, models.ErrWrongPassword) {
@@ -177,15 +177,22 @@ func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {
 }
 
 func toAPIUser(u models.User) api.User {
+	var provider *api.UserOauthProvider
+	if u.IsExternal {
+		github := api.Github
+		provider = &github
+	}
+
 	return api.User{
-		Id:        openapi_types.UUID(u.ID),
-		Login:     u.Login,
-		Avatar:    u.Avatar,
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
+		Id:            openapi_types.UUID(u.ID),
+		Login:         u.Login,
+		Avatar:        u.Avatar,
+		Is2faEnabled:  u.Is2FAEnabled,
+		OauthProvider: provider,
+		CreatedAt:     u.CreatedAt,
+		UpdatedAt:     u.UpdatedAt,
 	}
 }
-
 func (h *Handler) Generate2FA(ctx context.Context, req api.Generate2FARequestObject) (api.Generate2FAResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {

@@ -86,10 +86,6 @@ func (u *Usecase) SignUp(ctx context.Context, login, password string) (models.Us
 }
 
 func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.User, models.AuthTokens, error) {
-	if err := validateCredentials(login, password); err != nil {
-		return models.User{}, models.AuthTokens{}, err
-	}
-
 	user, err := u.repo.ReadUserByLogin(ctx, login)
 	if errors.Is(err, models.ErrUserNotFound) {
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidCredentials
@@ -99,7 +95,7 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 	}
 
 	if user.IsExternal {
-		return models.User{}, models.AuthTokens{}, errors.New("user registered via oauth, please use oauth login")
+		return models.User{}, models.AuthTokens{}, models.ErrOAuthAccount
 	}
 
 	if !verifyPassword(password, user.PasswordHash) {
@@ -160,6 +156,10 @@ func (u *Usecase) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassw
 	user, err := u.repo.ReadUserByID(ctx, userID)
 	if err != nil {
 		return models.AuthTokens{}, err
+	}
+
+	if user.IsExternal {
+		return models.AuthTokens{}, models.ErrOAuthAccount
 	}
 
 	if !verifyPassword(oldPassword, user.PasswordHash) {

@@ -16,4 +16,5 @@ var (
 	ErrUnsupportedFileType  = errors.New("unsupported file type")
 	ErrTagNotFound          = errors.New("tag not found")
 	ErrTagExists            = errors.New("tag already exists")
+	ErrOAuthAccount         = errors.New("account registered via oauth")
 )

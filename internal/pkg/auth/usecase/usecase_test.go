@@ -130,10 +130,12 @@ func TestSignIn(t *testing.T) {
 			expectedErr: models.ErrInvalidCredentials,
 		},
 		{
-			name:        "validation",
-			password:    "short",
-			prepare:     func(repo *mocks.MockRepo) {},
-			expectedErr: models.ErrValidation,
+			name:     "oauth account",
+			password: "any",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadUserByLogin(gomock.Any(), "seyran").Return(models.User{ID: user.ID, Login: "seyran", IsExternal: true}, nil)
+			},
+			expectedErr: models.ErrOAuthAccount,
 		},
 		{
 			name:     "read user error",
@@ -361,6 +363,15 @@ func TestChangePassword(t *testing.T) {
 				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(user, nil)
 			},
 			expectedErr: models.ErrWrongPassword,
+		},
+		{
+			name:        "oauth account",
+			oldPassword: "oldpassword",
+			newPassword: "newpassword",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadUserByID(gomock.Any(), userID).Return(models.User{ID: userID, IsExternal: true}, nil)
+			},
+			expectedErr: models.ErrOAuthAccount,
 		},
 		{
 			name:        "new password too short",

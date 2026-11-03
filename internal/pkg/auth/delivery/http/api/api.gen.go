@@ -19,6 +19,21 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for UserOauthProvider.
+const (
+	Github UserOauthProvider = "github"
+)
+
+// Valid indicates whether the value is a known member of the UserOauthProvider enum.
+func (e UserOauthProvider) Valid() bool {
+	switch e {
+	case Github:
+		return true
+	default:
+		return false
+	}
+}
+
 // ChangePasswordRequest defines model for ChangePasswordRequest.
 type ChangePasswordRequest struct {
 	// NewPassword Example: newpassword456
@@ -30,7 +45,9 @@ type ChangePasswordRequest struct {
 
 // SignInRequest defines model for SignInRequest.
 type SignInRequest struct {
-	// Login Example: seyran
+	// Login Логин или email, если аккаунт создан через GitHub
+	//
+	// Example: seyran
 	Login string `json:"login"`
 
 	// Password Example: password123
@@ -55,10 +72,19 @@ type User struct {
 	CreatedAt time.Time          `json:"created_at"`
 	Id        openapi_types.UUID `json:"id"`
 
+	// Is2faEnabled Включена ли двухфакторная аутентификация
+	Is2faEnabled bool `json:"is_2fa_enabled"`
+
 	// Login Example: seyran
-	Login     string    `json:"login"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Login string `json:"login"`
+
+	// OauthProvider Через какой сервис создан аккаунт. null, если аккаунт с паролем
+	OauthProvider *UserOauthProvider `json:"oauth_provider"`
+	UpdatedAt     time.Time          `json:"updated_at"`
 }
+
+// UserOauthProvider Через какой сервис создан аккаунт. null, если аккаунт с паролем
+type UserOauthProvider string
 
 // AttachmentID defines model for AttachmentID.
 type AttachmentID = openapi_types.UUID
@@ -844,6 +870,14 @@ type SignIn401Response struct {
 
 func (response SignIn401Response) VisitSignInResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
+	return nil
+}
+
+type SignIn403Response struct {
+}
+
+func (response SignIn403Response) VisitSignInResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
 	return nil
 }
 

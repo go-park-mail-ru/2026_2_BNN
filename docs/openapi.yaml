@@ -66,9 +66,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
         '400':
-          description: Не прошла валидация или битый JSON
+          description: Битый JSON
         '401':
           description: Неверный логин или пароль
+        '403':
+          description: Аккаунт создан через GitHub, войти можно только через GitHub
         '413':
           description: Тело запроса больше 4096 байт
 
@@ -131,7 +133,7 @@ paths:
         '204':
           description: Пароль изменён, ставятся новые куки bnn_access и bnn_refresh
         '400':
-          description: Новый пароль не прошёл валидацию или битый JSON
+          description: Новый пароль не прошёл валидацию, битый JSON или аккаунт создан через GitHub и пароля у него нет
         '401':
           description: Нет куки или она истекла
         '403':
@@ -628,13 +630,10 @@ components:
       properties:
         login:
           type: string
-          minLength: 3
-          maxLength: 20
+          description: Логин или email, если аккаунт создан через GitHub
           example: seyran
         password:
           type: string
-          minLength: 8
-          maxLength: 128
           example: password123
 
     ChangePasswordRequest:
@@ -652,7 +651,7 @@ components:
 
     User:
       type: object
-      required: [id, login, avatar, created_at, updated_at]
+      required: [id, login, avatar, is_2fa_enabled, oauth_provider, created_at, updated_at]
       properties:
         id:
           type: string
@@ -664,6 +663,14 @@ components:
           type: string
           description: Путь к картинке или пустая строка, если аватарки нет
           example: /avatars/8e1d4c2a-6b3f-4f0e-9a1d-2c7e5b8f1a30.jpg
+        is_2fa_enabled:
+          type: boolean
+          description: Включена ли двухфакторная аутентификация
+        oauth_provider:
+          type: string
+          nullable: true
+          enum: [github]
+          description: Через какой сервис создан аккаунт. null, если аккаунт с паролем
         created_at:
           type: string
           format: date-time

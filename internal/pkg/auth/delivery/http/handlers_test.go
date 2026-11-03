@@ -113,7 +113,7 @@ func TestSignIn(t *testing.T) {
 	}{
 		{name: "ok", expected: api.SignIn200JSONResponse(toAPIUser(user))},
 		{name: "invalid credentials", ucErr: models.ErrInvalidCredentials, expected: api.SignIn401Response{}},
-		{name: "validation", ucErr: models.ErrValidation, expected: api.SignIn400Response{}},
+		{name: "oauth account", ucErr: models.ErrOAuthAccount, expected: api.SignIn403Response{}},
 	}
 
 	for _, tt := range tests {
@@ -294,6 +294,7 @@ func TestChangePassword(t *testing.T) {
 		{name: "validation", ucErr: models.ErrValidation, expected: api.ChangePassword400Response{}},
 		{name: "wrong password", ucErr: models.ErrWrongPassword, expected: api.ChangePassword403Response{}},
 		{name: "user deleted", ucErr: models.ErrUserNotFound, expected: api.ChangePassword401Response{}},
+		{name: "oauth account", ucErr: models.ErrOAuthAccount, expected: api.ChangePassword400Response{}},
 	}
 
 	for _, tt := range tests {
@@ -530,4 +531,31 @@ func TestUpdateAvatarRequestTooLarge(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, api.UpdateAvatar413Response{}, resp)
+}
+
+func TestToAPIUser(t *testing.T) {
+	github := api.Github
+
+	tests := []struct {
+		name     string
+		user     models.User
+		expected api.User
+	}{
+		{
+			name:     "password account",
+			user:     models.User{Login: "seyran"},
+			expected: api.User{Login: "seyran"},
+		},
+		{
+			name:     "github account with 2fa",
+			user:     models.User{Login: "a@b.ru", IsExternal: true, Is2FAEnabled: true},
+			expected: api.User{Login: "a@b.ru", OauthProvider: &github, Is2faEnabled: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, toAPIUser(tt.user))
+		})
+	}
 }

@@ -26,7 +26,6 @@ jobs:
           key: ${{ secrets.PRIVATE_KEY }}
           command_timeout: 30m
           script: |
-          script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
             git pull origin ${{ github.ref_name }}

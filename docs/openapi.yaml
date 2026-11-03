@@ -65,6 +65,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '202':
+          description: Пароль верный, но включена 2FA. Ставится кука bnn_2fa на 5 минут, дальше отправить код в /auth/2fa/verify
         '400':
           description: Битый JSON
         '401':
@@ -192,7 +194,9 @@ paths:
                 type: string
                 format: binary
         '401':
-          description: Не авторизован
+          description: Нет куки или она истекла
+        '409':
+          description: 2FA уже включена, сначала выключить
 
   /auth/2fa/enable:
     post:
@@ -206,15 +210,15 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [code]
-              properties:
-                code:
-                  type: string
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
       responses:
         '200':
           description: 2FA включена
+        '400':
+          description: QR-код ещё не получали или битый JSON
         '401':
+          description: Нет куки или она истекла
+        '403':
           description: Неверный код
 
   /auth/2fa/disable:
@@ -224,11 +228,46 @@ paths:
       summary: Выключить 2FA
       security:
         - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
       responses:
         '200':
           description: 2FA выключена
         '401':
-          description: Не авторизован
+          description: Нет куки или она истекла
+        '403':
+          description: Неверный код или 2FA не включена
+
+  /auth/2fa/verify:
+    post:
+      tags: [auth]
+      operationId: Verify2FA
+      summary: Второй шаг входа, код из приложения
+      description: Нужна кука bnn_2fa, которую ставит /auth/signin или вход через GitHub.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '200':
+          description: Вход выполнен, ставятся куки bnn_access и bnn_refresh
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Битый JSON
+        '401':
+          description: Нет куки bnn_2fa или прошло больше 5 минут, нужно войти заново
+        '403':
+          description: Неверный код
+
 
   /auth/github/login:
     get:
@@ -841,4 +880,13 @@ components:
           type: string
           pattern: '^#[0-9a-fA-F]{8}$'
           example: '#FF880080'
+    
+    TwoFactorCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 6 цифр из приложения-аутентификатора
+          example: '123456'
           

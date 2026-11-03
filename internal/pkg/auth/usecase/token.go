@@ -9,13 +9,18 @@ import (
 )
 
 const (
-	accessTokenTTL  = 15 * time.Minute
-	refreshTokenTTL = 30 * 24 * time.Hour
+	accessTokenTTL    = 15 * time.Minute
+	refreshTokenTTL   = 30 * 24 * time.Hour
+	twoFactorTokenTTL = 5 * time.Minute
+
+	accessAudience    = "access"
+	twoFactorAudience = "2fa"
 )
 
-func (u *Usecase) newAccessToken(userID uuid.UUID, expiresAt time.Time) (string, error) {
+func (u *Usecase) newToken(userID uuid.UUID, audience string, expiresAt time.Time) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   userID.String(),
+		Audience:  jwt.ClaimStrings{audience},
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
 	}
@@ -23,12 +28,12 @@ func (u *Usecase) newAccessToken(userID uuid.UUID, expiresAt time.Time) (string,
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(u.secret)
 }
 
-func (u *Usecase) parseAccessToken(token string) (uuid.UUID, error) {
+func (u *Usecase) parseToken(token, audience string) (uuid.UUID, error) {
 	var claims jwt.RegisteredClaims
 
 	_, err := jwt.ParseWithClaims(token, &claims, func(*jwt.Token) (any, error) {
 		return u.secret, nil
-	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithAudience(audience))
 	if err != nil {
 		return uuid.Nil, err
 	}

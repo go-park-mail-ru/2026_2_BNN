@@ -58,6 +58,11 @@ func (h *Handler) SignIn(ctx context.Context, req api.SignInRequestObject) (api.
 		return nil, err
 	}
 
+	if tokens.TwoFactorToken != "" {
+		setTwoFactorCookie(ctx, tokens)
+		return api.SignIn202Response{}, nil
+	}
+
 	setAuthCookies(ctx, tokens)
 
 	return toSignInResponse(user), nil
@@ -200,6 +205,9 @@ func (h *Handler) Generate2FA(ctx context.Context, req api.Generate2FARequestObj
 	}
 
 	png, err := h.uc.Generate2FA(ctx, userID)
+	if errors.Is(err, models.ErrTwoFactorEnabled) {
+		return api.Generate2FA409Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +225,11 @@ func (h *Handler) Enable2FA(ctx context.Context, req api.Enable2FARequestObject)
 	}
 
 	err := h.uc.Enable2FA(ctx, userID, req.Body.Code)
-	if errors.Is(err, models.ErrInvalidToken) || errors.Is(err, models.ErrValidation) {
-		return api.Enable2FA401Response{}, nil
+	if errors.Is(err, models.ErrValidation) {
+		return api.Enable2FA400Response{}, nil
+	}
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Enable2FA403Response{}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -233,11 +244,38 @@ func (h *Handler) Disable2FA(ctx context.Context, req api.Disable2FARequestObjec
 		return api.Disable2FA401Response{}, nil
 	}
 
-	if err := h.uc.Disable2FA(ctx, userID); err != nil {
+	err := h.uc.Disable2FA(ctx, userID, req.Body.Code)
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Disable2FA403Response{}, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 
 	return api.Disable2FA200Response{}, nil
+}
+
+func (h *Handler) Verify2FA(ctx context.Context, req api.Verify2FARequestObject) (api.Verify2FAResponseObject, error) {
+	token, err := cookies.Get(ctx, twoFactorCookieName)
+	if err != nil {
+		return api.Verify2FA401Response{}, nil
+	}
+
+	user, tokens, err := h.uc.VerifyTwoFactor(ctx, token, req.Body.Code)
+	if errors.Is(err, models.ErrInvalidToken) {
+		return api.Verify2FA401Response{}, nil
+	}
+	if errors.Is(err, models.ErrInvalidCode) {
+		return api.Verify2FA403Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	clearTwoFactorCookie(ctx)
+	setAuthCookies(ctx, tokens)
+
+	return api.Verify2FA200JSONResponse(toAPIUser(user)), nil
 }
 
 func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObject) (api.GitHubLoginResponseObject, error) {

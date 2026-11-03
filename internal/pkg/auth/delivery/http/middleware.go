@@ -11,6 +11,8 @@ var publicPaths = map[string]bool{
 	"/api/auth/signin":  true,
 	"/api/auth/refresh": true,
 	"/api/auth/logout":  true,
+
+	"/api/auth/2fa/verify": true,
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {

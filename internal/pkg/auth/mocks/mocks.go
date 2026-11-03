@@ -73,17 +73,17 @@ func (mr *MockUsecaseMockRecorder) ChangePassword(ctx, userID, oldPassword, newP
 }
 
 // Disable2FA mocks base method.
-func (m *MockUsecase) Disable2FA(ctx context.Context, userID uuid.UUID) error {
+func (m *MockUsecase) Disable2FA(ctx context.Context, userID uuid.UUID, code string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disable2FA", ctx, userID)
+	ret := m.ctrl.Call(m, "Disable2FA", ctx, userID, code)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disable2FA indicates an expected call of Disable2FA.
-func (mr *MockUsecaseMockRecorder) Disable2FA(ctx, userID any) *gomock.Call {
+func (mr *MockUsecaseMockRecorder) Disable2FA(ctx, userID, code any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disable2FA", reflect.TypeOf((*MockUsecase)(nil).Disable2FA), ctx, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disable2FA", reflect.TypeOf((*MockUsecase)(nil).Disable2FA), ctx, userID, code)
 }
 
 // Enable2FA mocks base method.
@@ -234,6 +234,22 @@ func (m *MockUsecase) UpdateAvatar(ctx context.Context, userID uuid.UUID, data [
 func (mr *MockUsecaseMockRecorder) UpdateAvatar(ctx, userID, data, contentType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatar", reflect.TypeOf((*MockUsecase)(nil).UpdateAvatar), ctx, userID, data, contentType)
+}
+
+// VerifyTwoFactor mocks base method.
+func (m *MockUsecase) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyTwoFactor", ctx, twoFactorToken, code)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(models.AuthTokens)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// VerifyTwoFactor indicates an expected call of VerifyTwoFactor.
+func (mr *MockUsecaseMockRecorder) VerifyTwoFactor(ctx, twoFactorToken, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTwoFactor", reflect.TypeOf((*MockUsecase)(nil).VerifyTwoFactor), ctx, twoFactorToken, code)
 }
 
 // MockRepo is a mock of Repo interface.

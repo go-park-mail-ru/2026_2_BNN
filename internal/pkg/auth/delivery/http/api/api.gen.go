@@ -772,10 +772,16 @@ type GitHubCallbackResponseObject interface {
 	VisitGitHubCallbackResponse(w http.ResponseWriter) error
 }
 
+type GitHubCallback307ResponseHeaders struct {
+	Location string
+}
+
 type GitHubCallback307Response struct {
+	Headers GitHubCallback307ResponseHeaders
 }
 
 func (response GitHubCallback307Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
 	w.WriteHeader(307)
 	return nil
 }
@@ -788,14 +794,6 @@ func (response GitHubCallback400Response) VisitGitHubCallbackResponse(w http.Res
 	return nil
 }
 
-type GitHubCallback500Response struct {
-}
-
-func (response GitHubCallback500Response) VisitGitHubCallbackResponse(w http.ResponseWriter) error {
-	w.WriteHeader(500)
-	return nil
-}
-
 type GitHubLoginRequestObject struct {
 }
 
@@ -803,19 +801,17 @@ type GitHubLoginResponseObject interface {
 	VisitGitHubLoginResponse(w http.ResponseWriter) error
 }
 
+type GitHubLogin307ResponseHeaders struct {
+	Location string
+}
+
 type GitHubLogin307Response struct {
+	Headers GitHubLogin307ResponseHeaders
 }
 
 func (response GitHubLogin307Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
 	w.WriteHeader(307)
-	return nil
-}
-
-type GitHubLogin500Response struct {
-}
-
-func (response GitHubLogin500Response) VisitGitHubLoginResponse(w http.ResponseWriter) error {
-	w.WriteHeader(500)
 	return nil
 }
 

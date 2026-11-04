@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
@@ -13,20 +14,27 @@ import (
 	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/upload"
 
+	"github.com/samber/lo"
+	uuid "github.com/satori/go.uuid"
+
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
 	avatarField      = "avatar"
 	maxAvatarSize5MB = 5 << 20
+	githubProvider   = "github"
+	profilePage      = "profile"
+	twoFactorPage    = "login/2fa"
 )
 
 type Handler struct {
-	uc auth.Usecase
+	uc          auth.Usecase
+	frontendURL string
 }
 
-func NewHandler(uc auth.Usecase) *Handler {
-	return &Handler{uc: uc}
+func NewHandler(uc auth.Usecase, frontendURL string) *Handler {
+	return &Handler{uc: uc, frontendURL: frontendURL}
 }
 
 func (h *Handler) SignUp(ctx context.Context, req api.SignUpRequestObject) (api.SignUpResponseObject, error) {
@@ -182,18 +190,12 @@ func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {
 }
 
 func toAPIUser(u models.User) api.User {
-	var provider *api.UserOauthProvider
-	if u.IsExternal {
-		github := api.Github
-		provider = &github
-	}
-
 	return api.User{
 		Id:            openapi_types.UUID(u.ID),
 		Login:         u.Login,
 		Avatar:        u.Avatar,
 		Is2faEnabled:  u.Is2FAEnabled,
-		OauthProvider: provider,
+		OauthProvider: lo.Ternary(u.IsExternal, lo.ToPtr(api.Github), nil),
 		CreatedAt:     u.CreatedAt,
 		UpdatedAt:     u.UpdatedAt,
 	}
@@ -279,17 +281,38 @@ func (h *Handler) Verify2FA(ctx context.Context, req api.Verify2FARequestObject)
 }
 
 func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObject) (api.GitHubLoginResponseObject, error) {
-	return nil, errors.New("use /api/auth/github/login router directly")
+	state := uuid.NewV4().String()
+	setOAuthStateCookie(ctx, state)
+
+	location := h.uc.GetOAuthURL(githubProvider, state)
+	return api.GitHubLogin307Response{Headers: api.GitHubLogin307ResponseHeaders{Location: location}}, nil
 }
 
 func (h *Handler) GitHubCallback(ctx context.Context, req api.GitHubCallbackRequestObject) (api.GitHubCallbackResponseObject, error) {
-	return nil, errors.New("use /api/auth/github/callback router directly")
-}
+	state, err := cookies.Get(ctx, oauthStateCookieName)
+	if err != nil || state != req.Params.State {
+		return api.GitHubCallback400Response{}, nil
+	}
 
-func (h *Handler) GetOAuthURL(provider string, state string) string {
-	return h.uc.GetOAuthURL(provider, state)
-}
+	_, tokens, err := h.uc.HandleOAuthCallback(ctx, githubProvider, req.Params.Code)
+	if err != nil {
+		return nil, err
+	}
 
-func (h *Handler) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
-	return h.uc.HandleOAuthCallback(ctx, provider, code)
+	clearOAuthStateCookie(ctx)
+
+	page := profilePage
+	if tokens.TwoFactorToken != "" {
+		setTwoFactorCookie(ctx, tokens)
+		page = twoFactorPage
+	} else {
+		setAuthCookies(ctx, tokens)
+	}
+
+	location, err := url.JoinPath(h.frontendURL, page)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.GitHubCallback307Response{Headers: api.GitHubCallback307ResponseHeaders{Location: location}}, nil
 }

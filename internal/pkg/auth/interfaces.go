@@ -49,3 +49,8 @@ type Storage interface {
 	DeleteFile(ctx context.Context, key string) error
 	PublicPath(key string) (string, error)
 }
+
+type OAuthProvider interface {
+	AuthURL(state string) string
+	ReadProfile(ctx context.Context, code string) (models.OAuthProfile, error)
+}

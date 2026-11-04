@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -50,10 +50,10 @@ var update2FAStatusQuery string
 var readUserByEmailQuery string
 
 type Repo struct {
-	db *pgxpool.Pool
+	db database.DB
 }
 
-func NewRepo(db *pgxpool.Pool) *Repo {
+func NewRepo(db database.DB) *Repo {
 	return &Repo{db: db}
 }
 
@@ -152,10 +152,10 @@ func (r *Repo) readUser(ctx context.Context, query string, arg any) (models.User
 		&user.Login,
 		&user.PasswordHash,
 		&user.Avatar,
-		&user.TOTPSecret,
-		&user.Is2FAEnabled,
 		&user.Email,
 		&user.IsExternal,
+		&user.TOTPSecret,
+		&user.Is2FAEnabled,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)

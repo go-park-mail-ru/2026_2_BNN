@@ -3,10 +3,8 @@ package usecase
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"path"
 	"time"
 	"unicode/utf8"
@@ -29,12 +27,13 @@ const (
 	minPasswordLength = 8
 	maxPasswordLength = 128
 	issuerName        = "BNN_Notes"
+	githubProvider    = "github"
 )
 
 type Usecase struct {
 	repo    auth.Repo
 	storage auth.Storage
-	oauth   *auth.OAuthConfig
+	oauth   auth.OAuthProvider
 	secret  []byte
 }
 
@@ -44,7 +43,7 @@ var allowedAvatarTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
-func NewUsecase(repo auth.Repo, storage auth.Storage, oauth *auth.OAuthConfig, secret string) *Usecase {
+func NewUsecase(repo auth.Repo, storage auth.Storage, oauth auth.OAuthProvider, secret string) *Usecase {
 	return &Usecase{
 		repo:    repo,
 		storage: storage,
@@ -377,85 +376,28 @@ func checkCode(secret, code string) bool {
 }
 
 func (u *Usecase) GetOAuthURL(provider string, state string) string {
-	if provider == "github" {
-		return u.oauth.GitHub.AuthCodeURL(state)
+	if provider != githubProvider {
+		return ""
 	}
-	return ""
+	return u.oauth.AuthURL(state)
 }
 
 func (u *Usecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
-	if provider != "github" {
+	if provider != githubProvider {
 		return models.User{}, models.AuthTokens{}, models.ErrValidation
 	}
-	return u.handleGitHubCallback(ctx, code)
-}
 
-func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models.User, models.AuthTokens, error) {
-	tok, err := u.oauth.GitHub.Exchange(ctx, code)
+	profile, err := u.oauth.ReadProfile(ctx, code)
 	if err != nil {
-		return models.User{}, models.AuthTokens{}, fmt.Errorf("exchange github code: %w", err)
+		return models.User{}, models.AuthTokens{}, err
 	}
 
-	client := u.oauth.GitHub.Client(ctx, tok)
-
-	resp, err := client.Get("https://api.github.com/user")
+	user, err := u.repo.ReadUserByEmail(ctx, profile.Email)
+	if errors.Is(err, models.ErrUserNotFound) {
+		user, err = u.createOAuthUser(ctx, profile)
+	}
 	if err != nil {
-		return models.User{}, models.AuthTokens{}, fmt.Errorf("get github user: %w", err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	var ghUser struct {
-		Login     string `json:"login"`
-		Email     string `json:"email"`
-		AvatarURL string `json:"avatar_url"`
-	}
-	json.Unmarshal(body, &ghUser)
-
-	email := ghUser.Email
-	if email == "" {
-		emailResp, err := client.Get("https://api.github.com/user/emails")
-		if err == nil {
-			defer emailResp.Body.Close()
-			var emails []struct {
-				Email    string `json:"email"`
-				Primary  bool   `json:"primary"`
-				Verified bool   `json:"verified"`
-			}
-			emailBody, _ := io.ReadAll(emailResp.Body)
-			json.Unmarshal(emailBody, &emails)
-			for _, e := range emails {
-				if e.Primary {
-					email = e.Email
-					break
-				}
-			}
-		}
-	}
-
-	if email == "" {
-		return models.User{}, models.AuthTokens{}, errors.New("no email provided by github")
-	}
-
-	user, err := u.repo.ReadUserByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, models.ErrUserNotFound) {
-			now := time.Now().UTC()
-			user = models.User{
-				ID:         uuid.NewV4(),
-				Login:      email,
-				Email:      email,
-				Avatar:     ghUser.AvatarURL,
-				IsExternal: true,
-				CreatedAt:  now,
-				UpdatedAt:  now,
-			}
-			if err := u.repo.CreateUser(ctx, user); err != nil {
-				return models.User{}, models.AuthTokens{}, err
-			}
-		} else {
-			return models.User{}, models.AuthTokens{}, err
-		}
+		return models.User{}, models.AuthTokens{}, err
 	}
 
 	tokens, err := u.startSession(ctx, user)
@@ -464,4 +406,23 @@ func (u *Usecase) handleGitHubCallback(ctx context.Context, code string) (models
 	}
 
 	return user, tokens, nil
+}
+
+func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfile) (models.User, error) {
+	now := time.Now().UTC()
+	user := models.User{
+		ID:         uuid.NewV4(),
+		Login:      profile.Email,
+		Email:      profile.Email,
+		Avatar:     profile.AvatarURL,
+		IsExternal: true,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	if err := u.repo.CreateUser(ctx, user); err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
 }

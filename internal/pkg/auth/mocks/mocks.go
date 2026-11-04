@@ -500,3 +500,56 @@ func (mr *MockStorageMockRecorder) PutFile(ctx, key, data, contentType any) *gom
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutFile", reflect.TypeOf((*MockStorage)(nil).PutFile), ctx, key, data, contentType)
 }
+
+// MockOAuthProvider is a mock of OAuthProvider interface.
+type MockOAuthProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MockOAuthProviderMockRecorder
+	isgomock struct{}
+}
+
+// MockOAuthProviderMockRecorder is the mock recorder for MockOAuthProvider.
+type MockOAuthProviderMockRecorder struct {
+	mock *MockOAuthProvider
+}
+
+// NewMockOAuthProvider creates a new mock instance.
+func NewMockOAuthProvider(ctrl *gomock.Controller) *MockOAuthProvider {
+	mock := &MockOAuthProvider{ctrl: ctrl}
+	mock.recorder = &MockOAuthProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockOAuthProvider) EXPECT() *MockOAuthProviderMockRecorder {
+	return m.recorder
+}
+
+// AuthURL mocks base method.
+func (m *MockOAuthProvider) AuthURL(state string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AuthURL", state)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// AuthURL indicates an expected call of AuthURL.
+func (mr *MockOAuthProviderMockRecorder) AuthURL(state any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthURL", reflect.TypeOf((*MockOAuthProvider)(nil).AuthURL), state)
+}
+
+// ReadProfile mocks base method.
+func (m *MockOAuthProvider) ReadProfile(ctx context.Context, code string) (models.OAuthProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadProfile", ctx, code)
+	ret0, _ := ret[0].(models.OAuthProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadProfile indicates an expected call of ReadProfile.
+func (mr *MockOAuthProviderMockRecorder) ReadProfile(ctx, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadProfile", reflect.TypeOf((*MockOAuthProvider)(nil).ReadProfile), ctx, code)
+}

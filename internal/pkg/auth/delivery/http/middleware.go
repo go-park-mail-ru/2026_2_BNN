@@ -12,7 +12,9 @@ var publicPaths = map[string]bool{
 	"/api/auth/refresh": true,
 	"/api/auth/logout":  true,
 
-	"/api/auth/2fa/verify": true,
+	"/api/auth/2fa/verify":      true,
+	"/api/auth/github/login":    true,
+	"/api/auth/github/callback": true,
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {

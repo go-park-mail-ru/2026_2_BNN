@@ -5,20 +5,18 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
-	"bnn/docs"
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
 	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
 	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
-	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/swagger"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
@@ -34,6 +32,7 @@ import (
 	notesUsecase "bnn/internal/pkg/notes/usecase"
 	"bnn/internal/pkg/s3"
 
+	authGithub "bnn/internal/pkg/auth/repo/github"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
 	tagsapi "bnn/internal/pkg/tags/delivery/http/api"
 	tagsRepo "bnn/internal/pkg/tags/repo/postgres"
@@ -42,12 +41,16 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	httpSwagger "github.com/swaggo/http-swagger/v2"
+	"github.com/samber/lo"
 )
 
 const (
 	shutdownTimeout    = 5 * time.Second
 	MaxRequestSize20MB = 20 << 20
+
+	defaultAppBaseURL  = "http://localhost:5458"
+	defaultFrontendURL = "http://localhost:3000"
+	githubCallbackPath = "/api/auth/github/callback"
 )
 
 func main() {
@@ -83,24 +86,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	appBaseURL := os.Getenv("APP_BASE_URL")
-	if appBaseURL == "" {
-		appBaseURL = "http://localhost:5458"
+	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
+	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
+
+	githubCallbackURL, err := url.JoinPath(appBaseURL, githubCallbackPath)
+	if err != nil {
+		slog.Error("Failed to build GitHub callback URL", "error", err)
+		os.Exit(1)
 	}
 
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
-	}
-
-	oauthConfig := auth.NewOAuthConfig(
-		os.Getenv("GITHUB_CLIENT_ID"),
-		os.Getenv("GITHUB_CLIENT_SECRET"),
-		appBaseURL,
-	)
+	githubRepo := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), githubCallbackURL)
 
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, oauthConfig, mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, githubRepo, mustEnv("JWT_SECRET")),
+		frontendURL,
 	)
 
 	notesHandler := notesDelivery.NewHandler(
@@ -130,35 +129,6 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
 
-	router.HandleFunc("/api/auth/github/login", func(w http.ResponseWriter, r *http.Request) {
-		state := uuid.NewV4().String()
-		http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 600, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
-		url := authHandler.GetOAuthURL("github", state)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-	}).Methods(http.MethodGet)
-
-	router.HandleFunc("/api/auth/github/callback", func(w http.ResponseWriter, r *http.Request) {
-		stateCookie, err := r.Cookie("oauth_state")
-		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
-			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
-			return
-		}
-		user, tokens, err := authHandler.HandleOAuthCallback(r.Context(), "github", r.URL.Query().Get("code"))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		_ = user
-		if tokens.TwoFactorToken != "" {
-			http.SetCookie(w, &http.Cookie{Name: "bnn_2fa", Value: tokens.TwoFactorToken, Path: "/api/auth/2fa", Expires: tokens.TwoFactorExpiresAt, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
-			http.Redirect(w, r, frontendURL+"/login/2fa", http.StatusTemporaryRedirect)
-			return
-		}
-		http.SetCookie(w, &http.Cookie{Name: "bnn_access", Value: tokens.AccessToken, Path: "/", HttpOnly: true, Secure: true})
-		http.SetCookie(w, &http.Cookie{Name: "bnn_refresh", Value: tokens.RefreshToken, Path: "/api/auth", HttpOnly: true, Secure: true})
-		http.Redirect(w, r, frontendURL+"/profile", http.StatusTemporaryRedirect)
-	}).Methods(http.MethodGet)
-
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
 	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize20MB))
@@ -183,18 +153,7 @@ func main() {
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
 
-	router.HandleFunc("/swagger/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/yaml")
-		if _, err := w.Write(docs.OpenAPI); err != nil {
-			slog.Error("Failed to write spec", "error", err)
-		}
-	}).Methods(http.MethodGet)
-
-	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
-		httpSwagger.URL("/swagger/openapi.yaml"),
-		httpSwagger.DeepLinking(true),
-		httpSwagger.DocExpansion("none"),
-	)).Methods(http.MethodGet)
+	swagger.Register(router)
 
 	server := http.Server{
 		Addr:    ":5458",

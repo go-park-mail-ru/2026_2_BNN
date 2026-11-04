@@ -45,3 +45,8 @@ type AuthTokens struct {
 	TwoFactorToken     string
 	TwoFactorExpiresAt time.Time
 }
+
+type OAuthProfile struct {
+	Email     string
+	AvatarURL string
+}

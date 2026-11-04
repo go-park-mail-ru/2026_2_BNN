@@ -277,9 +277,12 @@ paths:
       description: Перенаправляет пользователя на страницу авторизации GitHub.
       responses:
         '307':
-          description: Временный редирект на GitHub
-        '500':
-            description: Внутренняя ошибка сервера
+          description: Редирект на GitHub, ставится кука oauth_state на 10 минут
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
 
   /auth/github/callback:
     get:
@@ -302,11 +305,14 @@ paths:
             type: string
       responses:
         '307':
-          description: Временный редирект на фронтенд после успешного входа
+          description: Редирект на фронтенд, на /profile или на /login/2fa, если включена 2FA
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
         '400':
           description: Неверный state или отсутствует код
-        '500':
-          description: Внутренняя ошибка сервера
 
   /notes/all:
     get:

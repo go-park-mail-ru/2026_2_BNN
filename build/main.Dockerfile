@@ -1,6 +1,8 @@
 # Этап сборки
 FROM golang:1.26-alpine AS builder
 
+RUN apk add --no-cache ca-certificates
+
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -17,6 +19,7 @@ WORKDIR /app/
 
 COPY --from=builder /out/bnn ./bnn
 
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/local/go/lib/time/zoneinfo.zip /
 ENV TZ="Europe/Moscow"
 ENV ZONEINFO=/zoneinfo.zip

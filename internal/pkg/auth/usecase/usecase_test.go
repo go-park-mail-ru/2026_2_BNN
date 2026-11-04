@@ -765,3 +765,116 @@ func TestDisable2FA(t *testing.T) {
 		})
 	}
 }
+
+func TestGetOAuthURL(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	oauth := mocks.NewMockOAuthProvider(ctrl)
+	oauth.EXPECT().AuthURL("state-1").Return("https://github.com/login")
+
+	u := NewUsecase(nil, nil, oauth, secret)
+
+	assert.Equal(t, "https://github.com/login", u.GetOAuthURL("github", "state-1"))
+	assert.Empty(t, u.GetOAuthURL("google", "state-1"))
+}
+
+func TestHandleOAuthCallback(t *testing.T) {
+	profile := models.OAuthProfile{Email: "a@b.ru", AvatarURL: "https://avatars/1"}
+	existing := models.User{ID: uuid.NewV4(), Login: "a@b.ru", Email: "a@b.ru", IsExternal: true}
+
+	tests := []struct {
+		name        string
+		prepare     func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider)
+		expectedErr error
+		twoFactor   bool
+	}{
+		{
+			name: "existing user",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(profile, nil)
+				repo.EXPECT().ReadUserByEmail(gomock.Any(), "a@b.ru").Return(existing, nil)
+				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+			},
+		},
+		{
+			name: "new user",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(profile, nil)
+				repo.EXPECT().ReadUserByEmail(gomock.Any(), "a@b.ru").Return(models.User{}, models.ErrUserNotFound)
+				repo.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, user models.User) error {
+					assert.Equal(t, "a@b.ru", user.Login)
+					assert.Equal(t, "a@b.ru", user.Email)
+					assert.Equal(t, "https://avatars/1", user.Avatar)
+					assert.True(t, user.IsExternal)
+					assert.Nil(t, user.PasswordHash)
+					return nil
+				})
+				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+			},
+		},
+		{
+			name: "user with 2fa",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(profile, nil)
+				withTwoFactor := existing
+				withTwoFactor.Is2FAEnabled = true
+				repo.EXPECT().ReadUserByEmail(gomock.Any(), "a@b.ru").Return(withTwoFactor, nil)
+			},
+			twoFactor: true,
+		},
+		{
+			name: "github error",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(models.OAuthProfile{}, errDB)
+			},
+			expectedErr: errDB,
+		},
+		{
+			name: "read user error",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(profile, nil)
+				repo.EXPECT().ReadUserByEmail(gomock.Any(), "a@b.ru").Return(models.User{}, errDB)
+			},
+			expectedErr: errDB,
+		},
+		{
+			name: "create user error",
+			prepare: func(repo *mocks.MockRepo, oauth *mocks.MockOAuthProvider) {
+				oauth.EXPECT().ReadProfile(gomock.Any(), "code").Return(profile, nil)
+				repo.EXPECT().ReadUserByEmail(gomock.Any(), "a@b.ru").Return(models.User{}, models.ErrUserNotFound)
+				repo.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(errDB)
+			},
+			expectedErr: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			oauth := mocks.NewMockOAuthProvider(ctrl)
+			tt.prepare(repo, oauth)
+
+			user, tokens, err := NewUsecase(repo, nil, oauth, secret).HandleOAuthCallback(context.Background(), "github", "code")
+
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "a@b.ru", user.Email)
+			if tt.twoFactor {
+				assert.NotEmpty(t, tokens.TwoFactorToken)
+				assert.Empty(t, tokens.AccessToken)
+			} else {
+				assert.NotEmpty(t, tokens.AccessToken)
+			}
+		})
+	}
+}
+
+func TestHandleOAuthCallbackUnknownProvider(t *testing.T) {
+	_, _, err := NewUsecase(nil, nil, nil, secret).HandleOAuthCallback(context.Background(), "google", "code")
+
+	assert.ErrorIs(t, err, models.ErrValidation)
+}

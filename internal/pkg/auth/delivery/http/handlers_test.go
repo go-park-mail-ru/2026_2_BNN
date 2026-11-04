@@ -24,6 +24,8 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+const frontendURL = "https://brandnewnotes.ru"
+
 var tokens = models.AuthTokens{
 	AccessToken:      "access",
 	AccessExpiresAt:  time.Now().Add(time.Hour),
@@ -87,7 +89,7 @@ func TestSignUp(t *testing.T) {
 			var resp api.SignUpResponseObject
 			var err error
 			set := withCookies(nil, func(ctx context.Context) {
-				resp, err = NewHandler(uc).SignUp(ctx, api.SignUpRequestObject{Body: body})
+				resp, err = NewHandler(uc, frontendURL).SignUp(ctx, api.SignUpRequestObject{Body: body})
 			})
 
 			require.NoError(t, err)
@@ -125,7 +127,7 @@ func TestSignIn(t *testing.T) {
 			var resp api.SignInResponseObject
 			var err error
 			set := withCookies(nil, func(ctx context.Context) {
-				resp, err = NewHandler(uc).SignIn(ctx, api.SignInRequestObject{Body: body})
+				resp, err = NewHandler(uc, frontendURL).SignIn(ctx, api.SignInRequestObject{Body: body})
 			})
 
 			require.NoError(t, err)
@@ -178,7 +180,7 @@ func TestRefresh(t *testing.T) {
 			var resp api.RefreshResponseObject
 			var err error
 			set := withCookies(tt.cookies, func(ctx context.Context) {
-				resp, err = NewHandler(uc).Refresh(ctx, api.RefreshRequestObject{})
+				resp, err = NewHandler(uc, frontendURL).Refresh(ctx, api.RefreshRequestObject{})
 			})
 
 			require.NoError(t, err)
@@ -218,7 +220,7 @@ func TestLogout(t *testing.T) {
 			var resp api.LogoutResponseObject
 			var err error
 			set := withCookies(tt.cookies, func(ctx context.Context) {
-				resp, err = NewHandler(uc).Logout(ctx, api.LogoutRequestObject{})
+				resp, err = NewHandler(uc, frontendURL).Logout(ctx, api.LogoutRequestObject{})
 			})
 
 			require.NoError(t, err)
@@ -273,7 +275,7 @@ func TestGetCurrentUser(t *testing.T) {
 			uc := mocks.NewMockUsecase(ctrl)
 			tt.prepare(uc)
 
-			resp, err := NewHandler(uc).GetCurrentUser(tt.ctx, api.GetCurrentUserRequestObject{})
+			resp, err := NewHandler(uc, frontendURL).GetCurrentUser(tt.ctx, api.GetCurrentUserRequestObject{})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -307,7 +309,7 @@ func TestChangePassword(t *testing.T) {
 			var err error
 			set := withCookies(nil, func(ctx context.Context) {
 				ctx = ctxutil.WithUserID(ctx, userID)
-				resp, err = NewHandler(uc).ChangePassword(ctx, api.ChangePasswordRequestObject{Body: body})
+				resp, err = NewHandler(uc, frontendURL).ChangePassword(ctx, api.ChangePasswordRequestObject{Body: body})
 			})
 
 			require.NoError(t, err)
@@ -324,7 +326,7 @@ func TestChangePasswordNoUser(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	uc := mocks.NewMockUsecase(ctrl)
 
-	resp, err := NewHandler(uc).ChangePassword(context.Background(), api.ChangePasswordRequestObject{})
+	resp, err := NewHandler(uc, frontendURL).ChangePassword(context.Background(), api.ChangePasswordRequestObject{})
 
 	require.NoError(t, err)
 	assert.Equal(t, api.ChangePassword401Response{}, resp)
@@ -390,7 +392,7 @@ func TestUpdateAvatar(t *testing.T) {
 			uc := mocks.NewMockUsecase(ctrl)
 			tt.prepare(uc)
 
-			resp, err := NewHandler(uc).UpdateAvatar(tt.ctx, api.UpdateAvatarRequestObject{Body: tt.form(t)})
+			resp, err := NewHandler(uc, frontendURL).UpdateAvatar(tt.ctx, api.UpdateAvatarRequestObject{Body: tt.form(t)})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -461,7 +463,7 @@ func TestMiddleware(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 
-			NewHandler(uc).Middleware(next).ServeHTTP(rec, req)
+			NewHandler(uc, frontendURL).Middleware(next).ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.expectedCode, rec.Code)
 			assert.Equal(t, tt.expectedUser, gotUser)
@@ -483,7 +485,7 @@ func TestHandlersInternalError(t *testing.T) {
 	uc.EXPECT().ChangePassword(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(models.AuthTokens{}, dbErr)
 	uc.EXPECT().UpdateAvatar(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(models.User{}, dbErr)
 
-	h := NewHandler(uc)
+	h := NewHandler(uc, frontendURL)
 	refresh := []*http.Cookie{{Name: refreshCookieName, Value: "refresh"}}
 
 	withCookies(refresh, func(ctx context.Context) {
@@ -527,7 +529,7 @@ func TestUpdateAvatarRequestTooLarge(t *testing.T) {
 	body := http.MaxBytesReader(nil, io.NopCloser(&buf), 10)
 	req := api.UpdateAvatarRequestObject{Body: multipart.NewReader(body, w.Boundary())}
 
-	resp, err := NewHandler(uc).UpdateAvatar(ctxutil.WithUserID(context.Background(), uuid.NewV4()), req)
+	resp, err := NewHandler(uc, frontendURL).UpdateAvatar(ctxutil.WithUserID(context.Background(), uuid.NewV4()), req)
 
 	require.NoError(t, err)
 	assert.Equal(t, api.UpdateAvatar413Response{}, resp)
@@ -570,7 +572,7 @@ func TestSignInWithTwoFactor(t *testing.T) {
 	var err error
 	set := withCookies(nil, func(ctx context.Context) {
 		body := &api.SignInJSONRequestBody{Login: "seyran", Password: "password123"}
-		resp, err = NewHandler(uc).SignIn(ctx, api.SignInRequestObject{Body: body})
+		resp, err = NewHandler(uc, frontendURL).SignIn(ctx, api.SignInRequestObject{Body: body})
 	})
 
 	require.NoError(t, err)
@@ -631,7 +633,7 @@ func TestVerify2FA(t *testing.T) {
 			var resp api.Verify2FAResponseObject
 			var err error
 			set := withCookies(tt.cookies, func(ctx context.Context) {
-				resp, err = NewHandler(uc).Verify2FA(ctx, api.Verify2FARequestObject{Body: body})
+				resp, err = NewHandler(uc, frontendURL).Verify2FA(ctx, api.Verify2FARequestObject{Body: body})
 			})
 
 			require.NoError(t, err)
@@ -654,7 +656,7 @@ func TestTwoFactorSettings(t *testing.T) {
 		uc := mocks.NewMockUsecase(ctrl)
 		uc.EXPECT().Generate2FA(gomock.Any(), userID).Return([]byte("png"), nil)
 		uc.EXPECT().Generate2FA(gomock.Any(), userID).Return(nil, models.ErrTwoFactorEnabled)
-		h := NewHandler(uc)
+		h := NewHandler(uc, frontendURL)
 
 		resp, err := h.Generate2FA(ctx, api.Generate2FARequestObject{})
 		require.NoError(t, err)
@@ -680,7 +682,7 @@ func TestTwoFactorSettings(t *testing.T) {
 			uc := mocks.NewMockUsecase(ctrl)
 			uc.EXPECT().Enable2FA(gomock.Any(), userID, "123456").Return(tt.ucErr)
 
-			resp, err := NewHandler(uc).Enable2FA(ctx, api.Enable2FARequestObject{Body: code})
+			resp, err := NewHandler(uc, frontendURL).Enable2FA(ctx, api.Enable2FARequestObject{Body: code})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -701,10 +703,122 @@ func TestTwoFactorSettings(t *testing.T) {
 			uc := mocks.NewMockUsecase(ctrl)
 			uc.EXPECT().Disable2FA(gomock.Any(), userID, "123456").Return(tt.ucErr)
 
-			resp, err := NewHandler(uc).Disable2FA(ctx, api.Disable2FARequestObject{Body: code})
+			resp, err := NewHandler(uc, frontendURL).Disable2FA(ctx, api.Disable2FARequestObject{Body: code})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
 		}
 	})
+}
+
+func TestGitHubLogin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+
+	var state string
+	uc.EXPECT().GetOAuthURL("github", gomock.Any()).DoAndReturn(func(provider, s string) string {
+		state = s
+		return "https://github.com/login/oauth/authorize?state=" + s
+	})
+
+	var resp api.GitHubLoginResponseObject
+	var err error
+	set := withCookies(nil, func(ctx context.Context) {
+		resp, err = NewHandler(uc, frontendURL).GitHubLogin(ctx, api.GitHubLoginRequestObject{})
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, api.GitHubLogin307Response{
+		Headers: api.GitHubLogin307ResponseHeaders{Location: "https://github.com/login/oauth/authorize?state=" + state},
+	}, resp)
+	assert.Equal(t, state, set[oauthStateCookieName].Value)
+}
+
+func TestGitHubCallback(t *testing.T) {
+	stateCookie := []*http.Cookie{{Name: oauthStateCookieName, Value: "state-1"}}
+	pending := models.AuthTokens{TwoFactorToken: "pending", TwoFactorExpiresAt: time.Now().Add(5 * time.Minute)}
+
+	tests := []struct {
+		name         string
+		cookies      []*http.Cookie
+		state        string
+		prepare      func(uc *mocks.MockUsecase)
+		expected     api.GitHubCallbackResponseObject
+		expectCookie string
+	}{
+		{
+			name:    "ok",
+			cookies: stateCookie,
+			state:   "state-1",
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().HandleOAuthCallback(gomock.Any(), "github", "code-1").Return(models.User{}, tokens, nil)
+			},
+			expected: api.GitHubCallback307Response{
+				Headers: api.GitHubCallback307ResponseHeaders{Location: frontendURL + "/profile"},
+			},
+			expectCookie: accessCookieName,
+		},
+		{
+			name:    "2fa enabled",
+			cookies: stateCookie,
+			state:   "state-1",
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().HandleOAuthCallback(gomock.Any(), "github", "code-1").Return(models.User{}, pending, nil)
+			},
+			expected: api.GitHubCallback307Response{
+				Headers: api.GitHubCallback307ResponseHeaders{Location: frontendURL + "/login/2fa"},
+			},
+			expectCookie: twoFactorCookieName,
+		},
+		{
+			name:     "no state cookie",
+			state:    "state-1",
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.GitHubCallback400Response{},
+		},
+		{
+			name:     "wrong state",
+			cookies:  stateCookie,
+			state:    "other",
+			prepare:  func(uc *mocks.MockUsecase) {},
+			expected: api.GitHubCallback400Response{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			tt.prepare(uc)
+
+			var resp api.GitHubCallbackResponseObject
+			var err error
+			set := withCookies(tt.cookies, func(ctx context.Context) {
+				req := api.GitHubCallbackRequestObject{Params: api.GitHubCallbackParams{Code: "code-1", State: tt.state}}
+				resp, err = NewHandler(uc, frontendURL).GitHubCallback(ctx, req)
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+			if tt.expectCookie != "" {
+				assert.Contains(t, set, tt.expectCookie)
+				assert.Negative(t, set[oauthStateCookieName].MaxAge)
+			}
+		})
+	}
+}
+
+func TestGitHubCallbackError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+	dbErr := errors.New("github is down")
+	uc.EXPECT().HandleOAuthCallback(gomock.Any(), "github", "code-1").Return(models.User{}, models.AuthTokens{}, dbErr)
+
+	var err error
+	withCookies([]*http.Cookie{{Name: oauthStateCookieName, Value: "s"}}, func(ctx context.Context) {
+		req := api.GitHubCallbackRequestObject{Params: api.GitHubCallbackParams{Code: "code-1", State: "s"}}
+		_, err = NewHandler(uc, frontendURL).GitHubCallback(ctx, req)
+	})
+
+	assert.ErrorIs(t, err, dbErr)
 }

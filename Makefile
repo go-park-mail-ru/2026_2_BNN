@@ -8,7 +8,7 @@ test:
 
 cover:
 	go test -coverprofile=cover.out.tmp ./...
-	grep -v '/mocks/' cover.out.tmp > cover.out
+	grep -v -e '/mocks/' -e '.gen.go' cover.out.tmp > cover.out
 	rm cover.out.tmp
 	go tool cover -func=cover.out
 

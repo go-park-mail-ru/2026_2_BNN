@@ -6,6 +6,7 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/tags"
 	"bnn/internal/pkg/tags/delivery/http/api"
 
@@ -103,7 +104,7 @@ func (h *Handler) DeleteTag(ctx context.Context, req api.DeleteTagRequestObject)
 func toAPITag(tag models.Tag) api.Tag {
 	return api.Tag{
 		Id:        openapi_types.UUID(tag.ID),
-		Name:      tag.Name,
+		Name:      escape.String(tag.Name),
 		Color:     tag.Color,
 		CreatedAt: tag.CreatedAt,
 		UpdatedAt: tag.UpdatedAt,

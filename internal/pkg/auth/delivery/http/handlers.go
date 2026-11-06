@@ -12,6 +12,7 @@ import (
 	"bnn/internal/pkg/auth/delivery/http/api"
 	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/upload"
 
 	"github.com/samber/lo"
@@ -192,7 +193,7 @@ func toGetCurrentUserResponse(u models.User) api.GetCurrentUser200JSONResponse {
 func toAPIUser(u models.User) api.User {
 	return api.User{
 		Id:            openapi_types.UUID(u.ID),
-		Login:         u.Login,
+		Login:         escape.String(u.Login),
 		Avatar:        u.Avatar,
 		Is2faEnabled:  u.Is2FAEnabled,
 		OauthProvider: lo.Ternary(u.IsExternal, lo.ToPtr(api.Github), nil),

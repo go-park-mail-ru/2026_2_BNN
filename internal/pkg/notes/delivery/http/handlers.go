@@ -7,10 +7,12 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/notes"
 	"bnn/internal/pkg/notes/delivery/http/api"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -198,18 +200,18 @@ func toAPINote(n models.Note) api.Note {
 
 	var header *string
 	if n.Header != "" {
-		header = &n.Header
+		header = lo.ToPtr(escape.String(n.Header))
 	}
 	var icon *string
 	if n.Icon != "" {
-		icon = &n.Icon
+		icon = lo.ToPtr(escape.String(n.Icon))
 	}
 
 	return api.Note{
 		Id:           openapi_types.UUID(n.ID),
 		ParentNoteId: parentNoteID,
 		CreatedBy:    openapi_types.UUID(n.CreatedBy),
-		Title:        n.Title,
+		Title:        escape.String(n.Title),
 		Header:       header,
 		Icon:         icon,
 		Blocks:       blocks,
@@ -224,7 +226,7 @@ func toAPIBlock(b models.Block) api.Block {
 	_ = json.Unmarshal(b.Content, &content)
 	return api.Block{
 		Id:        openapi_types.UUID(b.ID),
-		Content:   content,
+		Content:   escape.Map(content),
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
 	}
@@ -233,7 +235,7 @@ func toAPIBlock(b models.Block) api.Block {
 func toAPITag(t models.Tag) api.Tag {
 	return api.Tag{
 		Id:        openapi_types.UUID(t.ID),
-		Name:      t.Name,
+		Name:      escape.String(t.Name),
 		Color:     t.Color,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,

@@ -549,6 +549,11 @@ func TestToAPIUser(t *testing.T) {
 			expected: api.User{Login: "seyran"},
 		},
 		{
+			name:     "login with html",
+			user:     models.User{Login: "<b>seyran</b>"},
+			expected: api.User{Login: "&lt;b&gt;seyran&lt;/b&gt;"},
+		},
+		{
 			name:     "github account with 2fa",
 			user:     models.User{Login: "a@b.ru", IsExternal: true, Is2FAEnabled: true},
 			expected: api.User{Login: "a@b.ru", OauthProvider: &github, Is2faEnabled: true},

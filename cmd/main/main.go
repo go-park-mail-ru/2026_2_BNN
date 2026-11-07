@@ -126,8 +126,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	baseLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
+	router.Use(middleware.RequestID)
+	router.Use(middleware.AccessLog(baseLogger))
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)

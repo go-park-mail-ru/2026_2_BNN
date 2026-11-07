@@ -448,6 +448,55 @@ paths:
         '404':
           description: Заметки нет или она чужая
 
+  /notes/{id}/favorite:
+    parameters:
+      - $ref: '#/components/parameters/NoteID'
+    post:
+      tags: [notes]
+      operationId: AddFavorite
+      summary: Добавить заметку в избранное
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Заметка добавлена в избранное
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заметка не найдена
+    delete:
+      tags: [notes]
+      operationId: RemoveFavorite
+      summary: Удалить заметку из избранного
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Заметка удалена из избранного
+        '401':
+          description: Не авторизован
+        '404':
+          description: Заметка не найдена
+
+  /notes/favorites:
+    get:
+      tags: [notes]
+      operationId: ListFavorites
+      summary: Список избранных заметок
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Список избранных заметок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+        '401':
+          description: Не авторизован
+  
   /blocks/{id}/attachments:
     parameters:
       - $ref: '#/components/parameters/BlockID'

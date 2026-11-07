@@ -440,3 +440,21 @@ func TestHandlersInternalError(t *testing.T) {
 func intPtr(i int) *int {
 	return &i
 }
+
+func TestToAPINoteEscapesText(t *testing.T) {
+	note := models.Note{
+		Title:  "<script>alert(1)</script>",
+		Header: "Tom & Jerry",
+		Icon:   `"><img src=x>`,
+		Blocks: []models.Block{{Content: json.RawMessage(`{"text":"<b>жирный</b>","items":["<i>"]}`)}},
+		Tags:   []models.Tag{{Name: "<u>тег</u>"}},
+	}
+
+	got := toAPINote(note)
+
+	assert.Equal(t, "&lt;script&gt;alert(1)&lt;/script&gt;", got.Title)
+	assert.Equal(t, "Tom &amp; Jerry", *got.Header)
+	assert.Equal(t, "&#34;&gt;&lt;img src=x&gt;", *got.Icon)
+	assert.Equal(t, api.BlockContent{"text": "&lt;b&gt;жирный&lt;/b&gt;", "items": []interface{}{"&lt;i&gt;"}}, (*got.Blocks)[0].Content)
+	assert.Equal(t, "&lt;u&gt;тег&lt;/u&gt;", (*got.Tags)[0].Name)
+}

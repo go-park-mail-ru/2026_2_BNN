@@ -43,6 +43,20 @@ func (m *MockUsecase) EXPECT() *MockUsecaseMockRecorder {
 	return m.recorder
 }
 
+// AddFavorite mocks base method.
+func (m *MockUsecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddFavorite", ctx, userID, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddFavorite indicates an expected call of AddFavorite.
+func (mr *MockUsecaseMockRecorder) AddFavorite(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFavorite", reflect.TypeOf((*MockUsecase)(nil).AddFavorite), ctx, userID, noteID)
+}
+
 // CreateNote mocks base method.
 func (m *MockUsecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
 	m.ctrl.T.Helper()
@@ -70,6 +84,21 @@ func (m *MockUsecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) 
 func (mr *MockUsecaseMockRecorder) DeleteNote(ctx, userID, noteID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNote", reflect.TypeOf((*MockUsecase)(nil).DeleteNote), ctx, userID, noteID)
+}
+
+// GetFavorites mocks base method.
+func (m *MockUsecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFavorites", ctx, userID)
+	ret0, _ := ret[0].([]models.Note)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFavorites indicates an expected call of GetFavorites.
+func (mr *MockUsecaseMockRecorder) GetFavorites(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFavorites", reflect.TypeOf((*MockUsecase)(nil).GetFavorites), ctx, userID)
 }
 
 // GetNote mocks base method.
@@ -100,6 +129,20 @@ func (m *MockUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, off
 func (mr *MockUsecaseMockRecorder) GetNotes(ctx, userID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotes", reflect.TypeOf((*MockUsecase)(nil).GetNotes), ctx, userID, limit, offset)
+}
+
+// RemoveFavorite mocks base method.
+func (m *MockUsecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveFavorite", ctx, userID, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveFavorite indicates an expected call of RemoveFavorite.
+func (mr *MockUsecaseMockRecorder) RemoveFavorite(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveFavorite", reflect.TypeOf((*MockUsecase)(nil).RemoveFavorite), ctx, userID, noteID)
 }
 
 // UpdateNote mocks base method.
@@ -139,6 +182,20 @@ func NewMockRepo(ctrl *gomock.Controller) *MockRepo {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
+}
+
+// AddFavorite mocks base method.
+func (m *MockRepo) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddFavorite", ctx, userID, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddFavorite indicates an expected call of AddFavorite.
+func (mr *MockRepoMockRecorder) AddFavorite(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFavorite", reflect.TypeOf((*MockRepo)(nil).AddFavorite), ctx, userID, noteID)
 }
 
 // CreateNote mocks base method.
@@ -182,6 +239,21 @@ func (m *MockRepo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.B
 func (mr *MockRepoMockRecorder) ReadBlocks(ctx, noteID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlocks", reflect.TypeOf((*MockRepo)(nil).ReadBlocks), ctx, noteID)
+}
+
+// ReadFavorites mocks base method.
+func (m *MockRepo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadFavorites", ctx, userID)
+	ret0, _ := ret[0].([]models.Note)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadFavorites indicates an expected call of ReadFavorites.
+func (mr *MockRepoMockRecorder) ReadFavorites(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFavorites", reflect.TypeOf((*MockRepo)(nil).ReadFavorites), ctx, userID)
 }
 
 // ReadNote mocks base method.
@@ -242,6 +314,20 @@ func (m *MockRepo) ReadUserTags(ctx context.Context, userID uuid.UUID, tagIDs []
 func (mr *MockRepoMockRecorder) ReadUserTags(ctx, userID, tagIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserTags", reflect.TypeOf((*MockRepo)(nil).ReadUserTags), ctx, userID, tagIDs)
+}
+
+// RemoveFavorite mocks base method.
+func (m *MockRepo) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveFavorite", ctx, userID, noteID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveFavorite indicates an expected call of RemoveFavorite.
+func (mr *MockRepoMockRecorder) RemoveFavorite(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveFavorite", reflect.TypeOf((*MockRepo)(nil).RemoveFavorite), ctx, userID, noteID)
 }
 
 // UpdateNote mocks base method.

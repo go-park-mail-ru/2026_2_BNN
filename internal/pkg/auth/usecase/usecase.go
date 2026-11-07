@@ -414,7 +414,7 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 		ID:         uuid.NewV4(),
 		Login:      profile.Email,
 		Email:      profile.Email,
-		Avatar:     profile.AvatarURL,
+		Avatar:     httpsURL(profile.AvatarURL),
 		IsExternal: true,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -425,4 +425,12 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 	}
 
 	return user, nil
+}
+
+func httpsURL(raw string) string {
+	link, err := url.Parse(raw)
+	if err != nil || link.Scheme != "https" {
+		return ""
+	}
+	return raw
 }

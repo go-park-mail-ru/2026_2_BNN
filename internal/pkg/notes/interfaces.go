@@ -16,6 +16,9 @@ type Usecase interface {
 	CreateNote(ctx context.Context, userID uuid.UUID, req CreateNoteRequest) (models.Note, error)
 	UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req UpdateNoteRequest) (models.Note, error)
 	DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error
+	AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error
+	RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error
+	GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error)
 }
 
 type Repo interface {
@@ -28,6 +31,10 @@ type Repo interface {
 	CreateNote(ctx context.Context, note models.Note, blocks []models.Block) error
 	UpdateNote(ctx context.Context, note models.Note, blocks []models.Block, deletedBlockIDs []uuid.UUID) error
 	DeleteNote(ctx context.Context, noteID uuid.UUID) error
+
+	AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error
+	RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error
+	ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error)
 }
 
 type CreateNoteRequest struct {

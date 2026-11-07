@@ -10,6 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/oapi-codegen/runtime v1.7.0
+	github.com/pashagolub/pgxmock/v3 v3.4.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/samber/lo v1.53.0
 	github.com/satori/go.uuid v1.2.0

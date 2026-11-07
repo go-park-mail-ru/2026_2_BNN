@@ -140,6 +140,9 @@ type ServerInterface interface {
 	// ListNotes Список своих заметок
 	// (GET /notes/all)
 	ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams)
+	// ListFavorites Список избранных заметок
+	// (GET /notes/favorites)
+	ListFavorites(w http.ResponseWriter, r *http.Request)
 	// DeleteNote Удалить заметку
 	// (DELETE /notes/{id})
 	DeleteNote(w http.ResponseWriter, r *http.Request, id NoteID)
@@ -149,6 +152,12 @@ type ServerInterface interface {
 	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(w http.ResponseWriter, r *http.Request, id NoteID)
+	// RemoveFavorite Удалить заметку из избранного
+	// (DELETE /notes/{id}/favorite)
+	RemoveFavorite(w http.ResponseWriter, r *http.Request, id NoteID)
+	// AddFavorite Добавить заметку в избранное
+	// (POST /notes/{id}/favorite)
+	AddFavorite(w http.ResponseWriter, r *http.Request, id NoteID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -211,6 +220,20 @@ func (siw *ServerInterfaceWrapper) ListNotes(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListNotes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFavorites operation middleware
+func (siw *ServerInterfaceWrapper) ListFavorites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFavorites(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -289,6 +312,58 @@ func (siw *ServerInterfaceWrapper) UpdateNote(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateNote(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveFavorite operation middleware
+func (siw *ServerInterfaceWrapper) RemoveFavorite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id NoteID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveFavorite(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddFavorite operation middleware
+func (siw *ServerInterfaceWrapper) AddFavorite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id NoteID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddFavorite(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -421,6 +496,12 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/notes/{id}", wrapper.UpdateNote).Methods(http.MethodPut)
 
+	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.RemoveFavorite).Methods(http.MethodDelete)
+
+	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.AddFavorite).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/notes/favorites", wrapper.ListFavorites).Methods(http.MethodGet)
+
 	return r
 }
 
@@ -512,6 +593,35 @@ type ListNotes401Response struct {
 }
 
 func (response ListNotes401Response) VisitListNotesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListFavoritesRequestObject struct {
+}
+
+type ListFavoritesResponseObject interface {
+	VisitListFavoritesResponse(w http.ResponseWriter) error
+}
+
+type ListFavorites200JSONResponse []Note
+
+func (response ListFavorites200JSONResponse) VisitListFavoritesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFavorites401Response struct {
+}
+
+func (response ListFavorites401Response) VisitListFavoritesResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
 	return nil
 }
@@ -657,6 +767,70 @@ func (response UpdateNote413Response) VisitUpdateNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type RemoveFavoriteRequestObject struct {
+	Id NoteID `json:"id"`
+}
+
+type RemoveFavoriteResponseObject interface {
+	VisitRemoveFavoriteResponse(w http.ResponseWriter) error
+}
+
+type RemoveFavorite204Response struct {
+}
+
+func (response RemoveFavorite204Response) VisitRemoveFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveFavorite401Response struct {
+}
+
+func (response RemoveFavorite401Response) VisitRemoveFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type RemoveFavorite404Response struct {
+}
+
+func (response RemoveFavorite404Response) VisitRemoveFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type AddFavoriteRequestObject struct {
+	Id NoteID `json:"id"`
+}
+
+type AddFavoriteResponseObject interface {
+	VisitAddFavoriteResponse(w http.ResponseWriter) error
+}
+
+type AddFavorite204Response struct {
+}
+
+func (response AddFavorite204Response) VisitAddFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type AddFavorite401Response struct {
+}
+
+func (response AddFavorite401Response) VisitAddFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type AddFavorite404Response struct {
+}
+
+func (response AddFavorite404Response) VisitAddFavoriteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// CreateNote Создать заметку
@@ -665,6 +839,9 @@ type StrictServerInterface interface {
 	// ListNotes Список своих заметок
 	// (GET /notes/all)
 	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
+	// ListFavorites Список избранных заметок
+	// (GET /notes/favorites)
+	ListFavorites(ctx context.Context, request ListFavoritesRequestObject) (ListFavoritesResponseObject, error)
 	// DeleteNote Удалить заметку
 	// (DELETE /notes/{id})
 	DeleteNote(ctx context.Context, request DeleteNoteRequestObject) (DeleteNoteResponseObject, error)
@@ -674,6 +851,12 @@ type StrictServerInterface interface {
 	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
+	// RemoveFavorite Удалить заметку из избранного
+	// (DELETE /notes/{id}/favorite)
+	RemoveFavorite(ctx context.Context, request RemoveFavoriteRequestObject) (RemoveFavoriteResponseObject, error)
+	// AddFavorite Добавить заметку в избранное
+	// (POST /notes/{id}/favorite)
+	AddFavorite(ctx context.Context, request AddFavoriteRequestObject) (AddFavoriteResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -772,6 +955,30 @@ func (sh *strictHandler) ListNotes(w http.ResponseWriter, r *http.Request, param
 	}
 }
 
+// ListFavorites operation middleware
+func (sh *strictHandler) ListFavorites(w http.ResponseWriter, r *http.Request) {
+	var request ListFavoritesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListFavorites(ctx, request.(ListFavoritesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListFavorites")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFavoritesResponseObject); ok {
+		if err := validResponse.VisitListFavoritesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteNote operation middleware
 func (sh *strictHandler) DeleteNote(w http.ResponseWriter, r *http.Request, id NoteID) {
 	var request DeleteNoteRequestObject
@@ -850,6 +1057,58 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, id N
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateNoteResponseObject); ok {
 		if err := validResponse.VisitUpdateNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveFavorite operation middleware
+func (sh *strictHandler) RemoveFavorite(w http.ResponseWriter, r *http.Request, id NoteID) {
+	var request RemoveFavoriteRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveFavorite(ctx, request.(RemoveFavoriteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveFavorite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveFavoriteResponseObject); ok {
+		if err := validResponse.VisitRemoveFavoriteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddFavorite operation middleware
+func (sh *strictHandler) AddFavorite(w http.ResponseWriter, r *http.Request, id NoteID) {
+	var request AddFavoriteRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddFavorite(ctx, request.(AddFavoriteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddFavorite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddFavoriteResponseObject); ok {
+		if err := validResponse.VisitAddFavoriteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

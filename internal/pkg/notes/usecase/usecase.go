@@ -183,3 +183,22 @@ func (u *Usecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) erro
 	}
 	return u.repo.DeleteNote(ctx, noteID)
 }
+
+func (u *Usecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrNoteNotFound
+	}
+	return u.repo.AddFavorite(ctx, userID, noteID)
+}
+
+func (u *Usecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	return u.repo.RemoveFavorite(ctx, userID, noteID)
+}
+
+func (u *Usecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	return u.repo.ReadFavorites(ctx, userID)
+}

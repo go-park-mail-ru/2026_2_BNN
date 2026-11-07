@@ -97,6 +97,8 @@ func TestSignUp(t *testing.T) {
 			if tt.withCookies {
 				assert.Equal(t, "access", set[accessCookieName].Value)
 				assert.Equal(t, "refresh", set[refreshCookieName].Value)
+				assert.NotEmpty(t, set[csrfCookieName].Value)
+				assert.False(t, set[csrfCookieName].HttpOnly)
 			} else {
 				assert.Empty(t, set)
 			}
@@ -227,6 +229,7 @@ func TestLogout(t *testing.T) {
 			assert.Equal(t, api.Logout200Response{}, resp)
 			assert.Negative(t, set[accessCookieName].MaxAge)
 			assert.Negative(t, set[refreshCookieName].MaxAge)
+			assert.Negative(t, set[csrfCookieName].MaxAge)
 		})
 	}
 }
@@ -826,4 +829,64 @@ func TestGitHubCallbackError(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, dbErr)
+}
+
+func TestMiddlewareCSRF(t *testing.T) {
+	userID := uuid.NewV4()
+	access := &http.Cookie{Name: accessCookieName, Value: "good"}
+	csrf := &http.Cookie{Name: csrfCookieName, Value: "csrf-1"}
+
+	tests := []struct {
+		name         string
+		method       string
+		path         string
+		cookies      []*http.Cookie
+		header       string
+		expectedCode int
+	}{
+		{name: "get without token", method: http.MethodGet, path: "/api/notes/all", cookies: []*http.Cookie{access}, expectedCode: http.StatusOK},
+		{name: "put with token", method: http.MethodPut, path: "/api/notes/1", cookies: []*http.Cookie{access, csrf}, header: "csrf-1", expectedCode: http.StatusOK},
+		{name: "put without header", method: http.MethodPut, path: "/api/notes/1", cookies: []*http.Cookie{access, csrf}, expectedCode: http.StatusForbidden},
+		{name: "delete with wrong header", method: http.MethodDelete, path: "/api/notes/1", cookies: []*http.Cookie{access, csrf}, header: "other", expectedCode: http.StatusForbidden},
+		{name: "post without csrf cookie", method: http.MethodPost, path: "/api/notes", cookies: []*http.Cookie{access}, header: "csrf-1", expectedCode: http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			uc.EXPECT().Authenticate(gomock.Any(), "good").Return(userID, nil)
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			for _, c := range tt.cookies {
+				req.AddCookie(c)
+			}
+			if tt.header != "" {
+				req.Header.Set(csrfHeaderName, tt.header)
+			}
+			rec := httptest.NewRecorder()
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+			NewHandler(uc, frontendURL).Middleware(next).ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.expectedCode, rec.Code)
+		})
+	}
+}
+
+func TestMiddlewareCSRFPublicPath(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	uc := mocks.NewMockUsecase(ctrl)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/signin", nil)
+	rec := httptest.NewRecorder()
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	NewHandler(uc, frontendURL).Middleware(next).ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 }

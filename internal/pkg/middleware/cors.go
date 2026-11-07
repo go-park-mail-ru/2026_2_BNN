@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	corsAllowMethods = "GET, POST, OPTIONS"
-	corsAllowHeaders = "Content-Type"
+	corsAllowMethods = "GET, POST, PUT, DELETE, OPTIONS"
+	corsAllowHeaders = "Content-Type, X-CSRF-Token"
 	corsMaxAge       = "600"
 )
 

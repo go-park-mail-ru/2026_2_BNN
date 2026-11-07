@@ -5,6 +5,9 @@ info:
   description: |
     Авторизация через куки bnn_access (15 мин) и bnn_refresh (30 дней).
     На 401 вызвать /auth/refresh и повторить запрос. Если refresh тоже 401, то на страницу входа.
+    На POST, PUT и DELETE (кроме signup, signin, refresh, logout и 2fa/verify) нужен заголовок
+    X-CSRF-Token со значением куки bnn_csrf. Кука ставится при входе и обновляется при refresh.
+    Без заголовка или с другим значением ответ 403.
     У ошибок нет тела.
 
 servers:

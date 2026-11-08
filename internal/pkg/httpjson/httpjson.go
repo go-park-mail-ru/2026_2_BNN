@@ -1,7 +1,6 @@
 package httpjson
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -14,13 +13,11 @@ func RequestError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
-	slog.Warn("Bad request", "error", err)
+	slog.WarnContext(r.Context(), "Bad request", "error", err)
 	w.WriteHeader(http.StatusBadRequest)
 }
 
 func ResponseError(w http.ResponseWriter, r *http.Request, err error) {
-	ctx := context.Background()
-
-	slog.ErrorContext(ctx, "Request failed", "error", err)
+	slog.ErrorContext(r.Context(), "Request failed", "error", err)
 	w.WriteHeader(http.StatusInternalServerError)
 }

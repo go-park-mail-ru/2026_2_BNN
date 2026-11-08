@@ -100,7 +100,8 @@ func TestReadProfile(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	repo, err := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	require.NoError(t, err)
 
 	link := repo.AuthURL("state-1")
 
@@ -110,6 +111,24 @@ func TestAuthURL(t *testing.T) {
 }
 
 func TestCallbackURL(t *testing.T) {
-	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	repo, err := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	require.NoError(t, err)
 	assert.Equal(t, "https://brandnewnotes.ru/api/auth/github/callback", repo.config.RedirectURL)
+}
+
+func TestHTTPSURL(t *testing.T) {
+	tests := []struct {
+		raw      string
+		expected string
+	}{
+		{raw: "https://avatars.githubusercontent.com/u/1?v=4", expected: "https://avatars.githubusercontent.com/u/1?v=4"},
+		{raw: "javascript:alert(1)", expected: ""},
+		{raw: "http://example.com/a.png", expected: ""},
+		{raw: "", expected: ""},
+		{raw: "%zz", expected: ""},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, httpsURL(tt.raw), tt.raw)
+	}
 }

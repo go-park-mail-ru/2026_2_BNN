@@ -39,7 +39,7 @@ func (t *Tracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQ
 
 	duration := time.Since(info.start)
 
-	t.logger.Info("DB Query",
+	t.logger.InfoContext(ctx, "DB Query",
 		"sql", info.sql,
 		"duration", duration.String(),
 		"err", data.Err,

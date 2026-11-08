@@ -15,8 +15,10 @@ import (
 	"golang.org/x/oauth2/github"
 )
 
-const apiURL = "https://api.github.com"
-const callbackPath = "/api/auth/github/callback"
+const (
+	apiURL       = "https://api.github.com"
+	callbackPath = "/api/auth/github/callback"
+)
 
 var errNoEmail = errors.New("github account has no verified primary email")
 
@@ -36,11 +38,12 @@ type Repo struct {
 	apiURL string
 }
 
-func NewRepo(clientID, clientSecret, appBaseURL string) *Repo {
+func NewRepo(clientID, clientSecret, appBaseURL string) (*Repo, error) {
 	callbackURL, err := url.JoinPath(appBaseURL, callbackPath)
 	if err != nil {
-		callbackURL = appBaseURL + callbackPath
+		return nil, fmt.Errorf("build github callback url: %w", err)
 	}
+
 	return &Repo{
 		config: &oauth2.Config{
 			ClientID:     clientID,
@@ -50,7 +53,7 @@ func NewRepo(clientID, clientSecret, appBaseURL string) *Repo {
 			Scopes:       []string{"read:user", "user:email"},
 		},
 		apiURL: apiURL,
-	}
+	}, nil
 }
 
 func (r *Repo) AuthURL(state string) string {

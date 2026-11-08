@@ -83,7 +83,10 @@ func (r *Repo) ReadProfile(ctx context.Context, code string) (models.OAuthProfil
 		return models.OAuthProfile{}, errNoEmail
 	}
 
-	return models.OAuthProfile{Email: email, AvatarURL: user.AvatarURL}, nil
+	return models.OAuthProfile{
+		Email:     email,
+		AvatarURL: httpsURL(user.AvatarURL),
+	}, nil
 }
 
 func (r *Repo) getJSON(ctx context.Context, client *http.Client, path string, dst any) error {
@@ -112,4 +115,12 @@ func (r *Repo) getJSON(ctx context.Context, client *http.Client, path string, ds
 	}
 
 	return nil
+}
+
+func httpsURL(raw string) string {
+	link, err := url.Parse(raw)
+	if err != nil || link.Scheme != "https" {
+		return ""
+	}
+	return raw
 }

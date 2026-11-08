@@ -54,7 +54,10 @@ const (
 )
 
 func main() {
-	_ = godotenv.Load()
+	err := godotenv.Load(".env")
+	if err != nil {
+		slog.Warn("No .env file found, using system environment variables", "error", err)
+	}
 
 	ctx := context.Background()
 

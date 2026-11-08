@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"bnn/internal/models"
@@ -400,4 +401,75 @@ func TestDeleteNote(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCreateNoteEscapesText(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	header := "Tom & Jerry"
+	icon := `"><img src=x>`
+
+	repo.EXPECT().CreateNote(gomock.Any(), gomock.Any(), gomock.Nil()).
+		DoAndReturn(func(ctx context.Context, note models.Note, blocks []models.Block) error {
+			assert.Equal(t, "&lt;script&gt;alert(1)&lt;/script&gt;", note.Title)
+			assert.Equal(t, "Tom &amp; Jerry", note.Header)
+			assert.Equal(t, "&#34;&gt;&lt;img src=x&gt;", note.Icon)
+			return nil
+		})
+
+	req := notes.CreateNoteRequest{Title: "<script>alert(1)</script>", Header: &header, Icon: &icon}
+	_, err := NewUsecase(repo).CreateNote(context.Background(), uuid.NewV4(), req)
+
+	require.NoError(t, err)
+}
+
+func TestNoteTitleTooLong(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	u := NewUsecase(repo)
+	long := strings.Repeat("я", maxTitleLength+1)
+
+	_, err := u.CreateNote(context.Background(), uuid.NewV4(), notes.CreateNoteRequest{Title: long})
+	assert.ErrorIs(t, err, models.ErrValidation)
+
+	_, err = u.UpdateNote(context.Background(), uuid.NewV4(), uuid.NewV4(), notes.UpdateNoteRequest{Title: long})
+	assert.ErrorIs(t, err, models.ErrValidation)
+}
+
+func TestUpdateNoteEscapesBlocks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
+
+	repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: userID}, nil)
+	repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
+	repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
+	repo.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, note models.Note, blocks []models.Block, deleted []uuid.UUID) error {
+			assert.Equal(t, "a &lt; b", note.Title)
+			require.Len(t, blocks, 1)
+			assert.JSONEq(t, `{"text":"&lt;b&gt;жирный&lt;/b&gt;"}`, string(blocks[0].Content))
+			return nil
+		})
+
+	req := notes.UpdateNoteRequest{Title: "a < b", Blocks: []notes.BlockInput{{Content: []byte(`{"text":"<b>жирный</b>"}`)}}}
+	_, err := NewUsecase(repo).UpdateNote(context.Background(), userID, noteID, req)
+
+	require.NoError(t, err)
+}
+
+func TestUpdateNoteInvalidBlock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
+
+	repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: userID}, nil)
+	repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
+
+	req := notes.UpdateNoteRequest{Title: "t", Blocks: []notes.BlockInput{{Content: []byte(`{`)}}}
+	_, err := NewUsecase(repo).UpdateNote(context.Background(), userID, noteID, req)
+
+	assert.ErrorIs(t, err, models.ErrValidation)
 }

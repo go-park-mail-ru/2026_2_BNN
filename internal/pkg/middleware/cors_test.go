@@ -50,7 +50,8 @@ func TestCORS(t *testing.T) {
 		mw(nextHandler).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNoContent, rec.Code)
-		assert.Equal(t, "GET, POST, OPTIONS", rec.Header().Get("Access-Control-Allow-Methods"))
+		assert.Equal(t, "GET, POST, PUT, DELETE, OPTIONS", rec.Header().Get("Access-Control-Allow-Methods"))
+		assert.Equal(t, "Content-Type, X-CSRF-Token", rec.Header().Get("Access-Control-Allow-Headers"))
 	})
 
 	t.Run("No Origins Error", func(t *testing.T) {

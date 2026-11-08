@@ -46,6 +46,13 @@ func TestSignUp(t *testing.T) {
 			expectedErr: models.ErrValidation,
 		},
 		{
+			name:        "login with html",
+			login:       "<b>seyran</b>",
+			password:    "password123",
+			prepare:     func(repo *mocks.MockRepo) {},
+			expectedErr: models.ErrValidation,
+		},
+		{
 			name:        "short password",
 			login:       "seyran",
 			password:    "short",

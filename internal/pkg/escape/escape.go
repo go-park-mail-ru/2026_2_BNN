@@ -1,16 +1,20 @@
 package escape
 
-import "html"
+import (
+	"encoding/json"
+	"html"
+)
 
 func String(s string) string {
 	return html.EscapeString(s)
 }
 
-func Map(m map[string]any) map[string]any {
-	for key, val := range m {
-		m[key] = value(val)
+func JSON(raw []byte) ([]byte, error) {
+	var data any
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return nil, err
 	}
-	return m
+	return json.Marshal(value(data))
 }
 
 func value(v any) any {
@@ -18,7 +22,10 @@ func value(v any) any {
 	case string:
 		return html.EscapeString(t)
 	case map[string]any:
-		return Map(t)
+		for key, item := range t {
+			t[key] = value(item)
+		}
+		return t
 	case []any:
 		for i, item := range t {
 			t[i] = value(item)

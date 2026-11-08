@@ -490,6 +490,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/notes", wrapper.CreateNote).Methods(http.MethodPost)
 
+	r.HandleFunc(options.BaseURL+"/notes/favorites", wrapper.ListFavorites).Methods(http.MethodGet)
+
 	r.HandleFunc(options.BaseURL+"/notes/{id}", wrapper.DeleteNote).Methods(http.MethodDelete)
 
 	r.HandleFunc(options.BaseURL+"/notes/{id}", wrapper.GetNote).Methods(http.MethodGet)
@@ -499,8 +501,6 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.RemoveFavorite).Methods(http.MethodDelete)
 
 	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.AddFavorite).Methods(http.MethodPost)
-
-	r.HandleFunc(options.BaseURL+"/notes/favorites", wrapper.ListFavorites).Methods(http.MethodGet)
 
 	return r
 }

@@ -382,10 +382,6 @@ paths:
         '413':
           description: Тело запроса больше 1 МБ
 
-<<<<<<< HEAD
-
-=======
->>>>>>> eb266a80e6f207e6fa808c90172fec8c3a5c0c15
   /notes/favorites:
     get:
       tags: [notes]

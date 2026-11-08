@@ -289,14 +289,14 @@ func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, er
 		return nil, err
 	}
 
-	otpURL := fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s",
-		issuerName,
-		user.Login,
-		secret,
-		issuerName,
-	)
+	otpURL := url.URL{
+		Scheme:   "otpauth",
+		Host:     "totp",
+		Path:     fmt.Sprintf("/%s:%s", issuerName, user.Login),
+		RawQuery: url.Values{"secret": {secret}, "issuer": {issuerName}}.Encode(),
+	}
 
-	png, err := qrcode.Encode(otpURL, qrcode.Medium, 256)
+	png, err := qrcode.Encode(otpURL.String(), qrcode.Medium, 256)
 	if err != nil {
 		return nil, fmt.Errorf("generate qr: %w", err)
 	}
@@ -419,7 +419,7 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 		ID:         uuid.NewV4(),
 		Login:      profile.Email,
 		Email:      profile.Email,
-		Avatar:     httpsURL(profile.AvatarURL),
+		Avatar:     profile.AvatarURL,
 		IsExternal: true,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -430,12 +430,4 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 	}
 
 	return user, nil
-}
-
-func httpsURL(raw string) string {
-	link, err := url.Parse(raw)
-	if err != nil || link.Scheme != "https" {
-		return ""
-	}
-	return raw
 }

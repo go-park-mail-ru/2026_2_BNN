@@ -8,8 +8,8 @@ import (
 )
 
 type Block struct {
-	ID        uuid.UUID       `json:"id"`
-	Content   json.RawMessage `json:"content"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID        uuid.UUID
+	Content   json.RawMessage
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

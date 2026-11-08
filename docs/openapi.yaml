@@ -382,6 +382,25 @@ paths:
         '413':
           description: Тело запроса больше 1 МБ
 
+  /notes/favorites:
+    get:
+      tags: [notes]
+      operationId: ListFavorites
+      summary: Список избранных заметок
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Список избранных заметок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+        '401':
+          description: Не авторизован
+
   /notes/{id}:
     parameters:
       - $ref: '#/components/parameters/NoteID'
@@ -480,25 +499,6 @@ paths:
           description: Не авторизован
         '404':
           description: Заметка не найдена
-
-  /notes/favorites:
-    get:
-      tags: [notes]
-      operationId: ListFavorites
-      summary: Список избранных заметок
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Список избранных заметок
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Note'
-        '401':
-          description: Не авторизован
   
   /blocks/{id}/attachments:
     parameters:

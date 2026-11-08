@@ -3,7 +3,8 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"uuid"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 type ctxKey string
@@ -14,7 +15,7 @@ func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqID := r.Header.Get("X-Request-Id")
 		if reqID == "" {
-			reqID = uuid.New().String()
+			reqID = uuid.NewV4().String()
 		}
 
 		ctx := context.WithValue(r.Context(), RequestIDKey, reqID)

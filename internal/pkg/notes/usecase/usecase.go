@@ -3,13 +3,18 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/notes"
 
 	uuid "github.com/satori/go.uuid"
 )
+
+const maxTitleLength = 255
 
 type Usecase struct {
 	repo notes.Repo
@@ -45,6 +50,9 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
+	if err := validateTitle(req.Title); err != nil {
+		return models.Note{}, err
+	}
 	if req.ParentNoteID != nil {
 		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
 		if err != nil {
@@ -63,15 +71,15 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 		ID:           uuid.NewV4(),
 		ParentNoteID: req.ParentNoteID,
 		CreatedBy:    userID,
-		Title:        req.Title,
+		Title:        escape.String(req.Title),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 	if req.Header != nil {
-		note.Header = *req.Header
+		note.Header = escape.String(*req.Header)
 	}
 	if req.Icon != nil {
-		note.Icon = *req.Icon
+		note.Icon = escape.String(*req.Icon)
 	}
 
 	if err := u.repo.CreateNote(ctx, note, nil); err != nil {
@@ -81,6 +89,10 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 }
 
 func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+	if err := validateTitle(req.Title); err != nil {
+		return models.Note{}, err
+	}
+
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
@@ -89,13 +101,13 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		return models.Note{}, models.ErrNoteNotFound
 	}
 
-	note.Title = req.Title
+	note.Title = escape.String(req.Title)
 	note.UpdatedAt = time.Now().UTC()
 	if req.Header != nil {
-		note.Header = *req.Header
+		note.Header = escape.String(*req.Header)
 	}
 	if req.Icon != nil {
-		note.Icon = *req.Icon
+		note.Icon = escape.String(*req.Icon)
 	}
 
 	oldBlocks, err := u.repo.ReadBlocks(ctx, noteID)
@@ -120,9 +132,14 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 			id = *b.ID
 		}
 
+		content, err := escape.JSON(b.Content)
+		if err != nil {
+			return models.Note{}, fmt.Errorf("%w: invalid block content", models.ErrValidation)
+		}
+
 		blocksToSave = append(blocksToSave, models.Block{
 			ID:        id,
-			Content:   b.Content,
+			Content:   content,
 			CreatedAt: note.UpdatedAt,
 			UpdatedAt: note.UpdatedAt,
 		})
@@ -201,4 +218,11 @@ func (u *Usecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) 
 
 func (u *Usecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
 	return u.repo.ReadFavorites(ctx, userID)
+}
+
+func validateTitle(title string) error {
+	if utf8.RuneCountInString(title) > maxTitleLength {
+		return fmt.Errorf("%w: title too long", models.ErrValidation)
+	}
+	return nil
 }

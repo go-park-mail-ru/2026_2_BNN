@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"regexp"
 	"time"
 	"unicode/utf8"
 
@@ -42,6 +43,8 @@ var allowedAvatarTypes = map[string]string{
 	"image/png":  ".png",
 	"image/webp": ".webp",
 }
+
+var loginPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
 func NewUsecase(repo auth.Repo, storage auth.Storage, oauth auth.OAuthProvider, secret string) *Usecase {
 	return &Usecase{
@@ -215,6 +218,9 @@ func validateCredentials(login, password string) error {
 	loginLength := utf8.RuneCountInString(login)
 	if loginLength < minLoginLength || loginLength > maxLoginLength {
 		return fmt.Errorf("%w: invalid login length", models.ErrValidation)
+	}
+	if !loginPattern.MatchString(login) {
+		return fmt.Errorf("%w: invalid login characters", models.ErrValidation)
 	}
 
 	return validatePassword(password)

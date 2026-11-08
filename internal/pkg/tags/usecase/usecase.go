@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/tags"
 
 	uuid "github.com/satori/go.uuid"
@@ -39,6 +40,8 @@ func (u *Usecase) CreateTag(ctx context.Context, userID uuid.UUID, name, color s
 		return models.Tag{}, err
 	}
 
+	name = escape.String(name)
+
 	now := time.Now().UTC()
 	tag := models.Tag{
 		ID:        uuid.NewV4(),
@@ -61,6 +64,8 @@ func (u *Usecase) UpdateTag(ctx context.Context, userID, tagID uuid.UUID, name, 
 	if err := validateTag(name, color); err != nil {
 		return models.Tag{}, err
 	}
+
+	name = escape.String(name)
 
 	tag, err := u.readOwnTag(ctx, userID, tagID)
 	if err != nil {

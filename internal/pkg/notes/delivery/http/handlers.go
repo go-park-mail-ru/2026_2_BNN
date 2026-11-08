@@ -7,12 +7,10 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/notes"
 	"bnn/internal/pkg/notes/delivery/http/api"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
-	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -148,7 +146,7 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.UpdateNote404Response{}, nil
 	}
-	if errors.Is(err, models.ErrBlockNotFound) || errors.Is(err, models.ErrTagNotFound) {
+	if errors.Is(err, models.ErrBlockNotFound) || errors.Is(err, models.ErrTagNotFound) || errors.Is(err, models.ErrValidation) {
 		return api.UpdateNote400Response{}, nil
 	}
 	if err != nil {
@@ -200,18 +198,18 @@ func toAPINote(n models.Note) api.Note {
 
 	var header *string
 	if n.Header != "" {
-		header = lo.ToPtr(escape.String(n.Header))
+		header = &n.Header
 	}
 	var icon *string
 	if n.Icon != "" {
-		icon = lo.ToPtr(escape.String(n.Icon))
+		icon = &n.Icon
 	}
 
 	return api.Note{
 		Id:           openapi_types.UUID(n.ID),
 		ParentNoteId: parentNoteID,
 		CreatedBy:    openapi_types.UUID(n.CreatedBy),
-		Title:        escape.String(n.Title),
+		Title:        n.Title,
 		Header:       header,
 		Icon:         icon,
 		Blocks:       blocks,
@@ -226,7 +224,7 @@ func toAPIBlock(b models.Block) api.Block {
 	_ = json.Unmarshal(b.Content, &content)
 	return api.Block{
 		Id:        openapi_types.UUID(b.ID),
-		Content:   escape.Map(content),
+		Content:   content,
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
 	}
@@ -235,7 +233,7 @@ func toAPIBlock(b models.Block) api.Block {
 func toAPITag(t models.Tag) api.Tag {
 	return api.Tag{
 		Id:        openapi_types.UUID(t.ID),
-		Name:      escape.String(t.Name),
+		Name:      t.Name,
 		Color:     t.Color,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,

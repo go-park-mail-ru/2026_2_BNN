@@ -100,11 +100,16 @@ func TestReadProfile(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru/api/auth/github/callback")
+	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
 
 	link := repo.AuthURL("state-1")
 
 	assert.True(t, strings.HasPrefix(link, "https://github.com/login/oauth/authorize?"))
 	assert.Contains(t, link, "client_id=client-id")
 	assert.Contains(t, link, "state=state-1")
+}
+
+func TestCallbackURL(t *testing.T) {
+	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	assert.Equal(t, "https://brandnewnotes.ru/api/auth/github/callback", repo.config.RedirectURL)
 }

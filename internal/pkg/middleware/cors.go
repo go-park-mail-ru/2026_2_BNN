@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -31,6 +32,8 @@ func parseOrigins(rawOrigins string) []string {
 }
 
 func NewCORS(rawOrigins string) (func(http.Handler) http.Handler, error) {
+	ctx := context.Background()
+
 	origins := parseOrigins(rawOrigins)
 	if len(origins) == 0 {
 		return nil, ErrNoOrigins
@@ -41,7 +44,7 @@ func NewCORS(rawOrigins string) (func(http.Handler) http.Handler, error) {
 		allowed[origin] = struct{}{}
 	}
 
-	slog.Info("CORS configured", "allowed_origins", origins)
+	slog.InfoContext(ctx, "CORS configured", "allowed_origins", origins)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

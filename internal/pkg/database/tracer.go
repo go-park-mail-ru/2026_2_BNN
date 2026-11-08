@@ -5,10 +5,15 @@ import (
 	"log/slog"
 	"time"
 
-	"bnn/internal/pkg/middleware"
-
 	"github.com/jackc/pgx/v5"
 )
+
+type queryStartKey struct{}
+
+type queryInfo struct {
+	start time.Time
+	sql   string
+}
 
 type Tracer struct {
 	logger *slog.Logger
@@ -19,17 +24,24 @@ func NewTracer(logger *slog.Logger) *Tracer {
 }
 
 func (t *Tracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	return context.WithValue(ctx, "query_start", time.Now())
+	info := queryInfo{
+		start: time.Now(),
+		sql:   data.SQL,
+	}
+	return context.WithValue(ctx, queryStartKey{}, info)
 }
 
 func (t *Tracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
-	start, _ := ctx.Value("query_start").(time.Time)
-	reqID, _ := ctx.Value(middleware.RequestIDKey).(string)
+	info, ok := ctx.Value(queryStartKey{}).(queryInfo)
+	if !ok {
+		return
+	}
+
+	duration := time.Since(info.start)
 
 	t.logger.Info("DB Query",
-		"request_id", reqID,
-		"sql", data.CommandTag.String(),
-		"duration", time.Since(start).String(),
+		"sql", info.sql,
+		"duration", duration.String(),
 		"err", data.Err,
 	)
 }

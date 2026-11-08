@@ -16,6 +16,7 @@ import (
 )
 
 const apiURL = "https://api.github.com"
+const callbackPath = "/api/auth/github/callback"
 
 var errNoEmail = errors.New("github account has no verified primary email")
 
@@ -35,12 +36,16 @@ type Repo struct {
 	apiURL string
 }
 
-func NewRepo(clientID, clientSecret, redirectURL string) *Repo {
+func NewRepo(clientID, clientSecret, appBaseURL string) *Repo {
+	callbackURL, err := url.JoinPath(appBaseURL, callbackPath)
+	if err != nil {
+		callbackURL = appBaseURL + callbackPath
+	}
 	return &Repo{
 		config: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			RedirectURL:  redirectURL,
+			RedirectURL:  callbackURL,
 			Endpoint:     github.Endpoint,
 			Scopes:       []string{"read:user", "user:email"},
 		},

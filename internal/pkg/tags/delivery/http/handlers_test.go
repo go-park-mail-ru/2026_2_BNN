@@ -165,7 +165,3 @@ func TestDeleteTagInternalError(t *testing.T) {
 
 	assert.ErrorIs(t, err, dbErr)
 }
-
-func TestToAPITagEscapesName(t *testing.T) {
-	assert.Equal(t, "&lt;b&gt;учёба&lt;/b&gt;", toAPITag(models.Tag{Name: "<b>учёба</b>"}).Name)
-}

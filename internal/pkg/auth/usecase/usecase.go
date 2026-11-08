@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
 	"time"
 	"unicode/utf8"
@@ -15,7 +16,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"encoding/base32"
-	"net/url"
 
 	"github.com/dgryski/dgoogauth"
 	"github.com/skip2/go-qrcode"
@@ -26,7 +26,7 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
-	issuerName        = "BNN_Notes"
+	issuerName        = "BNN"
 	githubProvider    = "github"
 )
 
@@ -283,15 +283,14 @@ func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, er
 		return nil, err
 	}
 
-	u2, _ := url.Parse("otpauth://totp")
-	u2.Path += fmt.Sprintf("/%s:%s", url.PathEscape(issuerName), url.PathEscape(user.Login))
+	otpURL := fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s",
+		issuerName,
+		user.Login,
+		secret,
+		issuerName,
+	)
 
-	params := url.Values{}
-	params.Add("secret", secret)
-	params.Add("issuer", issuerName)
-	u2.RawQuery = params.Encode()
-
-	png, err := qrcode.Encode(u2.String(), qrcode.Medium, 256)
+	png, err := qrcode.Encode(otpURL, qrcode.Medium, 256)
 	if err != nil {
 		return nil, fmt.Errorf("generate qr: %w", err)
 	}

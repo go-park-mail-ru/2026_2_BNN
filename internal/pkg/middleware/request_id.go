@@ -1,15 +1,12 @@
 package middleware
 
 import (
-	"bnn/internal/pkg/ctxutil"
 	"net/http"
+
+	"bnn/internal/pkg/ctxutil"
 
 	uuid "github.com/satori/go.uuid"
 )
-
-type ctxKey string
-
-const RequestIDKey ctxKey = "request_id"
 
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

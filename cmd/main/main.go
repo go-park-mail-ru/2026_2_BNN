@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bnn/internal/pkg/logger"
 	"context"
 	"errors"
 	"log/slog"
@@ -26,6 +25,7 @@ import (
 	authUsecase "bnn/internal/pkg/auth/usecase"
 	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/httpjson"
+	"bnn/internal/pkg/logger"
 	"bnn/internal/pkg/middleware"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
@@ -108,7 +108,11 @@ func main() {
 	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
 	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
 
-	githubRepo := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), appBaseURL)
+	githubRepo, err := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), appBaseURL)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to create GitHub repo", "error", err)
+		os.Exit(1)
+	}
 
 	authHandler := authDelivery.NewHandler(
 		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, githubRepo, mustEnv("JWT_SECRET")),
@@ -201,10 +205,9 @@ func main() {
 }
 
 func mustEnv(key string) string {
-	ctx := context.Background()
 	value := os.Getenv(key)
 	if value == "" {
-		slog.ErrorContext(ctx, "Environment variable is not set", "key", key)
+		slog.Error("Environment variable is not set", "key", key)
 		os.Exit(1)
 	}
 

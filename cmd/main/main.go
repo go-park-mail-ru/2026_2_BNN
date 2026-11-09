@@ -108,17 +108,11 @@ func main() {
 	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
 	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
 
-	githubClient, err := authGithub.NewClient(
-		mustEnv("GITHUB_CLIENT_ID"),
-		mustEnv("GITHUB_CLIENT_SECRET"),
-		appBaseURL,
-	)
+	githubRepo, err := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), appBaseURL)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create github client", "error", err)
+		slog.ErrorContext(ctx, "Failed to create GitHub repo", "error", err)
 		os.Exit(1)
 	}
-
-	githubRepo := authGithub.NewRepo(githubClient)
 
 	authHandler := authDelivery.NewHandler(
 		authUsecase.NewUsecase(

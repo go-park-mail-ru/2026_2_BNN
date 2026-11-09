@@ -8,73 +8,87 @@ import (
 
 	"bnn/internal/models"
 
+	githubapi "github.com/google/go-github/v93/github"
 	"github.com/samber/lo"
 	"golang.org/x/oauth2"
+	oauthgithub "golang.org/x/oauth2/github"
 )
 
 const (
-	apiURL       = "https://api.github.com"
+	apiURL       = "https://api.github.com/"
 	callbackPath = "/api/auth/github/callback"
 )
 
-type APIClient interface {
-	ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error)
-	GetJSON(ctx context.Context, token *oauth2.Token, path string, dst any) error
-	AuthURL(state string) string
-}
+var errNoEmail = errors.New("github account has no verified primary email")
 
 type Repo struct {
-	client APIClient
+	config *oauth2.Config
+	apiURL string
 }
 
-func NewRepo(client APIClient) *Repo {
-	return &Repo{client: client}
+func NewRepo(clientID, clientSecret, appBaseURL string) (*Repo, error) {
+	callbackURL, err := url.JoinPath(appBaseURL, callbackPath)
+	if err != nil {
+		return nil, fmt.Errorf("build github callback url: %w", err)
+	}
+
+	return &Repo{
+		config: &oauth2.Config{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			RedirectURL:  callbackURL,
+			Endpoint:     oauthgithub.Endpoint,
+			Scopes:       []string{"read:user", "user:email"},
+		},
+		apiURL: apiURL,
+	}, nil
 }
 
-type githubUser struct {
-	Email     string `json:"email"`
-	AvatarURL string `json:"avatar_url"`
-}
-
-type githubEmail struct {
-	Email    string `json:"email"`
-	Primary  bool   `json:"primary"`
-	Verified bool   `json:"verified"`
+func (r *Repo) AuthURL(state string) string {
+	return r.config.AuthCodeURL(state)
 }
 
 func (r *Repo) ReadProfile(ctx context.Context, code string) (models.OAuthProfile, error) {
-	token, err := r.client.ExchangeCode(ctx, code)
+	token, err := r.config.Exchange(ctx, code)
 	if err != nil {
 		return models.OAuthProfile{}, fmt.Errorf("exchange github code: %w", err)
 	}
 
-	var user githubUser
-	if err := r.client.GetJSON(ctx, token, "user", &user); err != nil {
-		return models.OAuthProfile{}, err
+	client, err := githubapi.NewClient(
+		githubapi.WithHTTPClient(r.config.Client(ctx, token)),
+		githubapi.WithURLs(&r.apiURL, nil),
+	)
+	if err != nil {
+		return models.OAuthProfile{}, fmt.Errorf("create github client: %w", err)
 	}
 
-	email := user.Email
+	user, _, err := client.Users.Get(ctx, "")
+	if err != nil {
+		return models.OAuthProfile{}, fmt.Errorf("get github user: %w", err)
+	}
+
+	email := user.GetEmail()
 	if email == "" {
-		var emails []githubEmail
-		if err := r.client.GetJSON(ctx, token, "user/emails", &emails); err != nil {
-			return models.OAuthProfile{}, err
+		emails, _, err := client.Users.ListEmails(ctx, nil)
+		if err != nil {
+			return models.OAuthProfile{}, fmt.Errorf("get github emails: %w", err)
 		}
 
-		primary, ok := lo.Find(emails, func(e githubEmail) bool {
-			return e.Primary && e.Verified
+		primary, ok := lo.Find(emails, func(e *githubapi.UserEmail) bool {
+			return e.GetPrimary() && e.GetVerified()
 		})
 		if ok {
-			email = primary.Email
+			email = primary.GetEmail()
 		}
 	}
 
 	if email == "" {
-		return models.OAuthProfile{}, errors.New("no verified email provided by github")
+		return models.OAuthProfile{}, errNoEmail
 	}
 
 	return models.OAuthProfile{
 		Email:     email,
-		AvatarURL: httpsURL(user.AvatarURL),
+		AvatarURL: httpsURL(user.GetAvatarURL()),
 	}, nil
 }
 
@@ -84,8 +98,4 @@ func httpsURL(raw string) string {
 		return ""
 	}
 	return raw
-}
-
-func (r *Repo) AuthURL(state string) string {
-	return r.client.AuthURL(state)
 }

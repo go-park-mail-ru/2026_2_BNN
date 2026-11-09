@@ -6,16 +6,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-type SignUpRequest struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
-type SignInRequest struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Login        string    `json:"login"`

@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/escape"
 	"bnn/internal/pkg/notes"
 
 	uuid "github.com/satori/go.uuid"
@@ -71,15 +70,15 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 		ID:           uuid.NewV4(),
 		ParentNoteID: req.ParentNoteID,
 		CreatedBy:    userID,
-		Title:        escape.String(req.Title),
+		Title:        req.Title,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 	if req.Header != nil {
-		note.Header = escape.String(*req.Header)
+		note.Header = *req.Header
 	}
 	if req.Icon != nil {
-		note.Icon = escape.String(*req.Icon)
+		note.Icon = *req.Icon
 	}
 
 	if err := u.repo.CreateNote(ctx, note, nil); err != nil {
@@ -101,13 +100,13 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		return models.Note{}, models.ErrNoteNotFound
 	}
 
-	note.Title = escape.String(req.Title)
+	note.Title = req.Title
 	note.UpdatedAt = time.Now().UTC()
 	if req.Header != nil {
-		note.Header = escape.String(*req.Header)
+		note.Header = *req.Header
 	}
 	if req.Icon != nil {
-		note.Icon = escape.String(*req.Icon)
+		note.Icon = *req.Icon
 	}
 
 	oldBlocks, err := u.repo.ReadBlocks(ctx, noteID)
@@ -132,14 +131,9 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 			id = *b.ID
 		}
 
-		content, err := escape.JSON(b.Content)
-		if err != nil {
-			return models.Note{}, fmt.Errorf("%w: invalid block content", models.ErrValidation)
-		}
-
 		blocksToSave = append(blocksToSave, models.Block{
 			ID:        id,
-			Content:   content,
+			Content:   b.Content,
 			CreatedAt: note.UpdatedAt,
 			UpdatedAt: note.UpdatedAt,
 		})

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
 )
 
 type Client struct {
@@ -15,11 +17,22 @@ type Client struct {
 	baseURL string
 }
 
-func NewClient(config *oauth2.Config) *Client {
-	return &Client{
-		config:  config,
-		baseURL: "https://api.github.com",
+func NewClient(clientID, clientSecret, appBaseURL string) (*Client, error) {
+	callbackURL, err := url.JoinPath(appBaseURL, callbackPath)
+	if err != nil {
+		return nil, fmt.Errorf("build github callback url: %w", err)
 	}
+
+	return &Client{
+		config: &oauth2.Config{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			RedirectURL:  callbackURL,
+			Endpoint:     github.Endpoint,
+			Scopes:       []string{"read:user", "user:email"},
+		},
+		baseURL: apiURL,
+	}, nil
 }
 
 func (c *Client) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {

@@ -8,9 +8,10 @@ import (
 
 type contextKey string
 
-const RequestIDKey contextKey = "request_id"
-
-const userIDKey contextKey = "userID"
+const (
+	userIDKey    contextKey = "userID"
+	requestIDKey contextKey = "request_id"
+)
 
 func WithUserID(ctx context.Context, userID uuid.UUID) context.Context {
 	return context.WithValue(ctx, userIDKey, userID)
@@ -22,10 +23,10 @@ func GetUserID(ctx context.Context) (uuid.UUID, bool) {
 }
 
 func WithRequestID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, RequestIDKey, id)
+	return context.WithValue(ctx, requestIDKey, id)
 }
 
 func GetRequestID(ctx context.Context) (string, bool) {
-	id, ok := ctx.Value(RequestIDKey).(string)
+	id, ok := ctx.Value(requestIDKey).(string)
 	return id, ok
 }

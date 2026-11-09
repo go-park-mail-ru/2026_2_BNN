@@ -3,13 +3,17 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/notes"
 
 	uuid "github.com/satori/go.uuid"
 )
+
+const maxTitleLength = 255
 
 type Usecase struct {
 	repo notes.Repo
@@ -45,6 +49,9 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
+	if err := validateTitle(req.Title); err != nil {
+		return models.Note{}, err
+	}
 	if req.ParentNoteID != nil {
 		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
 		if err != nil {
@@ -81,6 +88,10 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 }
 
 func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+	if err := validateTitle(req.Title); err != nil {
+		return models.Note{}, err
+	}
+
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
@@ -182,4 +193,30 @@ func (u *Usecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) erro
 		return models.ErrNoteNotFound
 	}
 	return u.repo.DeleteNote(ctx, noteID)
+}
+
+func (u *Usecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrNoteNotFound
+	}
+	return u.repo.AddFavorite(ctx, userID, noteID)
+}
+
+func (u *Usecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	return u.repo.RemoveFavorite(ctx, userID, noteID)
+}
+
+func (u *Usecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	return u.repo.ReadFavorites(ctx, userID)
+}
+
+func validateTitle(title string) error {
+	if utf8.RuneCountInString(title) > maxTitleLength {
+		return fmt.Errorf("%w: title too long", models.ErrValidation)
+	}
+	return nil
 }

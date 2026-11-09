@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
+	"regexp"
 	"time"
 	"unicode/utf8"
 
@@ -15,7 +17,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"encoding/base32"
-	"net/url"
 
 	"github.com/dgryski/dgoogauth"
 	"github.com/skip2/go-qrcode"
@@ -26,7 +27,7 @@ const (
 	maxLoginLength    = 20
 	minPasswordLength = 8
 	maxPasswordLength = 128
-	issuerName        = "BNN_Notes"
+	issuerName        = "BNN"
 	githubProvider    = "github"
 )
 
@@ -42,6 +43,8 @@ var allowedAvatarTypes = map[string]string{
 	"image/png":  ".png",
 	"image/webp": ".webp",
 }
+
+var loginPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
 func NewUsecase(repo auth.Repo, storage auth.Storage, oauth auth.OAuthProvider, secret string) *Usecase {
 	return &Usecase{
@@ -216,6 +219,9 @@ func validateCredentials(login, password string) error {
 	if loginLength < minLoginLength || loginLength > maxLoginLength {
 		return fmt.Errorf("%w: invalid login length", models.ErrValidation)
 	}
+	if !loginPattern.MatchString(login) {
+		return fmt.Errorf("%w: invalid login characters", models.ErrValidation)
+	}
 
 	return validatePassword(password)
 }
@@ -283,15 +289,14 @@ func (u *Usecase) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, er
 		return nil, err
 	}
 
-	u2, _ := url.Parse("otpauth://totp")
-	u2.Path += fmt.Sprintf("/%s:%s", url.PathEscape(issuerName), url.PathEscape(user.Login))
+	otpURL := url.URL{
+		Scheme:   "otpauth",
+		Host:     "totp",
+		Path:     fmt.Sprintf("/%s:%s", issuerName, user.Login),
+		RawQuery: url.Values{"secret": {secret}, "issuer": {issuerName}}.Encode(),
+	}
 
-	params := url.Values{}
-	params.Add("secret", secret)
-	params.Add("issuer", issuerName)
-	u2.RawQuery = params.Encode()
-
-	png, err := qrcode.Encode(u2.String(), qrcode.Medium, 256)
+	png, err := qrcode.Encode(otpURL.String(), qrcode.Medium, 256)
 	if err != nil {
 		return nil, fmt.Errorf("generate qr: %w", err)
 	}

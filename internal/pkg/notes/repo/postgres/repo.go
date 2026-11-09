@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/database"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -49,11 +49,20 @@ var deleteNoteTagsQuery string
 //go:embed queries/create_note_tags.sql
 var createNoteTagsQuery string
 
+//go:embed queries/add_favorite.sql
+var addFavoriteQuery string
+
+//go:embed queries/remove_favorite.sql
+var removeFavoriteQuery string
+
+//go:embed queries/read_favorites.sql
+var readFavoritesQuery string
+
 type Repo struct {
-	db *pgxpool.Pool
+	db database.DB
 }
 
-func NewRepo(db *pgxpool.Pool) *Repo {
+func NewRepo(db database.DB) *Repo {
 	return &Repo{db: db}
 }
 
@@ -194,4 +203,42 @@ func (r *Repo) UpdateNote(ctx context.Context, note models.Note, blocks []models
 func (r *Repo) DeleteNote(ctx context.Context, noteID uuid.UUID) error {
 	_, err := r.db.Exec(ctx, deleteNoteQuery, noteID)
 	return err
+}
+
+func (r *Repo) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, addFavoriteQuery, userID, noteID)
+	if err != nil {
+		return fmt.Errorf("add favorite: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, removeFavoriteQuery, userID, noteID)
+	if err != nil {
+		return fmt.Errorf("remove favorite: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	rows, err := r.db.Query(ctx, readFavoritesQuery, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read favorites: %w", err)
+	}
+	defer rows.Close()
+
+	notes := make([]models.Note, 0)
+	for rows.Next() {
+		var note models.Note
+		err := rows.Scan(
+			&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title,
+			&note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan favorite note: %w", err)
+		}
+		notes = append(notes, note)
+	}
+	return notes, rows.Err()
 }

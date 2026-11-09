@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"crypto/rand"
 	"net/http"
 
 	"bnn/internal/models"
@@ -11,6 +12,7 @@ import (
 const (
 	accessCookieName     = "bnn_access"
 	refreshCookieName    = "bnn_refresh"
+	csrfCookieName       = "bnn_csrf"
 	refreshCookiePath    = "/api/auth"
 	twoFactorCookieName  = "bnn_2fa"
 	twoFactorCookiePath  = "/api/auth/2fa"
@@ -39,6 +41,15 @@ func setAuthCookies(ctx context.Context, tokens models.AuthTokens) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	cookies.Set(ctx, &http.Cookie{
+		Name:     csrfCookieName,
+		Value:    rand.Text(),
+		Path:     "/",
+		Expires:  tokens.RefreshExpiresAt,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func clearAuthCookies(ctx context.Context) {
@@ -56,6 +67,14 @@ func clearAuthCookies(ctx context.Context) {
 		Path:     refreshCookiePath,
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	cookies.Set(ctx, &http.Cookie{
+		Name:     csrfCookieName,
+		Path:     "/",
+		MaxAge:   -1,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})

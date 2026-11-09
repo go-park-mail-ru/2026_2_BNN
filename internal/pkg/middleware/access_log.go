@@ -24,10 +24,7 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(rw, r)
 
-			reqID, _ := r.Context().Value(RequestIDKey).(string)
-
-			logger.Info("HTTP Request",
-				"request_id", reqID,
+			logger.InfoContext(r.Context(), "HTTP Request",
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", rw.status,

@@ -12,6 +12,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	apiURL       = "https://api.github.com"
+	callbackPath = "/api/auth/github/callback"
+)
+
 type APIClient interface {
 	ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error)
 	GetJSON(ctx context.Context, token *oauth2.Token, path string, dst any) error

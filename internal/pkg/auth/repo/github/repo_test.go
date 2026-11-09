@@ -64,3 +64,20 @@ func TestReadProfile(t *testing.T) {
 		assert.Contains(t, err.Error(), "exchange github code")
 	})
 }
+
+func TestHTTPSURL(t *testing.T) {
+	tests := []struct {
+		raw      string
+		expected string
+	}{
+		{raw: "https://avatars.githubusercontent.com/u/1?v=4", expected: "https://avatars.githubusercontent.com/u/1?v=4"},
+		{raw: "javascript:alert(1)", expected: ""},
+		{raw: "http://example.com/a.png", expected: ""},
+		{raw: "", expected: ""},
+		{raw: "%zz", expected: ""},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, httpsURL(tt.raw), tt.raw)
+	}
+}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bnn/internal/pkg/logger"
 	"context"
 	"errors"
 	"log/slog"
@@ -26,6 +25,7 @@ import (
 	authUsecase "bnn/internal/pkg/auth/usecase"
 	"bnn/internal/pkg/cookies"
 	"bnn/internal/pkg/httpjson"
+	"bnn/internal/pkg/logger"
 	"bnn/internal/pkg/middleware"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
@@ -43,8 +43,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/samber/lo"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
 )
 
 const (
@@ -110,15 +108,15 @@ func main() {
 	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
 	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
 
-	githubOAuthConfig := &oauth2.Config{
-		ClientID:     mustEnv("GITHUB_CLIENT_ID"),
-		ClientSecret: mustEnv("GITHUB_CLIENT_SECRET"),
-		RedirectURL:  appBaseURL + "/api/auth/github/callback",
-		Endpoint:     github.Endpoint,
-		Scopes:       []string{"read:user", "user:email"},
+	githubClient, err := authGithub.NewClient(
+		mustEnv("GITHUB_CLIENT_ID"),
+		mustEnv("GITHUB_CLIENT_SECRET"),
+		appBaseURL,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to create github client", "error", err)
+		os.Exit(1)
 	}
-
-	githubClient := authGithub.NewClient(githubOAuthConfig)
 
 	githubRepo := authGithub.NewRepo(githubClient)
 
@@ -218,10 +216,9 @@ func main() {
 }
 
 func mustEnv(key string) string {
-	ctx := context.Background()
 	value := os.Getenv(key)
 	if value == "" {
-		slog.ErrorContext(ctx, "Environment variable is not set", "key", key)
+		slog.Error("Environment variable is not set", "key", key)
 		os.Exit(1)
 	}
 

@@ -1,7 +1,6 @@
 package swagger
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
@@ -24,9 +23,8 @@ func Register(router *mux.Router) {
 }
 
 func spec(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
 	w.Header().Set("Content-Type", "application/yaml")
 	if _, err := w.Write(docs.OpenAPI); err != nil {
-		slog.ErrorContext(ctx, "Failed to write spec", "error", err)
+		slog.ErrorContext(r.Context(), "Failed to write spec", "error", err)
 	}
 }

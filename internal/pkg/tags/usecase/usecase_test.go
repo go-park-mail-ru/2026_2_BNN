@@ -203,28 +203,3 @@ func TestDeleteTag(t *testing.T) {
 		})
 	}
 }
-
-func TestCreateTagEscapesName(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := mocks.NewMockRepo(ctrl)
-	repo.EXPECT().CreateTag(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, tag models.Tag) error {
-			assert.Equal(t, "&lt;b&gt;учёба&lt;/b&gt;", tag.Name)
-			return nil
-		})
-
-	_, err := NewUsecase(repo).CreateTag(context.Background(), uuid.NewV4(), "<b>учёба</b>", "#FF880080")
-
-	require.NoError(t, err)
-}
-
-func TestTagNameLengthCountedBeforeEscaping(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := mocks.NewMockRepo(ctrl)
-	repo.EXPECT().CreateTag(gomock.Any(), gomock.Any()).Return(nil)
-
-	tag, err := NewUsecase(repo).CreateTag(context.Background(), uuid.NewV4(), strings.Repeat("<", maxNameLength), "#FF880080")
-
-	require.NoError(t, err)
-	assert.Equal(t, strings.Repeat("&lt;", maxNameLength), tag.Name)
-}

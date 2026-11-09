@@ -7,16 +7,16 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Login        string    `json:"login"`
-	PasswordHash []byte    `json:"-"`
-	Avatar       string    `json:"avatar"`
-	TOTPSecret   string    `json:"-"`
-	Is2FAEnabled bool      `json:"is_2fa_enabled"`
-	IsExternal   bool      `json:"is_external"`
-	Email        string    `json:"email"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           uuid.UUID
+	Login        string
+	PasswordHash []byte
+	Avatar       string
+	TOTPSecret   string
+	Is2FAEnabled bool
+	IsExternal   bool
+	Email        string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type RefreshToken struct {

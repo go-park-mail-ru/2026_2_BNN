@@ -1,0 +1,1 @@
+DELETE FROM favorite WHERE user_id = $1 AND note_id = $2;

@@ -146,7 +146,7 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.UpdateNote404Response{}, nil
 	}
-	if errors.Is(err, models.ErrBlockNotFound) || errors.Is(err, models.ErrTagNotFound) {
+	if errors.Is(err, models.ErrBlockNotFound) || errors.Is(err, models.ErrTagNotFound) || errors.Is(err, models.ErrValidation) {
 		return api.UpdateNote400Response{}, nil
 	}
 	if err != nil {
@@ -238,4 +238,53 @@ func toAPITag(t models.Tag) api.Tag {
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
 	}
+}
+
+func (h *Handler) AddFavorite(ctx context.Context, req api.AddFavoriteRequestObject) (api.AddFavoriteResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.AddFavorite401Response{}, nil
+	}
+	noteID := uuid.UUID(req.Id)
+
+	err := h.uc.AddFavorite(ctx, userID, noteID)
+	if errors.Is(err, models.ErrNoteNotFound) {
+		return api.AddFavorite404Response{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return api.AddFavorite204Response{}, nil
+}
+
+func (h *Handler) RemoveFavorite(ctx context.Context, req api.RemoveFavoriteRequestObject) (api.RemoveFavoriteResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.RemoveFavorite401Response{}, nil
+	}
+	noteID := uuid.UUID(req.Id)
+
+	err := h.uc.RemoveFavorite(ctx, userID, noteID)
+	if err != nil {
+		return nil, err
+	}
+	return api.RemoveFavorite204Response{}, nil
+}
+
+func (h *Handler) ListFavorites(ctx context.Context, req api.ListFavoritesRequestObject) (api.ListFavoritesResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return api.ListFavorites401Response{}, nil
+	}
+
+	notesList, err := h.uc.GetFavorites(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	apiNotes := make([]api.Note, 0, len(notesList))
+	for _, n := range notesList {
+		apiNotes = append(apiNotes, toAPINote(n))
+	}
+	return api.ListFavorites200JSONResponse(apiNotes), nil
 }

@@ -41,7 +41,7 @@ func newTestRepo(t *testing.T, user, emails string) *Repo {
 			ClientSecret: "secret",
 			Endpoint:     oauth2.Endpoint{TokenURL: server.URL + "/token"},
 		},
-		apiURL: server.URL,
+		apiURL: server.URL + "/",
 	}
 }
 
@@ -100,11 +100,35 @@ func TestReadProfile(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	repo := NewRepo("client-id", "secret", "https://brandnewnotes.ru/api/auth/github/callback")
+	repo, err := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	require.NoError(t, err)
 
 	link := repo.AuthURL("state-1")
 
 	assert.True(t, strings.HasPrefix(link, "https://github.com/login/oauth/authorize?"))
 	assert.Contains(t, link, "client_id=client-id")
 	assert.Contains(t, link, "state=state-1")
+}
+
+func TestCallbackURL(t *testing.T) {
+	repo, err := NewRepo("client-id", "secret", "https://brandnewnotes.ru")
+	require.NoError(t, err)
+	assert.Equal(t, "https://brandnewnotes.ru/api/auth/github/callback", repo.config.RedirectURL)
+}
+
+func TestHTTPSURL(t *testing.T) {
+	tests := []struct {
+		raw      string
+		expected string
+	}{
+		{raw: "https://avatars.githubusercontent.com/u/1?v=4", expected: "https://avatars.githubusercontent.com/u/1?v=4"},
+		{raw: "javascript:alert(1)", expected: ""},
+		{raw: "http://example.com/a.png", expected: ""},
+		{raw: "", expected: ""},
+		{raw: "%zz", expected: ""},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, httpsURL(tt.raw), tt.raw)
+	}
 }

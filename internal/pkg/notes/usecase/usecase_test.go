@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"bnn/internal/models"
@@ -400,4 +401,17 @@ func TestDeleteNote(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestNoteTitleTooLong(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+	u := NewUsecase(repo)
+	long := strings.Repeat("я", maxTitleLength+1)
+
+	_, err := u.CreateNote(context.Background(), uuid.NewV4(), notes.CreateNoteRequest{Title: long})
+	assert.ErrorIs(t, err, models.ErrValidation)
+
+	_, err = u.UpdateNote(context.Background(), uuid.NewV4(), uuid.NewV4(), notes.UpdateNoteRequest{Title: long})
+	assert.ErrorIs(t, err, models.ErrValidation)
 }

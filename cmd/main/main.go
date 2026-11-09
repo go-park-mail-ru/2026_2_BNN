@@ -43,6 +43,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/samber/lo"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
 )
 
 const (
@@ -108,10 +110,25 @@ func main() {
 	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
 	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
 
-	githubRepo := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), appBaseURL)
+	githubOAuthConfig := &oauth2.Config{
+		ClientID:     mustEnv("GITHUB_CLIENT_ID"),
+		ClientSecret: mustEnv("GITHUB_CLIENT_SECRET"),
+		RedirectURL:  appBaseURL + "/api/auth/github/callback",
+		Endpoint:     github.Endpoint,
+		Scopes:       []string{"read:user", "user:email"},
+	}
+
+	githubClient := authGithub.NewClient(githubOAuthConfig)
+
+	githubRepo := authGithub.NewRepo(githubClient)
 
 	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, githubRepo, mustEnv("JWT_SECRET")),
+		authUsecase.NewUsecase(
+			authRepo.NewRepo(db),
+			avatarStorage,
+			githubRepo,
+			mustEnv("JWT_SECRET"),
+		),
 		frontendURL,
 	)
 

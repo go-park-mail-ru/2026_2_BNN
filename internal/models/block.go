@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -9,7 +8,7 @@ import (
 
 type Block struct {
 	ID        uuid.UUID
-	Content   json.RawMessage
+	Content   []byte
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

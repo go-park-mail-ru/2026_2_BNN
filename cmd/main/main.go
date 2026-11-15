@@ -152,6 +152,7 @@ func main() {
 	router.Use(cookies.Middleware)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.AccessLog(baseLogger))
+	router.Use(middleware.Recovery)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)

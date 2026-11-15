@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "bnn/internal/pkg/auth/delivery/grpc/gen;gen";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service Auth {
+  rpc SignUp(Credentials) returns (Session) {
+    option (google.api.http) = {
+      post: "/auth/signup"
+      body: "*"
+    };
+  }
+
+  rpc SignIn(Credentials) returns (Session) {
+    option (google.api.http) = {
+      post: "/auth/signin"
+      body: "*"
+    };
+  }
+
+  rpc VerifyTwoFactor(VerifyTwoFactorRequest) returns (Session) {
+    option (google.api.http) = {
+      post: "/auth/2fa/verify"
+      body: "*"
+    };
+  }
+
+  rpc Refresh(RefreshRequest) returns (Tokens) {
+    option (google.api.http) = {
+      post: "/auth/refresh"
+      body: "*"
+    };
+  }
+
+  rpc Logout(RefreshRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/auth/logout"
+      body: "*"
+    };
+  }
+
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {
+    option (google.api.http) = {
+      post: "/auth/authenticate"
+      body: "*"
+    };
+  }
+
+  rpc GetUser(UserRequest) returns (User) {
+    option (google.api.http) = {
+      get: "/auth/users/{user_id}"
+    };
+  }
+
+  rpc ChangePassword(ChangePasswordRequest) returns (Tokens) {
+    option (google.api.http) = {
+      put: "/auth/users/{user_id}/password"
+      body: "*"
+    };
+  }
+
+  rpc UpdateAvatar(UpdateAvatarRequest) returns (User) {
+    option (google.api.http) = {
+      put: "/auth/users/{user_id}/avatar"
+      body: "*"
+    };
+  }
+
+  rpc Generate2FA(UserRequest) returns (Generate2FAResponse) {
+    option (google.api.http) = {
+      post: "/auth/users/{user_id}/2fa/generate"
+    };
+  }
+
+  rpc Enable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/auth/users/{user_id}/2fa/enable"
+      body: "*"
+    };
+  }
+
+  rpc Disable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/auth/users/{user_id}/2fa/disable"
+      body: "*"
+    };
+  }
+
+  rpc GetOAuthURL(OAuthURLRequest) returns (OAuthURLResponse) {
+    option (google.api.http) = {
+      get: "/auth/oauth/{provider}/url"
+    };
+  }
+
+  rpc HandleOAuthCallback(OAuthCallbackRequest) returns (Session) {
+    option (google.api.http) = {
+      post: "/auth/oauth/{provider}/callback"
+      body: "*"
+    };
+  }
+}
+
+message User {
+  string id = 1;
+  string login = 2;
+  string avatar = 3;
+  string email = 4;
+  bool is_external = 5;
+  bool is_2fa_enabled = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message Tokens {
+  string access_token = 1;
+  google.protobuf.Timestamp access_expires_at = 2;
+  string refresh_token = 3;
+  google.protobuf.Timestamp refresh_expires_at = 4;
+  string two_factor_token = 5;
+  google.protobuf.Timestamp two_factor_expires_at = 6;
+}
+
+message Session {
+  User user = 1;
+  Tokens tokens = 2;
+}
+
+message Credentials {
+  string login = 1;
+  string password = 2;
+}
+
+message VerifyTwoFactorRequest {
+  string two_factor_token = 1;
+  string code = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message AuthenticateRequest {
+  string access_token = 1;
+}
+
+message AuthenticateResponse {
+  string user_id = 1;
+}
+
+message UserRequest {
+  string user_id = 1;
+}
+
+message ChangePasswordRequest {
+  string user_id = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message UpdateAvatarRequest {
+  string user_id = 1;
+  bytes data = 2;
+  string content_type = 3;
+}
+
+message Generate2FAResponse {
+  bytes qr_png = 1;
+}
+
+message TwoFactorCodeRequest {
+  string user_id = 1;
+  string code = 2;
+}
+
+message OAuthURLRequest {
+  string provider = 1;
+  string state = 2;
+}
+
+message OAuthURLResponse {
+  string url = 1;
+}
+
+message OAuthCallbackRequest {
+  string provider = 1;
+  string code = 2;
+}

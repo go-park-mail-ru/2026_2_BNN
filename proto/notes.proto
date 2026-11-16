@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package notes;
+
+option go_package = "bnn/internal/pkg/notes/delivery/grpc/gen;gen";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "proto/tags.proto";
+
+service Notes {
+  rpc GetNote(NoteRequest) returns (Note) {
+    option (google.api.http) = {
+      get: "/users/{user_id}/notes/{note_id}"
+    };
+  }
+
+  rpc GetNotes(GetNotesRequest) returns (NotesResponse) {
+    option (google.api.http) = {
+      get: "/users/{user_id}/notes"
+    };
+  }
+
+  rpc CreateNote(CreateNoteRequest) returns (Note) {
+    option (google.api.http) = {
+      post: "/users/{user_id}/notes"
+      body: "*"
+    };
+  }
+
+  rpc UpdateNote(UpdateNoteRequest) returns (Note) {
+    option (google.api.http) = {
+      put: "/users/{user_id}/notes/{note_id}"
+      body: "*"
+    };
+  }
+
+  rpc DeleteNote(NoteRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/users/{user_id}/notes/{note_id}"
+    };
+  }
+
+  rpc AddFavorite(NoteRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      put: "/users/{user_id}/favorites/{note_id}"
+    };
+  }
+
+  rpc RemoveFavorite(NoteRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/users/{user_id}/favorites/{note_id}"
+    };
+  }
+
+  rpc GetFavorites(UserRequest) returns (NotesResponse) {
+    option (google.api.http) = {
+      get: "/users/{user_id}/favorites"
+    };
+  }
+}
+
+message Note {
+  string id = 1;
+  optional string parent_note_id = 2;
+  repeated Block blocks = 3;
+  repeated tags.Tag tags = 4;
+  string created_by = 5;
+  string title = 6;
+  string header = 7;
+  string icon = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message Block {
+  string id = 1;
+  bytes content = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message NotesResponse {
+  repeated Note notes = 1;
+}
+
+message UserRequest {
+  string user_id = 1;
+}
+
+message NoteRequest {
+  string user_id = 1;
+  string note_id = 2;
+}
+
+message GetNotesRequest {
+  string user_id = 1;
+  int64 limit = 2;
+  int64 offset = 3;
+}
+
+message CreateNoteRequest {
+  string user_id = 1;
+  string title = 2;
+  optional string parent_note_id = 3;
+  optional string header = 4;
+  optional string icon = 5;
+}
+
+message UpdateNoteRequest {
+  string user_id = 1;
+  string note_id = 2;
+  string title = 3;
+  optional string header = 4;
+  optional string icon = 5;
+  repeated BlockInput blocks = 6;
+  TagIDs tag_ids = 7;
+}
+
+message BlockInput {
+  optional string id = 1;
+  bytes content = 2;
+}
+
+message TagIDs {
+  repeated string ids = 1;
+}

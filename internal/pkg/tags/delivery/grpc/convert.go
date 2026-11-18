@@ -39,3 +39,16 @@ func TagFromProto(t *gen.Tag) (models.Tag, error) {
 		UpdatedAt: t.GetUpdatedAt().AsTime(),
 	}, nil
 }
+
+func TagsFromProto(list []*gen.Tag) ([]models.Tag, error) {
+	result := make([]models.Tag, 0, len(list))
+	for _, t := range list {
+		tag, err := TagFromProto(t)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, tag)
+	}
+
+	return result, nil
+}

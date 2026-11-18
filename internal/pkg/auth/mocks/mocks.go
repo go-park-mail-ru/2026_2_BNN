@@ -116,17 +116,18 @@ func (mr *MockUsecaseMockRecorder) Generate2FA(ctx, userID any) *gomock.Call {
 }
 
 // GetOAuthURL mocks base method.
-func (m *MockUsecase) GetOAuthURL(provider, state string) string {
+func (m *MockUsecase) GetOAuthURL(ctx context.Context, provider, state string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOAuthURL", provider, state)
+	ret := m.ctrl.Call(m, "GetOAuthURL", ctx, provider, state)
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetOAuthURL indicates an expected call of GetOAuthURL.
-func (mr *MockUsecaseMockRecorder) GetOAuthURL(provider, state any) *gomock.Call {
+func (mr *MockUsecaseMockRecorder) GetOAuthURL(ctx, provider, state any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuthURL", reflect.TypeOf((*MockUsecase)(nil).GetOAuthURL), provider, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuthURL", reflect.TypeOf((*MockUsecase)(nil).GetOAuthURL), ctx, provider, state)
 }
 
 // GetUser mocks base method.

@@ -719,9 +719,9 @@ func TestGitHubLogin(t *testing.T) {
 	uc := mocks.NewMockUsecase(ctrl)
 
 	var state string
-	uc.EXPECT().GetOAuthURL("github", gomock.Any()).DoAndReturn(func(provider, s string) string {
+	uc.EXPECT().GetOAuthURL(gomock.Any(), "github", gomock.Any()).DoAndReturn(func(_ context.Context, provider, s string) (string, error) {
 		state = s
-		return "https://github.com/login/oauth/authorize?state=" + s
+		return "https://github.com/login/oauth/authorize?state=" + s, nil
 	})
 
 	var resp api.GitHubLoginResponseObject

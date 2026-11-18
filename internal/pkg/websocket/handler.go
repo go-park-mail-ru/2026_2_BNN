@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -12,7 +13,7 @@ import (
 )
 
 type TokenValidator interface {
-	ValidateAccessToken(tokenStr string) (uuid.UUID, error)
+	Authenticate(ctx context.Context, accessToken string) (uuid.UUID, error)
 }
 
 type Handler struct {
@@ -49,7 +50,7 @@ func (h *Handler) ServeNoteWS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		uid, err := h.validator.ValidateAccessToken(tokenStr)
+		uid, err := h.validator.Authenticate(r.Context(), tokenStr)
 		if err != nil {
 			slog.WarnContext(r.Context(), "WS auth failed", "error", err)
 			http.Error(w, "unauthorized: invalid token", http.StatusUnauthorized)

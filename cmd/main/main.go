@@ -17,6 +17,7 @@ import (
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
 	"bnn/internal/pkg/database"
 	"bnn/internal/pkg/swagger"
+	ws "bnn/internal/pkg/websocket"
 
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
@@ -114,15 +115,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	authHandler := authDelivery.NewHandler(
-		authUsecase.NewUsecase(
-			authRepo.NewRepo(db),
-			avatarStorage,
-			githubRepo,
-			mustEnv("JWT_SECRET"),
-		),
-		frontendURL,
+	authUC := authUsecase.NewUsecase(
+		authRepo.NewRepo(db),
+		avatarStorage,
+		githubRepo,
+		mustEnv("JWT_SECRET"),
 	)
+
+	authHandler := authDelivery.NewHandler(authUC, frontendURL)
 
 	notesHandler := notesDelivery.NewHandler(
 		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
@@ -148,11 +148,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	wsRepo := ws.NewPostgresRepo(db)
+	wsHub := ws.NewHub(wsRepo)
+	wsCtx, wsCancel := context.WithCancel(context.Background())
+	defer wsCancel()
+	go wsHub.Run(wsCtx)
+
+	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), authUC)
+
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.AccessLog(baseLogger))
 	router.Use(middleware.Recovery)
+
+	wsRouter := router.PathPrefix("/api/ws").Subrouter()
+	wsRouter.HandleFunc("/notes/{noteID}", wsHandler.ServeNoteWS).Methods(http.MethodGet)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
@@ -198,6 +209,8 @@ func main() {
 
 	sig := <-signalCh
 	slog.InfoContext(ctx, "Received signal, shutting down", "signal", sig)
+
+	wsCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()

@@ -1,0 +1,9 @@
+$kind: http-request
+name: http://localhost:5458/api/auth/signup
+description: ""
+url: http://localhost:5458/api/auth/signup
+method: POST
+body:
+  type: json
+  content: '{"login":"liza123","password":"pass12345678"}'
+order: 1000

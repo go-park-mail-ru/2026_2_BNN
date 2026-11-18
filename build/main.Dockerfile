@@ -1,6 +1,8 @@
 # Этап сборки
 FROM golang:1.26-alpine AS builder
 
+ARG SERVICE=main
+
 RUN apk add --no-cache ca-certificates
 
 WORKDIR /src
@@ -10,7 +12,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/bnn ./cmd/main
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/bnn ./cmd/${SERVICE}
 
 # Этап запуска
 FROM scratch AS runner
@@ -25,7 +27,5 @@ ENV TZ="Europe/Moscow"
 ENV ZONEINFO=/zoneinfo.zip
 
 USER 65534:65534
-
-EXPOSE 5458
 
 ENTRYPOINT ["./bnn"]

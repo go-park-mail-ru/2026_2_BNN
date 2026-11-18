@@ -284,7 +284,10 @@ func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObj
 	state := uuid.NewV4().String()
 	setOAuthStateCookie(ctx, state)
 
-	location := h.uc.GetOAuthURL(githubProvider, state)
+	location, err := h.uc.GetOAuthURL(ctx, githubProvider, state)
+	if err != nil {
+		return nil, err
+	}
 	return api.GitHubLogin307Response{Headers: api.GitHubLogin307ResponseHeaders{Location: location}}, nil
 }
 

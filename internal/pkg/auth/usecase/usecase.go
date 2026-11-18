@@ -380,11 +380,11 @@ func checkCode(secret, code string) bool {
 	return err == nil && ok
 }
 
-func (u *Usecase) GetOAuthURL(provider string, state string) string {
+func (u *Usecase) GetOAuthURL(_ context.Context, provider, state string) (string, error) {
 	if provider != githubProvider {
-		return ""
+		return "", models.ErrValidation
 	}
-	return u.oauth.AuthURL(state)
+	return u.oauth.AuthURL(state), nil
 }
 
 func (u *Usecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {

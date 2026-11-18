@@ -21,7 +21,7 @@ type Usecase interface {
 	UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error)
 	Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error)
 	Enable2FA(ctx context.Context, userID uuid.UUID, code string) error
-	GetOAuthURL(provider string, state string) string
+	GetOAuthURL(ctx context.Context, provider, state string) (string, error)
 	HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error)
 	Disable2FA(ctx context.Context, userID uuid.UUID, code string) error
 	VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error)

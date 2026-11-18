@@ -1,1 +1,128 @@
 package client
+
+import (
+	"context"
+
+	"bnn/internal/models"
+	"bnn/internal/pkg/grpcconv"
+	"bnn/internal/pkg/grpcerr"
+	"bnn/internal/pkg/notes"
+	notesgrpc "bnn/internal/pkg/notes/delivery/grpc"
+	"bnn/internal/pkg/notes/delivery/grpc/gen"
+
+	"github.com/samber/lo"
+	uuid "github.com/satori/go.uuid"
+	"google.golang.org/grpc"
+)
+
+var _ notes.Usecase = (*Client)(nil)
+
+type Client struct {
+	client gen.NotesClient
+}
+
+func NewClient(conn grpc.ClientConnInterface) *Client {
+	return &Client{client: gen.NewNotesClient(conn)}
+}
+
+func (c *Client) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
+	resp, err := c.client.GetNote(ctx, &gen.NoteRequest{UserId: userID.String(), NoteId: noteID.String()})
+	if err != nil {
+		return models.Note{}, grpcerr.FromStatus(err)
+	}
+
+	return fullNoteFromProto(resp)
+}
+
+func (c *Client) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
+	resp, err := c.client.GetNotes(ctx, &gen.GetNotesRequest{
+		UserId: userID.String(),
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		return nil, grpcerr.FromStatus(err)
+	}
+
+	return notesgrpc.NotesFromProto(resp.GetNotes())
+}
+
+func (c *Client) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
+	resp, err := c.client.CreateNote(ctx, &gen.CreateNoteRequest{
+		UserId:       userID.String(),
+		Title:        req.Title,
+		ParentNoteId: grpcconv.OptionalUUIDToString(req.ParentNoteID),
+		Header:       req.Header,
+		Icon:         req.Icon,
+	})
+	if err != nil {
+		return models.Note{}, grpcerr.FromStatus(err)
+	}
+
+	return notesgrpc.NoteFromProto(resp)
+}
+
+func (c *Client) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
+	in := &gen.UpdateNoteRequest{
+		UserId: userID.String(),
+		NoteId: noteID.String(),
+		Title:  req.Title,
+		Header: req.Header,
+		Icon:   req.Icon,
+		Blocks: lo.Map(req.Blocks, func(b notes.BlockInput, _ int) *gen.BlockInput {
+			return &gen.BlockInput{Id: grpcconv.OptionalUUIDToString(b.ID), Content: b.Content}
+		}),
+	}
+	if req.TagIDs != nil {
+		in.TagIds = &gen.TagIDs{
+			Ids: lo.Map(req.TagIDs, func(id uuid.UUID, _ int) string { return id.String() }),
+		}
+	}
+
+	resp, err := c.client.UpdateNote(ctx, in)
+	if err != nil {
+		return models.Note{}, grpcerr.FromStatus(err)
+	}
+
+	return fullNoteFromProto(resp)
+}
+
+func (c *Client) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := c.client.DeleteNote(ctx, &gen.NoteRequest{UserId: userID.String(), NoteId: noteID.String()})
+	return grpcerr.FromStatus(err)
+}
+
+func (c *Client) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := c.client.AddFavorite(ctx, &gen.NoteRequest{UserId: userID.String(), NoteId: noteID.String()})
+	return grpcerr.FromStatus(err)
+}
+
+func (c *Client) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := c.client.RemoveFavorite(ctx, &gen.NoteRequest{UserId: userID.String(), NoteId: noteID.String()})
+	return grpcerr.FromStatus(err)
+}
+
+func (c *Client) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error) {
+	resp, err := c.client.GetFavorites(ctx, &gen.UserRequest{UserId: userID.String()})
+	if err != nil {
+		return nil, grpcerr.FromStatus(err)
+	}
+
+	return notesgrpc.NotesFromProto(resp.GetNotes())
+}
+
+func fullNoteFromProto(n *gen.Note) (models.Note, error) {
+	note, err := notesgrpc.NoteFromProto(n)
+	if err != nil {
+		return models.Note{}, err
+	}
+
+	if note.Blocks == nil {
+		note.Blocks = []models.Block{}
+	}
+	if note.Tags == nil {
+		note.Tags = []models.Tag{}
+	}
+
+	return note, nil
+}

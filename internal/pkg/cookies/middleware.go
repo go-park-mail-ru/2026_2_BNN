@@ -1,7 +1,10 @@
 package cookies
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"net"
 	"net/http"
 )
 
@@ -9,6 +12,22 @@ type writer struct {
 	http.ResponseWriter
 	store       *store
 	wroteHeader bool
+}
+
+func (w *writer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("underlying ResponseWriter does not implement http.Hijacker")
+	}
+
+	if !w.wroteHeader {
+		w.wroteHeader = true
+		for _, c := range w.store.cookies {
+			http.SetCookie(w.ResponseWriter, c)
+		}
+	}
+
+	return hijacker.Hijack()
 }
 
 func (w *writer) WriteHeader(status int) {

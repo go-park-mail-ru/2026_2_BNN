@@ -28,6 +28,10 @@ func (u *Usecase) newToken(userID uuid.UUID, audience string, expiresAt time.Tim
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(u.secret)
 }
 
+func (u *Usecase) ValidateAccessToken(tokenStr string) (uuid.UUID, error) {
+	return u.parseToken(tokenStr, accessAudience)
+}
+
 func (u *Usecase) parseToken(token, audience string) (uuid.UUID, error) {
 	var claims jwt.RegisteredClaims
 

@@ -780,8 +780,12 @@ func TestGetOAuthURL(t *testing.T) {
 
 	u := NewUsecase(nil, nil, oauth, secret)
 
-	assert.Equal(t, "https://github.com/login", u.GetOAuthURL("github", "state-1"))
-	assert.Empty(t, u.GetOAuthURL("google", "state-1"))
+	url, err := u.GetOAuthURL(context.Background(), "github", "state-1")
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/login", url)
+
+	_, err = u.GetOAuthURL(context.Background(), "google", "state-1")
+	assert.ErrorIs(t, err, models.ErrValidation)
 }
 
 func TestHandleOAuthCallback(t *testing.T) {

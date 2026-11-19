@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/notes"
@@ -34,6 +35,7 @@ func TestGetNote(t *testing.T) {
 			name: "ok",
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(blocks, nil)
 				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(tags, nil)
 			},
@@ -46,16 +48,17 @@ func TestGetNote(t *testing.T) {
 			expectedErr: models.ErrNoteNotFound,
 		},
 		{
-			name: "foreign note",
+			name: "foreign note (IDOR)",
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: uuid.NewV4()}, nil)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, userID).Return("", models.ErrNoteNotFound)
 			},
 			expectedErr: models.ErrNoteNotFound,
 		},
 		{
 			name: "read blocks error",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, errDB)
 			},
 			expectedErr: errDB,
@@ -63,7 +66,7 @@ func TestGetNote(t *testing.T) {
 		{
 			name: "read tags error",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(blocks, nil)
 				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, errDB)
 			},
@@ -87,6 +90,51 @@ func TestGetNote(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, blocks, note.Blocks)
 			assert.Equal(t, tags, note.Tags)
+		})
+	}
+}
+
+func TestGetNoteUpdatedAt(t *testing.T) {
+	noteID := uuid.NewV4()
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name        string
+		prepare     func(repo *mocks.MockRepo)
+		expected    time.Time
+		expectedErr error
+	}{
+		{
+			name: "ok",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().GetNoteUpdatedAt(gomock.Any(), noteID).Return(now, nil)
+			},
+			expected: now,
+		},
+		{
+			name: "error",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().GetNoteUpdatedAt(gomock.Any(), noteID).Return(time.Time{}, errDB)
+			},
+			expectedErr: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			tt.prepare(repo)
+
+			res, err := NewUsecase(repo).GetNoteUpdatedAt(context.Background(), noteID)
+
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, res)
 		})
 	}
 }
@@ -211,7 +259,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "set tags",
 			req:  notes.UpdateNoteRequest{Title: "t", TagIDs: []uuid.UUID{tagID}},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().ReadUserTags(gomock.Any(), userID, []uuid.UUID{tagID}).Return([]models.Tag{tag}, nil)
 				repo.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
@@ -222,7 +270,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "tags not sent keep old",
 			req:  notes.UpdateNoteRequest{Title: "t"},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return([]models.Tag{tag}, nil)
 				repo.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
@@ -233,7 +281,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "foreign tag",
 			req:  notes.UpdateNoteRequest{Title: "t", TagIDs: []uuid.UUID{tagID}},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().ReadUserTags(gomock.Any(), userID, []uuid.UUID{tagID}).Return([]models.Tag{}, nil)
 			},
@@ -243,7 +291,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "read tags error",
 			req:  notes.UpdateNoteRequest{Title: "t", TagIDs: []uuid.UUID{tagID}},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().ReadUserTags(gomock.Any(), userID, []uuid.UUID{tagID}).Return(nil, errDB)
 			},
@@ -253,16 +301,17 @@ func TestUpdateNote(t *testing.T) {
 			name: "foreign block",
 			req:  notes.UpdateNoteRequest{Title: "t", Blocks: []notes.BlockInput{{ID: &blockID}}},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 			},
 			expectedErr: models.ErrBlockNotFound,
 		},
 		{
-			name: "foreign note",
+			name: "foreign note (IDOR)",
 			req:  notes.UpdateNoteRequest{Title: "t"},
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: uuid.NewV4()}, nil)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, userID).Return("", models.ErrNoteNotFound)
 			},
 			expectedErr: models.ErrNoteNotFound,
 		},
@@ -278,7 +327,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "read blocks error",
 			req:  notes.UpdateNoteRequest{Title: "t"},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, errDB)
 			},
 			expectedErr: errDB,
@@ -287,7 +336,7 @@ func TestUpdateNote(t *testing.T) {
 			name: "save error",
 			req:  notes.UpdateNoteRequest{Title: "t"},
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
 				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
 				repo.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errDB)
@@ -325,7 +374,7 @@ func TestUpdateNoteBlocks(t *testing.T) {
 	header := "Шапка"
 	icon := "📒"
 
-	repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: userID}, nil)
+	repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(models.Note{ID: noteID, CreatedBy: userID}, nil).Times(2)
 	repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return([]models.Block{{ID: keptID}, {ID: removedID}}, nil)
 	repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
 	repo.EXPECT().UpdateNote(gomock.Any(), gomock.Any(), gomock.Any(), []uuid.UUID{removedID}).
@@ -408,10 +457,145 @@ func TestNoteTitleTooLong(t *testing.T) {
 	repo := mocks.NewMockRepo(ctrl)
 	u := NewUsecase(repo)
 	long := strings.Repeat("я", maxTitleLength+1)
+	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
 
-	_, err := u.CreateNote(context.Background(), uuid.NewV4(), notes.CreateNoteRequest{Title: long})
+	_, err := u.CreateNote(context.Background(), userID, notes.CreateNoteRequest{Title: long})
 	assert.ErrorIs(t, err, models.ErrValidation)
 
-	_, err = u.UpdateNote(context.Background(), uuid.NewV4(), uuid.NewV4(), notes.UpdateNoteRequest{Title: long})
+	_, err = u.UpdateNote(context.Background(), userID, noteID, notes.UpdateNoteRequest{Title: long})
 	assert.ErrorIs(t, err, models.ErrValidation)
+}
+
+func TestGetNote_CheckAccess(t *testing.T) {
+	userID := uuid.NewV4()
+	foreignUserID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	own := models.Note{ID: noteID, CreatedBy: userID}
+
+	tests := []struct {
+		name        string
+		userID      uuid.UUID
+		prepare     func(repo *mocks.MockRepo)
+		expectedErr error
+	}{
+		{
+			name:   "owner access",
+			userID: userID,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
+				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
+				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
+			},
+		},
+		{
+			name:   "collaborator editor access",
+			userID: foreignUserID,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, foreignUserID).Return("editor", nil)
+				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
+				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
+			},
+		},
+		{
+			name:   "collaborator viewer access",
+			userID: foreignUserID,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(2)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, foreignUserID).Return("viewer", nil)
+				repo.EXPECT().ReadBlocks(gomock.Any(), noteID).Return(nil, nil)
+				repo.EXPECT().ReadNoteTags(gomock.Any(), noteID).Return(nil, nil)
+			},
+		},
+		{
+			name:   "no access (IDOR)",
+			userID: foreignUserID,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(1)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, foreignUserID).Return("", models.ErrNoteNotFound)
+			},
+			expectedErr: models.ErrNoteNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			tt.prepare(repo)
+
+			_, err := NewUsecase(repo).GetNote(context.Background(), tt.userID, noteID)
+
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestUpdateNote_ViewerCannotEdit(t *testing.T) {
+	userID := uuid.NewV4()
+	//ownerID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	own := models.Note{ID: noteID, CreatedBy: uuid.NewV4()}
+
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepo(ctrl)
+
+	repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil).Times(1)
+	repo.EXPECT().ReadCollaboratorRole(gomock.Any(), noteID, userID).Return("viewer", nil)
+
+	_, err := NewUsecase(repo).UpdateNote(context.Background(), userID, noteID, notes.UpdateNoteRequest{Title: "new"})
+
+	assert.ErrorIs(t, err, models.ErrForbidden)
+}
+
+func TestAddCollaborator(t *testing.T) {
+	ownerID := uuid.NewV4()
+	noteID := uuid.NewV4()
+	targetID := uuid.NewV4()
+	own := models.Note{ID: noteID, CreatedBy: ownerID}
+
+	tests := []struct {
+		name        string
+		userID      uuid.UUID
+		prepare     func(repo *mocks.MockRepo)
+		expectedErr error
+	}{
+		{
+			name:   "owner adds collaborator",
+			userID: ownerID,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+				repo.EXPECT().AddCollaborator(gomock.Any(), noteID, targetID, "editor").Return(nil)
+			},
+		},
+		{
+			name:   "not owner tries to add",
+			userID: uuid.NewV4(),
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().ReadNote(gomock.Any(), noteID).Return(own, nil)
+			},
+			expectedErr: models.ErrNoteNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			tt.prepare(repo)
+
+			err := NewUsecase(repo).AddCollaborator(context.Background(), tt.userID, noteID, targetID, "editor")
+
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

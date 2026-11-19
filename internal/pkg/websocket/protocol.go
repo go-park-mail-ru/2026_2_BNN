@@ -17,7 +17,7 @@ type Message struct {
 	Type    string          `json:"type"`
 	NoteID  uuid.UUID       `json:"note_id"`
 	UserID  uuid.UUID       `json:"user_id,omitempty"`
-	Payload json.RawMessage `json:"payload"`
+	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
 type CursorPayload struct {

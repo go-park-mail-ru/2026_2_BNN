@@ -1,9 +1,9 @@
 $kind: http-request
 name: http://localhost:5458/api/auth/signup
 description: ""
-url: http://localhost:5458/api/auth/signup
-method: POST
+url: http://localhost:5458/api/notes/all
+method: GET
 body:
   type: json
-  content: '{"login":"liza123","password":"pass12345678"}'
+  content: ""
 order: 1000

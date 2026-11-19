@@ -124,9 +124,8 @@ func main() {
 
 	authHandler := authDelivery.NewHandler(authUC, frontendURL)
 
-	notesHandler := notesDelivery.NewHandler(
-		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
-	)
+	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db))
+	notesHandler := notesDelivery.NewHandler(notesUC)
 
 	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, mustEnv("S3_ATTACHMENTS_BUCKET"))
 	if err != nil {
@@ -148,13 +147,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	wsRepo := ws.NewPostgresRepo(db)
-	wsHub := ws.NewHub(wsRepo)
+	wsHub := ws.NewHub(notesUC)
 	wsCtx, wsCancel := context.WithCancel(context.Background())
 	defer wsCancel()
 	go wsHub.Run(wsCtx)
 
-	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), authUC)
+	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesUC)
 
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
@@ -162,12 +160,11 @@ func main() {
 	router.Use(middleware.AccessLog(baseLogger))
 	router.Use(middleware.Recovery)
 
-	wsRouter := router.PathPrefix("/api/ws").Subrouter()
-	wsRouter.HandleFunc("/notes/{noteID}", wsHandler.ServeNoteWS).Methods(http.MethodGet)
-
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
 	apiRouter.Use(middleware.MaxBytesMiddleware(MaxRequestSize20MB))
+
+	apiRouter.HandleFunc("/ws/notes/{noteID}", wsHandler.ServeNoteWS).Methods(http.MethodGet)
 
 	authapi.HandlerFromMux(authapi.NewStrictHandlerWithOptions(authHandler, nil, authapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpjson.RequestError,

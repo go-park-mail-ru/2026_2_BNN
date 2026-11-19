@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/database"
@@ -241,4 +242,59 @@ func (r *Repo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.No
 		notes = append(notes, note)
 	}
 	return notes, rows.Err()
+}
+
+func (r *Repo) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	var updatedAt time.Time
+	query := `SELECT updated_at FROM notes WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, noteID).Scan(&updatedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return updatedAt, nil
+}
+
+func (r *Repo) AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error {
+	query := `
+		INSERT INTO note_collaborators (note_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (note_id, user_id) 
+		DO UPDATE SET role = EXCLUDED.role
+	`
+	_, err := r.db.Exec(ctx, query, noteID, userID, role)
+	return err
+}
+
+func (r *Repo) RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error {
+	query := `DELETE FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
+	_, err := r.db.Exec(ctx, query, noteID, userID)
+	return err
+}
+
+func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error) {
+	var role string
+	query := `SELECT role FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
+	err := r.db.QueryRow(ctx, query, noteID, userID).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", models.ErrNoteNotFound
+		}
+		return "", err
+	}
+	return role, nil
+}
+
+func (r *Repo) HasAccess(ctx context.Context, noteID, userID uuid.UUID) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			-- Пользователь является владельцем
+			SELECT 1 FROM notes WHERE id = $1 AND created_by = $2
+			UNION
+			-- Пользователь является участником
+			SELECT 1 FROM note_collaborators WHERE note_id = $1 AND user_id = $2
+		)
+	`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, noteID, userID).Scan(&exists)
+	return exists, err
 }

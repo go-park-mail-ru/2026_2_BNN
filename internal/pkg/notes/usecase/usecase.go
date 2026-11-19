@@ -24,13 +24,15 @@ func NewUsecase(repo notes.Repo) *Usecase {
 }
 
 func (u *Usecase) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
+	_, err := u.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return models.Note{}, err
+	}
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
 	}
-	if note.CreatedBy != userID {
-		return models.Note{}, models.ErrNoteNotFound
-	}
+
 	blocks, err := u.repo.ReadBlocks(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
@@ -91,13 +93,17 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 	if err := validateTitle(req.Title); err != nil {
 		return models.Note{}, err
 	}
+	role, err := u.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return models.Note{}, err
+	}
+	if role == "viewer" {
+		return models.Note{}, models.ErrForbidden
+	}
 
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
-	}
-	if note.CreatedBy != userID {
-		return models.Note{}, models.ErrNoteNotFound
 	}
 
 	note.Title = req.Title
@@ -219,4 +225,50 @@ func validateTitle(title string) error {
 		return fmt.Errorf("%w: title too long", models.ErrValidation)
 	}
 	return nil
+}
+
+func (u *Usecase) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	return u.repo.GetNoteUpdatedAt(ctx, noteID)
+}
+
+func (u *Usecase) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return "", err
+	}
+
+	if note.CreatedBy == userID {
+		return "owner", nil
+	}
+
+	role, err := u.repo.ReadCollaboratorRole(ctx, noteID, userID)
+	if err != nil {
+		return "", models.ErrNoteNotFound
+	}
+
+	return role, nil
+}
+
+func (u *Usecase) AddCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID, role string) error {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrNoteNotFound
+	}
+
+	return u.repo.AddCollaborator(ctx, noteID, targetUserID, role)
+}
+
+func (u *Usecase) RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrNoteNotFound
+	}
+
+	return u.repo.RemoveCollaborator(ctx, noteID, targetUserID)
 }

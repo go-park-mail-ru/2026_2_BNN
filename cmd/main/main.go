@@ -10,38 +10,27 @@ import (
 	"syscall"
 	"time"
 
+	attachmentsClient "bnn/internal/pkg/attachments/client"
 	attachmentsDelivery "bnn/internal/pkg/attachments/delivery/http"
 	attachmentsapi "bnn/internal/pkg/attachments/delivery/http/api"
-	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
-	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
-	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
-	"bnn/internal/pkg/database"
-	"bnn/internal/pkg/swagger"
-	ws "bnn/internal/pkg/websocket"
-
+	authClient "bnn/internal/pkg/auth/client"
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
-	authRepo "bnn/internal/pkg/auth/repo/postgres"
-	authFiles "bnn/internal/pkg/auth/repo/s3"
-	authUsecase "bnn/internal/pkg/auth/usecase"
 	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/logger"
 	"bnn/internal/pkg/middleware"
+	notesClient "bnn/internal/pkg/notes/client"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
-	notesRepo "bnn/internal/pkg/notes/repo/postgres"
-	notesUsecase "bnn/internal/pkg/notes/usecase"
-	"bnn/internal/pkg/s3"
-
-	authGithub "bnn/internal/pkg/auth/repo/github"
+	"bnn/internal/pkg/swagger"
+	tagsClient "bnn/internal/pkg/tags/client"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
 	tagsapi "bnn/internal/pkg/tags/delivery/http/api"
-	tagsRepo "bnn/internal/pkg/tags/repo/postgres"
-	tagsUsecase "bnn/internal/pkg/tags/usecase"
+	ws "bnn/internal/pkg/websocket"
 
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/samber/lo"
 )
@@ -50,96 +39,45 @@ const (
 	shutdownTimeout    = 5 * time.Second
 	MaxRequestSize20MB = 20 << 20
 
-	defaultAppBaseURL  = "http://localhost:5458"
 	defaultFrontendURL = "http://localhost:3000"
+	defaultAuthAddr    = "localhost:9001"
+	defaultNotesAddr   = "localhost:9002"
 )
 
 func main() {
-	err := godotenv.Load(".env")
-	if err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		slog.Warn("No .env file found, using system environment variables", "error", err)
 	}
 
 	ctx := context.Background()
-
-	baseHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
-	contextHandler := logger.ContextHandler{Handler: baseHandler}
-
-	baseLogger := slog.New(contextHandler)
+	baseLogger := logger.New()
 	slog.SetDefault(baseLogger)
 
-	dbTracer := database.NewTracer(baseLogger)
-
-	poolConfig, err := pgxpool.ParseConfig(mustEnv("DATABASE_URL"))
+	authConn, err := grpcutil.NewClient(lo.CoalesceOrEmpty(os.Getenv("AUTH_GRPC_ADDR"), defaultAuthAddr))
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to parse DB config", "error", err)
+		slog.ErrorContext(ctx, "Failed to create auth client", "error", err)
 		os.Exit(1)
 	}
+	defer authConn.Close()
 
-	poolConfig.ConnConfig.Tracer = dbTracer
-
-	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	notesConn, err := grpcutil.NewClient(lo.CoalesceOrEmpty(os.Getenv("NOTES_GRPC_ADDR"), defaultNotesAddr))
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create database pool", "error", err)
+		slog.ErrorContext(ctx, "Failed to create notes client", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer notesConn.Close()
 
-	if err := db.Ping(ctx); err != nil {
-		slog.ErrorContext(ctx, "Failed to connect to database", "error", err)
-		os.Exit(1)
-	}
+	authService := authClient.NewClient(authConn)
+	notesService := notesClient.NewClient(notesConn)
+	tagsService := tagsClient.NewClient(notesConn)
+	attachmentsService := attachmentsClient.NewClient(notesConn)
 
-	minioClient, err := s3.Connect(s3.Config{
-		Endpoint:  mustEnv("S3_ENDPOINT"),
-		AccessKey: mustEnv("S3_ACCESS_KEY"),
-		SecretKey: mustEnv("S3_SECRET_KEY"),
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create S3 client", "error", err)
-		os.Exit(1)
-	}
-
-	avatarStorage, err := authFiles.NewRepo(ctx, minioClient, mustEnv("S3_AVATARS_BUCKET"))
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create avatars storage", "error", err)
-		os.Exit(1)
-	}
-
-	appBaseURL := lo.CoalesceOrEmpty(os.Getenv("APP_BASE_URL"), defaultAppBaseURL)
 	frontendURL := lo.CoalesceOrEmpty(os.Getenv("FRONTEND_URL"), defaultFrontendURL)
 
-	githubRepo, err := authGithub.NewRepo(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), appBaseURL)
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create GitHub repo", "error", err)
-		os.Exit(1)
-	}
-
-	authUC := authUsecase.NewUsecase(
-		authRepo.NewRepo(db),
-		avatarStorage,
-		githubRepo,
-		mustEnv("JWT_SECRET"),
-	)
-
-	authHandler := authDelivery.NewHandler(authUC, frontendURL)
-
-	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db))
-	notesHandler := notesDelivery.NewHandler(notesUC)
-
-	attachmentsStorage, err := attachmentsFiles.NewRepo(ctx, minioClient, mustEnv("S3_ATTACHMENTS_BUCKET"))
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create attachments storage", "error", err)
-		os.Exit(1)
-	}
-
-	attachmentsHandler := attachmentsDelivery.NewHandler(
-		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage),
-	)
-
-	tagsHandler := tagsDelivery.NewHandler(
-		tagsUsecase.NewUsecase(tagsRepo.NewRepo(db)),
-	)
+	authHandler := authDelivery.NewHandler(authService, frontendURL)
+	notesHandler := notesDelivery.NewHandler(notesService)
+	tagsHandler := tagsDelivery.NewHandler(tagsService)
+	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
@@ -147,12 +85,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	wsHub := ws.NewHub(notesUC)
+	wsHub := ws.NewHub(notesService)
 	wsCtx, wsCancel := context.WithCancel(context.Background())
 	defer wsCancel()
 	go wsHub.Run(wsCtx)
 
-	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesUC)
+	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
@@ -218,14 +156,4 @@ func main() {
 	}
 
 	slog.InfoContext(ctx, "Server stopped")
-}
-
-func mustEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		slog.Error("Environment variable is not set", "key", key)
-		os.Exit(1)
-	}
-
-	return value
 }

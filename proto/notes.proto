@@ -59,6 +59,15 @@ service Notes {
       get: "/users/{user_id}/favorites"
     };
   }
+
+  rpc GetNoteUpdatedAt(GetNoteUpdatedAtRequest) returns (GetNoteUpdatedAtResponse);
+  
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+  
+  rpc AddCollaborator(AddCollaboratorRequest) returns (google.protobuf.Empty);
+  
+  rpc RemoveCollaborator(RemoveCollaboratorRequest) returns (google.protobuf.Empty);
+
 }
 
 message Note {
@@ -125,4 +134,34 @@ message BlockInput {
 
 message TagIDs {
   repeated string ids = 1;
+}
+
+message GetNoteUpdatedAtRequest {
+  string note_id = 1;
+}
+
+message GetNoteUpdatedAtResponse {
+  google.protobuf.Timestamp updated_at = 1;
+}
+
+message CheckAccessRequest {
+  string user_id = 1;
+  string note_id = 2;
+}
+
+message CheckAccessResponse {
+  string role = 1; // owner, editor, viewer
+}
+
+message AddCollaboratorRequest {
+  string user_id = 1;
+  string note_id = 2;
+  string target_user_id = 3;
+  string role = 4;
+}
+
+message RemoveCollaboratorRequest {
+  string user_id = 1;
+  string note_id = 2;
+  string target_user_id = 3;
 }

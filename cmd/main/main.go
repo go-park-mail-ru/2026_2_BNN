@@ -20,6 +20,7 @@ import (
 	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/logger"
+	"bnn/internal/pkg/metrics"
 	"bnn/internal/pkg/middleware"
 	notesClient "bnn/internal/pkg/notes/client"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 )
 
@@ -42,6 +44,7 @@ const (
 	defaultFrontendURL = "http://localhost:3000"
 	defaultAuthAddr    = "localhost:9001"
 	defaultNotesAddr   = "localhost:9002"
+	metricsAddr        = ":9101"
 )
 
 func main() {
@@ -92,10 +95,13 @@ func main() {
 
 	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
+	httpMetrics := metrics.NewHTTP(prometheus.DefaultRegisterer)
+
 	router := mux.NewRouter()
 	router.Use(cookies.Middleware)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.AccessLog(baseLogger))
+	router.Use(middleware.Metrics(httpMetrics))
 	router.Use(middleware.Recovery)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
@@ -131,6 +137,16 @@ func main() {
 		Handler: corsMiddleware(router),
 	}
 
+	metricsServer := metrics.NewServer(metricsAddr)
+
+	go func() {
+		slog.InfoContext(ctx, "Starting metrics server", "address", metricsAddr)
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.ErrorContext(ctx, "Metrics server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
 	go func() {
 		slog.InfoContext(ctx, "Starting server", "address", "http://localhost:5458")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -152,6 +168,11 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.ErrorContext(ctx, "Server shutdown failed", "error", err)
+		return
+	}
+
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		slog.ErrorContext(ctx, "Metrics server shutdown failed", "error", err)
 		return
 	}
 

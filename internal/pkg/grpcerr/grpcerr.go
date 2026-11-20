@@ -2,6 +2,7 @@ package grpcerr
 
 import (
 	"errors"
+	"log/slog"
 
 	"bnn/internal/models"
 
@@ -14,6 +15,8 @@ type knownError struct {
 	err  error
 	code codes.Code
 }
+
+const internalMessage = "internal error"
 
 var knownErrors = []knownError{
 	{models.ErrValidation, codes.InvalidArgument},
@@ -43,7 +46,8 @@ func ToStatus(err error) error {
 		return errors.Is(err, k.err)
 	})
 	if !ok {
-		return status.Error(codes.Internal, err.Error())
+		slog.Error("Internal error", "error", err)
+		return status.Error(codes.Internal, internalMessage)
 	}
 
 	return status.Error(known.code, known.err.Error())

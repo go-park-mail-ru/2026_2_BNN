@@ -25,6 +25,9 @@ var readAttachmentQuery string
 //go:embed queries/delete_attachment.sql
 var deleteAttachmentQuery string
 
+//go:embed queries/read_block_note_id.sql
+var readBlockNoteIDQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -85,4 +88,18 @@ func (r *Repo) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (r *Repo) ReadBlockNoteID(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
+	var noteID uuid.UUID
+
+	err := r.db.QueryRow(ctx, readBlockNoteIDQuery, blockID).Scan(&noteID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, models.ErrBlockNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("read block note id: %w", err)
+	}
+
+	return noteID, nil
 }

@@ -2,6 +2,7 @@ package notes
 
 import (
 	"context"
+	"time"
 
 	"bnn/internal/models"
 
@@ -19,6 +20,11 @@ type Usecase interface {
 	AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error
 	RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error
 	GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error)
+
+	AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login string, role string) error
+	RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error
+	GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error)
+	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
 }
 
 type Repo interface {
@@ -35,6 +41,12 @@ type Repo interface {
 	AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error
 	RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error
 	ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.Note, error)
+
+	GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error)
+
+	AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error
+	RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error
+	ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error)
 }
 
 type CreateNoteRequest struct {

@@ -14,6 +14,7 @@ import (
 	notes "bnn/internal/pkg/notes"
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	uuid "github.com/satori/go.uuid"
 	gomock "go.uber.org/mock/gomock"
@@ -43,6 +44,20 @@ func (m *MockUsecase) EXPECT() *MockUsecaseMockRecorder {
 	return m.recorder
 }
 
+// AddCollaborator mocks base method.
+func (m *MockUsecase) AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login, role string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddCollaborator", ctx, userID, noteID, login, role)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddCollaborator indicates an expected call of AddCollaborator.
+func (mr *MockUsecaseMockRecorder) AddCollaborator(ctx, userID, noteID, login, role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCollaborator", reflect.TypeOf((*MockUsecase)(nil).AddCollaborator), ctx, userID, noteID, login, role)
+}
+
 // AddFavorite mocks base method.
 func (m *MockUsecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -55,6 +70,21 @@ func (m *MockUsecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID)
 func (mr *MockUsecaseMockRecorder) AddFavorite(ctx, userID, noteID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFavorite", reflect.TypeOf((*MockUsecase)(nil).AddFavorite), ctx, userID, noteID)
+}
+
+// CheckAccess mocks base method.
+func (m *MockUsecase) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckAccess", ctx, userID, noteID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CheckAccess indicates an expected call of CheckAccess.
+func (mr *MockUsecaseMockRecorder) CheckAccess(ctx, userID, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckAccess", reflect.TypeOf((*MockUsecase)(nil).CheckAccess), ctx, userID, noteID)
 }
 
 // CreateNote mocks base method.
@@ -116,6 +146,21 @@ func (mr *MockUsecaseMockRecorder) GetNote(ctx, userID, noteID any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNote", reflect.TypeOf((*MockUsecase)(nil).GetNote), ctx, userID, noteID)
 }
 
+// GetNoteUpdatedAt mocks base method.
+func (m *MockUsecase) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNoteUpdatedAt", ctx, noteID)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNoteUpdatedAt indicates an expected call of GetNoteUpdatedAt.
+func (mr *MockUsecaseMockRecorder) GetNoteUpdatedAt(ctx, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNoteUpdatedAt", reflect.TypeOf((*MockUsecase)(nil).GetNoteUpdatedAt), ctx, noteID)
+}
+
 // GetNotes mocks base method.
 func (m *MockUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	m.ctrl.T.Helper()
@@ -129,6 +174,20 @@ func (m *MockUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, off
 func (mr *MockUsecaseMockRecorder) GetNotes(ctx, userID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotes", reflect.TypeOf((*MockUsecase)(nil).GetNotes), ctx, userID, limit, offset)
+}
+
+// RemoveCollaborator mocks base method.
+func (m *MockUsecase) RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveCollaborator", ctx, userID, noteID, targetUserID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveCollaborator indicates an expected call of RemoveCollaborator.
+func (mr *MockUsecaseMockRecorder) RemoveCollaborator(ctx, userID, noteID, targetUserID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveCollaborator", reflect.TypeOf((*MockUsecase)(nil).RemoveCollaborator), ctx, userID, noteID, targetUserID)
 }
 
 // RemoveFavorite mocks base method.
@@ -184,6 +243,20 @@ func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
+// AddCollaborator mocks base method.
+func (m *MockRepo) AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddCollaborator", ctx, noteID, userID, role)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddCollaborator indicates an expected call of AddCollaborator.
+func (mr *MockRepoMockRecorder) AddCollaborator(ctx, noteID, userID, role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCollaborator", reflect.TypeOf((*MockRepo)(nil).AddCollaborator), ctx, noteID, userID, role)
+}
+
 // AddFavorite mocks base method.
 func (m *MockRepo) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -226,6 +299,21 @@ func (mr *MockRepoMockRecorder) DeleteNote(ctx, noteID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNote", reflect.TypeOf((*MockRepo)(nil).DeleteNote), ctx, noteID)
 }
 
+// GetNoteUpdatedAt mocks base method.
+func (m *MockRepo) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNoteUpdatedAt", ctx, noteID)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNoteUpdatedAt indicates an expected call of GetNoteUpdatedAt.
+func (mr *MockRepoMockRecorder) GetNoteUpdatedAt(ctx, noteID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNoteUpdatedAt", reflect.TypeOf((*MockRepo)(nil).GetNoteUpdatedAt), ctx, noteID)
+}
+
 // ReadBlocks mocks base method.
 func (m *MockRepo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.Block, error) {
 	m.ctrl.T.Helper()
@@ -239,6 +327,21 @@ func (m *MockRepo) ReadBlocks(ctx context.Context, noteID uuid.UUID) ([]models.B
 func (mr *MockRepoMockRecorder) ReadBlocks(ctx, noteID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlocks", reflect.TypeOf((*MockRepo)(nil).ReadBlocks), ctx, noteID)
+}
+
+// ReadCollaboratorRole mocks base method.
+func (m *MockRepo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadCollaboratorRole", ctx, noteID, userID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadCollaboratorRole indicates an expected call of ReadCollaboratorRole.
+func (mr *MockRepoMockRecorder) ReadCollaboratorRole(ctx, noteID, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadCollaboratorRole", reflect.TypeOf((*MockRepo)(nil).ReadCollaboratorRole), ctx, noteID, userID)
 }
 
 // ReadFavorites mocks base method.
@@ -314,6 +417,20 @@ func (m *MockRepo) ReadUserTags(ctx context.Context, userID uuid.UUID, tagIDs []
 func (mr *MockRepoMockRecorder) ReadUserTags(ctx, userID, tagIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserTags", reflect.TypeOf((*MockRepo)(nil).ReadUserTags), ctx, userID, tagIDs)
+}
+
+// RemoveCollaborator mocks base method.
+func (m *MockRepo) RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveCollaborator", ctx, noteID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveCollaborator indicates an expected call of RemoveCollaborator.
+func (mr *MockRepoMockRecorder) RemoveCollaborator(ctx, noteID, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveCollaborator", reflect.TypeOf((*MockRepo)(nil).RemoveCollaborator), ctx, noteID, userID)
 }
 
 // RemoveFavorite mocks base method.

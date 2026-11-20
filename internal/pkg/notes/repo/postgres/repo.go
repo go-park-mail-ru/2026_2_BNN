@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/database"
@@ -81,19 +82,29 @@ func (r *Repo) ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error) 
 func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	rows, err := r.db.Query(ctx, readNotesQuery, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read notes: %w", err)
 	}
 	defer rows.Close()
 
-	notes := make([]models.Note, 0)
+	var notes []models.Note
 	for rows.Next() {
-		var note models.Note
-		err := rows.Scan(&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title, &note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt)
+		var n models.Note
+		err := rows.Scan(
+			&n.ID,
+			&n.ParentNoteID,
+			&n.CreatedBy,
+			&n.Title,
+			&n.Header,
+			&n.Icon,
+			&n.CreatedAt,
+			&n.UpdatedAt,
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan note: %w", err)
 		}
-		notes = append(notes, note)
+		notes = append(notes, n)
 	}
+
 	return notes, rows.Err()
 }
 
@@ -241,4 +252,44 @@ func (r *Repo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.No
 		notes = append(notes, note)
 	}
 	return notes, rows.Err()
+}
+
+func (r *Repo) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	var updatedAt time.Time
+	query := `SELECT updated_at FROM notes WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, noteID).Scan(&updatedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return updatedAt, nil
+}
+
+func (r *Repo) AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error {
+	query := `
+		INSERT INTO note_collaborators (note_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (note_id, user_id) 
+		DO UPDATE SET role = EXCLUDED.role
+	`
+	_, err := r.db.Exec(ctx, query, noteID, userID, role)
+	return err
+}
+
+func (r *Repo) RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error {
+	query := `DELETE FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
+	_, err := r.db.Exec(ctx, query, noteID, userID)
+	return err
+}
+
+func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error) {
+	var role string
+	query := `SELECT role FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
+	err := r.db.QueryRow(ctx, query, noteID, userID).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", models.ErrNoteNotFound
+		}
+		return "", err
+	}
+	return role, nil
 }

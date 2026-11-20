@@ -2,12 +2,15 @@ package grpc
 
 import (
 	"context"
+	"errors"
 
+	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/auth/delivery/grpc/gen"
 	"bnn/internal/pkg/grpcconv"
 	"bnn/internal/pkg/grpcerr"
 
+	uuid "github.com/satori/go.uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -171,4 +174,21 @@ func (h *Handler) HandleOAuthCallback(ctx context.Context, in *gen.OAuthCallback
 	}
 
 	return SessionToProto(user, tokens), nil
+}
+
+func (h *Handler) CheckUserExists(ctx context.Context, req *gen.UserRequest) (*gen.CheckUserExistsResponse, error) {
+	userID, err := uuid.FromString(req.UserId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	_, err = h.uc.GetUser(ctx, userID)
+	if err != nil {
+		if errors.Is(err, models.ErrUserNotFound) {
+			return &gen.CheckUserExistsResponse{Exists: false}, nil
+		}
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &gen.CheckUserExistsResponse{Exists: true}, nil
 }

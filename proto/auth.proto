@@ -103,6 +103,19 @@ service Auth {
       body: "*"
     };
   }
+
+  rpc CheckUserExists(UserRequest) returns (CheckUserExistsResponse) {
+    option (google.api.http) = {
+      get: "/auth/users/{user_id}/exists"
+    };
+  }
+
+
+rpc GetUserByLogin(GetUserByLoginRequest) returns (User) {
+    option (google.api.http) = {
+      get: "/auth/users/by-login/{login}"
+    };
+  }
 }
 
 message User {
@@ -189,4 +202,12 @@ message OAuthURLResponse {
 message OAuthCallbackRequest {
   string provider = 1;
   string code = 2;
+}
+
+message CheckUserExistsResponse {
+  bool exists = 1;
+}
+
+message GetUserByLoginRequest {
+  string login = 1;
 }

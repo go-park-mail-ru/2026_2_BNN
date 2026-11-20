@@ -500,6 +500,58 @@ paths:
         '404':
           description: Заметка не найдена
   
+  /notes/{id}/collaborators:
+    parameters:
+      - $ref: '#/components/parameters/NoteID'
+    post:
+      tags: [notes]
+      operationId: AddCollaborator
+      summary: "Добавить коллаборатора к заметке"
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCollaboratorRequest'
+      responses:
+        '201':
+          description: "Участник успешно добавлен"
+        '400':
+          description: "Неверные данные (невалидная роль, попытка добавить себя)"
+        '401':
+          description: "Нет куки или она истекла"
+        '403':
+          description: "Только владелец может добавлять участников"
+        '404':
+          description: "Пользователь или заметка не найдены"
+
+  /notes/{id}/collaborators/{user_id}:
+    parameters:
+      - $ref: '#/components/parameters/NoteID'
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [notes]
+      operationId: RemoveCollaborator
+      summary: "Удалить коллаборатора из заметки"
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: "Участник удален"
+        '401':
+          description: "Нет куки или она истекла"
+        '403':
+          description: "Только владелец может удалять участников"
+        '404':
+          description: "Заметка или участник не найдены"
+
   /blocks/{id}/attachments:
     parameters:
       - $ref: '#/components/parameters/BlockID'
@@ -706,6 +758,20 @@ components:
         format: uuid
 
   schemas:
+
+    AddCollaboratorRequest:
+      type: object
+      required:
+        - login
+        - role
+      properties:
+        login:
+          type: string
+          example: "vasya1111"
+        role:
+          type: string
+          enum: [editor, viewer]
+
     SignUpRequest:
       type: object
       required: [login, password]

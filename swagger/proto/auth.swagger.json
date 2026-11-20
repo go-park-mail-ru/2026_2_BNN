@@ -283,6 +283,36 @@
         ]
       }
     },
+    "/auth/users/by-login/{login}": {
+      "get": {
+        "operationId": "Auth_GetUserByLogin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/authUser"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "login",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/users/{userId}": {
       "get": {
         "operationId": "Auth_GetUser",
@@ -459,6 +489,36 @@
         ]
       }
     },
+    "/auth/users/{userId}/exists": {
+      "get": {
+        "operationId": "Auth_CheckUserExists",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/authCheckUserExistsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/users/{userId}/password": {
       "put": {
         "operationId": "Auth_ChangePassword",
@@ -559,6 +619,14 @@
       "properties": {
         "userId": {
           "type": "string"
+        }
+      }
+    },
+    "authCheckUserExistsResponse": {
+      "type": "object",
+      "properties": {
+        "exists": {
+          "type": "boolean"
         }
       }
     },

@@ -145,3 +145,28 @@ func (c *Client) HandleOAuthCallback(ctx context.Context, provider, code string)
 
 	return authgrpc.SessionFromProto(resp)
 }
+
+func (c *Client) CheckUserExists(ctx context.Context, userID uuid.UUID) (bool, error) {
+	resp, err := c.client.CheckUserExists(ctx, &gen.UserRequest{
+		UserId: userID.String(),
+	})
+	if err != nil {
+		return false, grpcerr.FromStatus(err)
+	}
+	return resp.Exists, nil
+}
+
+func (c *Client) GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error) {
+	resp, err := c.client.GetUserByLogin(ctx, &gen.GetUserByLoginRequest{
+		Login: login,
+	})
+	if err != nil {
+		return uuid.Nil, grpcerr.FromStatus(err)
+	}
+
+	userID, err := uuid.FromString(resp.Id)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return userID, nil
+}

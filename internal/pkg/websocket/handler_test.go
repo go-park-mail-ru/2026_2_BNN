@@ -15,12 +15,18 @@ import (
 )
 
 type mockNotesGetter struct {
-	note *models.Note
-	err  error
+	note    *models.Note
+	err     error
+	role    string
+	roleErr error
 }
 
 func (m *mockNotesGetter) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
 	return *m.note, m.err
+}
+
+func (m *mockNotesGetter) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
+	return m.role, m.roleErr
 }
 
 func TestServeNoteWS(t *testing.T) {
@@ -33,6 +39,8 @@ func TestServeNoteWS(t *testing.T) {
 		noteIDStr    string
 		mockNote     *models.Note
 		mockErr      error
+		role         string
+		roleErr      error
 		expectedCode int
 	}{
 		{
@@ -53,7 +61,17 @@ func TestServeNoteWS(t *testing.T) {
 			noteIDStr:    noteID.String(),
 			mockNote:     &models.Note{},
 			mockErr:      models.ErrNoteNotFound,
+			roleErr:      models.ErrNoteNotFound,
 			expectedCode: http.StatusNotFound,
+		},
+		{
+			name:         "forbidden (403 - no access)",
+			userID:       &userID,
+			noteIDStr:    noteID.String(),
+			mockNote:     &models.Note{},
+			role:         "",
+			roleErr:      models.ErrForbidden,
+			expectedCode: http.StatusForbidden,
 		},
 		{
 			name:         "internal server error (500)",
@@ -61,17 +79,23 @@ func TestServeNoteWS(t *testing.T) {
 			noteIDStr:    noteID.String(),
 			mockNote:     &models.Note{},
 			mockErr:      assert.AnError,
+			roleErr:      assert.AnError,
 			expectedCode: http.StatusInternalServerError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockGetter := &mockNotesGetter{note: tt.mockNote, err: tt.mockErr}
+			mockGetter := &mockNotesGetter{
+				note:    tt.mockNote,
+				err:     tt.mockErr,
+				role:    tt.role,
+				roleErr: tt.roleErr,
+			}
+
 			h := NewHandler(nil, "*", mockGetter)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/ws/notes/"+tt.noteIDStr, nil)
-
 			req = mux.SetURLVars(req, map[string]string{"noteID": tt.noteIDStr})
 
 			if tt.userID != nil {

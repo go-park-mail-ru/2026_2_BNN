@@ -20,6 +20,7 @@ type Repo interface {
 	CreateAttachment(ctx context.Context, attachment models.Attachment) error
 	ReadAttachment(ctx context.Context, id uuid.UUID) (models.Attachment, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
+	ReadBlockNoteID(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error)
 }
 
 type FileRepo interface {

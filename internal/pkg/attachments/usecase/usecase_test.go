@@ -18,22 +18,48 @@ import (
 
 var errDB = errors.New("db is down")
 
+// Мок для NotesClient (проверка доступа к заметке)
+type mockNotesClient struct {
+	role string
+	err  error
+}
+
+func (m *mockNotesClient) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
+	return m.role, m.err
+}
+
 func TestUploadAttachment(t *testing.T) {
 	userID := uuid.NewV4()
 	blockID := uuid.NewV4()
+	noteID := uuid.NewV4()
 	data := []byte("file")
 
 	tests := []struct {
 		name        string
 		contentType string
+		notesMock   *mockNotesClient
 		prepare     func(repo *mocks.MockRepo, files *mocks.MockFileRepo)
 		expectedErr error
 	}{
 		{
-			name:        "ok",
+			name:        "ok (owner)",
 			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				// Узнаем заметку по блоку и проверяем доступ
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
+				// Ожидаем, что CheckAccess вызовется (его реализует мок)
+
+				files.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
+				repo.EXPECT().CreateAttachment(gomock.Any(), gomock.Any()).Return(nil)
+			},
+		},
+		{
+			name:        "ok (editor)",
+			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "editor", err: nil},
+			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				files.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
 				repo.EXPECT().CreateAttachment(gomock.Any(), gomock.Any()).Return(nil)
 			},
@@ -41,32 +67,36 @@ func TestUploadAttachment(t *testing.T) {
 		{
 			name:        "block not found",
 			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(uuid.Nil, models.ErrBlockNotFound)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(uuid.Nil, models.ErrBlockNotFound)
 			},
 			expectedErr: models.ErrBlockNotFound,
 		},
 		{
-			name:        "foreign block",
+			name:        "no access (viewer)",
 			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "viewer", err: nil}, // viewer не может загружать
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(uuid.NewV4(), nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 			},
-			expectedErr: models.ErrBlockNotFound,
+			expectedErr: models.ErrForbidden, // Ожидаем ошибку доступа
 		},
 		{
 			name:        "unsupported type",
 			contentType: "text/plain; charset=utf-8",
+			notesMock:   &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 			},
 			expectedErr: models.ErrUnsupportedFileType,
 		},
 		{
 			name:        "storage error",
 			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				files.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(errDB)
 			},
 			expectedErr: errDB,
@@ -74,8 +104,9 @@ func TestUploadAttachment(t *testing.T) {
 		{
 			name:        "db error removes file",
 			contentType: "image/png",
+			notesMock:   &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				files.EXPECT().PutFile(gomock.Any(), gomock.Any(), data, "image/png").Return(nil)
 				repo.EXPECT().CreateAttachment(gomock.Any(), gomock.Any()).Return(errDB)
 				files.EXPECT().DeleteFile(gomock.Any(), gomock.Any()).Return(nil)
@@ -91,7 +122,9 @@ func TestUploadAttachment(t *testing.T) {
 			files := mocks.NewMockFileRepo(ctrl)
 			tt.prepare(repo, files)
 
-			attachment, err := NewUsecase(repo, files).UploadAttachment(context.Background(), userID, blockID, data, tt.contentType)
+			// Передаем 3 аргумента
+			uc := NewUsecase(repo, files, tt.notesMock)
+			attachment, err := uc.UploadAttachment(context.Background(), userID, blockID, data, tt.contentType)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -108,37 +141,42 @@ func TestUploadAttachment(t *testing.T) {
 func TestGetAttachment(t *testing.T) {
 	userID := uuid.NewV4()
 	blockID := uuid.NewV4()
+	noteID := uuid.NewV4()
 	attachmentID := uuid.NewV4()
 	attachment := models.Attachment{ID: attachmentID, BlockID: blockID, Path: "a.png"}
 	file := models.File{Body: io.NopCloser(strings.NewReader("file")), ContentType: "image/png", Size: 4}
 
 	tests := []struct {
 		name        string
+		notesMock   *mockNotesClient
 		prepare     func(repo *mocks.MockRepo, files *mocks.MockFileRepo)
 		expectedErr error
 	}{
 		{
-			name: "ok",
+			name:      "ok",
+			notesMock: &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(attachment, nil)
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				files.EXPECT().GetFile(gomock.Any(), "a.png").Return(file, nil)
 			},
 		},
 		{
-			name: "not found",
+			name:      "not found",
+			notesMock: &mockNotesClient{},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(models.Attachment{}, models.ErrAttachmentNotFound)
 			},
 			expectedErr: models.ErrAttachmentNotFound,
 		},
 		{
-			name: "foreign attachment",
+			name:      "no access",
+			notesMock: &mockNotesClient{err: models.ErrNoteNotFound}, // Доступ к заметке пропал
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(attachment, nil)
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(uuid.NewV4(), nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 			},
-			expectedErr: models.ErrAttachmentNotFound,
+			expectedErr: models.ErrAttachmentNotFound, // Скрываем наличие файла
 		},
 	}
 
@@ -149,7 +187,8 @@ func TestGetAttachment(t *testing.T) {
 			files := mocks.NewMockFileRepo(ctrl)
 			tt.prepare(repo, files)
 
-			got, err := NewUsecase(repo, files).GetAttachment(context.Background(), userID, attachmentID)
+			uc := NewUsecase(repo, files, tt.notesMock)
+			got, err := uc.GetAttachment(context.Background(), userID, attachmentID)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -165,36 +204,41 @@ func TestGetAttachment(t *testing.T) {
 func TestDeleteAttachment(t *testing.T) {
 	userID := uuid.NewV4()
 	blockID := uuid.NewV4()
+	noteID := uuid.NewV4()
 	attachmentID := uuid.NewV4()
 	attachment := models.Attachment{ID: attachmentID, BlockID: blockID, Path: "a.png"}
 
 	tests := []struct {
 		name        string
+		notesMock   *mockNotesClient
 		prepare     func(repo *mocks.MockRepo, files *mocks.MockFileRepo)
 		expectedErr error
 	}{
 		{
-			name: "ok",
+			name:      "ok",
+			notesMock: &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(attachment, nil)
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				repo.EXPECT().DeleteAttachment(gomock.Any(), attachmentID).Return(nil)
 				files.EXPECT().DeleteFile(gomock.Any(), "a.png").Return(nil)
 			},
 		},
 		{
-			name: "foreign attachment",
+			name:      "foreign attachment",
+			notesMock: &mockNotesClient{err: models.ErrNoteNotFound},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(attachment, nil)
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(uuid.NewV4(), nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 			},
 			expectedErr: models.ErrAttachmentNotFound,
 		},
 		{
-			name: "db error keeps file",
+			name:      "db error keeps file",
+			notesMock: &mockNotesClient{role: "owner", err: nil},
 			prepare: func(repo *mocks.MockRepo, files *mocks.MockFileRepo) {
 				repo.EXPECT().ReadAttachment(gomock.Any(), attachmentID).Return(attachment, nil)
-				repo.EXPECT().ReadBlockOwner(gomock.Any(), blockID).Return(userID, nil)
+				repo.EXPECT().ReadBlockNoteID(gomock.Any(), blockID).Return(noteID, nil)
 				repo.EXPECT().DeleteAttachment(gomock.Any(), attachmentID).Return(errDB)
 			},
 			expectedErr: errDB,
@@ -208,7 +252,8 @@ func TestDeleteAttachment(t *testing.T) {
 			files := mocks.NewMockFileRepo(ctrl)
 			tt.prepare(repo, files)
 
-			err := NewUsecase(repo, files).DeleteAttachment(context.Background(), userID, attachmentID)
+			uc := NewUsecase(repo, files, tt.notesMock)
+			err := uc.DeleteAttachment(context.Background(), userID, attachmentID)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)

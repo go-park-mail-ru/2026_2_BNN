@@ -10,6 +10,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+type NotesClient interface {
+	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
+}
+
 var allowedTypes = map[string]string{
 	"image/jpeg":      ".jpg",
 	"image/png":       ".png",
@@ -19,19 +23,21 @@ var allowedTypes = map[string]string{
 }
 
 type Usecase struct {
-	repo    attachments.Repo
-	storage attachments.FileRepo
+	repo        attachments.Repo
+	storage     attachments.FileRepo
+	notesClient NotesClient
 }
 
-func NewUsecase(repo attachments.Repo, storage attachments.FileRepo) *Usecase {
+func NewUsecase(repo attachments.Repo, storage attachments.FileRepo, notesClient NotesClient) *Usecase {
 	return &Usecase{
-		repo:    repo,
-		storage: storage,
+		repo:        repo,
+		storage:     storage,
+		notesClient: notesClient,
 	}
 }
 
 func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUID, data []byte, contentType string) (models.Attachment, error) {
-	if err := u.checkBlockOwner(ctx, userID, blockID); err != nil {
+	if err := u.checkEditAccess(ctx, userID, blockID); err != nil {
 		return models.Attachment{}, err
 	}
 
@@ -61,7 +67,7 @@ func (u *Usecase) UploadAttachment(ctx context.Context, userID, blockID uuid.UUI
 }
 
 func (u *Usecase) GetAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.File, error) {
-	attachment, err := u.readOwnAttachment(ctx, userID, attachmentID)
+	attachment, err := u.readAttachmentForRead(ctx, userID, attachmentID)
 	if err != nil {
 		return models.File{}, err
 	}
@@ -70,7 +76,7 @@ func (u *Usecase) GetAttachment(ctx context.Context, userID, attachmentID uuid.U
 }
 
 func (u *Usecase) DeleteAttachment(ctx context.Context, userID, attachmentID uuid.UUID) error {
-	attachment, err := u.readOwnAttachment(ctx, userID, attachmentID)
+	attachment, err := u.readAttachmentForEdit(ctx, userID, attachmentID)
 	if err != nil {
 		return err
 	}
@@ -82,27 +88,55 @@ func (u *Usecase) DeleteAttachment(ctx context.Context, userID, attachmentID uui
 	return u.storage.DeleteFile(ctx, attachment.Path)
 }
 
-func (u *Usecase) readOwnAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.Attachment, error) {
+func (u *Usecase) readAttachmentForRead(ctx context.Context, userID, attachmentID uuid.UUID) (models.Attachment, error) {
 	attachment, err := u.repo.ReadAttachment(ctx, attachmentID)
 	if err != nil {
 		return models.Attachment{}, err
 	}
 
-	if err := u.checkBlockOwner(ctx, userID, attachment.BlockID); err != nil {
+	if err := u.checkReadAccess(ctx, userID, attachment.BlockID); err != nil {
 		return models.Attachment{}, models.ErrAttachmentNotFound
 	}
 
 	return attachment, nil
 }
 
-func (u *Usecase) checkBlockOwner(ctx context.Context, userID, blockID uuid.UUID) error {
-	ownerID, err := u.repo.ReadBlockOwner(ctx, blockID)
+func (u *Usecase) readAttachmentForEdit(ctx context.Context, userID, attachmentID uuid.UUID) (models.Attachment, error) {
+	attachment, err := u.repo.ReadAttachment(ctx, attachmentID)
+	if err != nil {
+		return models.Attachment{}, err
+	}
+
+	if err := u.checkEditAccess(ctx, userID, attachment.BlockID); err != nil {
+		return models.Attachment{}, models.ErrAttachmentNotFound
+	}
+
+	return attachment, nil
+}
+
+func (u *Usecase) checkReadAccess(ctx context.Context, userID, blockID uuid.UUID) error {
+	noteID, err := u.repo.ReadBlockNoteID(ctx, blockID)
+	if err != nil {
+		return models.ErrBlockNotFound
+	}
+
+	_, err = u.notesClient.CheckAccess(ctx, userID, noteID)
+	return err
+}
+
+func (u *Usecase) checkEditAccess(ctx context.Context, userID, blockID uuid.UUID) error {
+	noteID, err := u.repo.ReadBlockNoteID(ctx, blockID)
+	if err != nil {
+		return models.ErrBlockNotFound
+	}
+
+	role, err := u.notesClient.CheckAccess(ctx, userID, noteID)
 	if err != nil {
 		return err
 	}
 
-	if ownerID != userID {
-		return models.ErrBlockNotFound
+	if role == "viewer" {
+		return models.ErrForbidden
 	}
 
 	return nil

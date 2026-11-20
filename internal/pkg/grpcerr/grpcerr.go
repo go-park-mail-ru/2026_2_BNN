@@ -32,6 +32,7 @@ var knownErrors = []knownError{
 	{models.ErrOAuthAccount, codes.FailedPrecondition},
 	{models.ErrInvalidCode, codes.InvalidArgument},
 	{models.ErrTwoFactorEnabled, codes.FailedPrecondition},
+	{models.ErrForbidden, codes.PermissionDenied},
 }
 
 func ToStatus(err error) error {

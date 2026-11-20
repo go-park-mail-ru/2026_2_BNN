@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS note_collaborators (
     note_id    UUID NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role       VARCHAR(20) NOT NULL DEFAULT 'editor',
+    role       VARCHAR(20) NOT NULL DEFAULT 'viewer',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     
     PRIMARY KEY (note_id, user_id),

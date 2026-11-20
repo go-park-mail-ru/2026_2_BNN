@@ -12,6 +12,7 @@ import (
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Handler struct {
@@ -192,4 +193,78 @@ func toNotesResponse(list []models.Note) *gen.NotesResponse {
 	return &gen.NotesResponse{
 		Notes: lo.Map(list, func(n models.Note, _ int) *gen.Note { return NoteToProto(n) }),
 	}
+}
+
+func (h *Handler) GetNoteUpdatedAt(ctx context.Context, req *gen.GetNoteUpdatedAtRequest) (*gen.GetNoteUpdatedAtResponse, error) {
+	noteID, err := uuid.FromString(req.NoteId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	updatedAt, err := h.uc.GetNoteUpdatedAt(ctx, noteID)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &gen.GetNoteUpdatedAtResponse{
+		UpdatedAt: timestamppb.New(updatedAt),
+	}, nil
+}
+
+func (h *Handler) CheckAccess(ctx context.Context, req *gen.CheckAccessRequest) (*gen.CheckAccessResponse, error) {
+	userID, err := uuid.FromString(req.UserId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+	noteID, err := uuid.FromString(req.NoteId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	role, err := h.uc.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &gen.CheckAccessResponse{Role: role}, nil
+}
+
+func (h *Handler) AddCollaborator(ctx context.Context, req *gen.AddCollaboratorRequest) (*emptypb.Empty, error) {
+	userID, err := uuid.FromString(req.UserId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+	noteID, err := uuid.FromString(req.NoteId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	err = h.uc.AddCollaborator(ctx, userID, noteID, req.TargetUserId, req.Role)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+func (h *Handler) RemoveCollaborator(ctx context.Context, req *gen.RemoveCollaboratorRequest) (*emptypb.Empty, error) {
+	userID, err := uuid.FromString(req.UserId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+	noteID, err := uuid.FromString(req.NoteId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+	targetID, err := uuid.FromString(req.TargetUserId)
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	err = h.uc.RemoveCollaborator(ctx, userID, noteID, targetID)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &emptypb.Empty{}, nil
 }

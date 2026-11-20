@@ -18,6 +18,7 @@ import (
 
 type NotesGetter interface {
 	GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error)
+	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
 }
 
 type Handler struct {
@@ -26,9 +27,9 @@ type Handler struct {
 	notes    NotesGetter
 }
 
-func NewHandler(hub *Hub, allowedOrigin string, notes NotesGetter) *Handler {
+func NewHandler(hub *Hub, allowedOrigins string, notes NotesGetter) *Handler {
 	allowed := make([]string, 0)
-	for _, origin := range strings.Split(allowedOrigin, ",") {
+	for _, origin := range strings.Split(allowedOrigins, ",") {
 		origin = strings.TrimSpace(origin)
 		origin = strings.TrimSuffix(origin, "/")
 		if origin != "" {
@@ -55,7 +56,6 @@ func NewHandler(hub *Hub, allowedOrigin string, notes NotesGetter) *Handler {
 
 func (h *Handler) ServeNoteWS(w http.ResponseWriter, r *http.Request) {
 	userID, ok := ctxutil.GetUserID(r.Context())
-
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -68,22 +68,26 @@ func (h *Handler) ServeNoteWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.notes.GetNote(r.Context(), userID, noteID)
+	role, err := h.notes.CheckAccess(r.Context(), userID, noteID)
 	if err != nil {
 		if errors.Is(err, models.ErrNoteNotFound) {
 			http.Error(w, "note not found", http.StatusNotFound)
 			return
 		}
-		slog.ErrorContext(r.Context(), "Failed to check note access", "error", err)
+		if errors.Is(err, models.ErrForbidden) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		slog.ErrorContext(r.Context(), "Failed to check access", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.ErrorContext(r.Context(), "Failed to upgrade connection to WebSocket", "error", err)
+		slog.ErrorContext(r.Context(), "Failed to upgrade connection", "error", err)
 		return
 	}
 
-	h.hub.AddClient(userID, noteID, conn)
+	h.hub.AddClient(userID, noteID, role, conn)
 }

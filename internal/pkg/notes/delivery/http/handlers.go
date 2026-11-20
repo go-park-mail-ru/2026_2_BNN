@@ -288,3 +288,46 @@ func (h *Handler) ListFavorites(ctx context.Context, req api.ListFavoritesReques
 	}
 	return api.ListFavorites200JSONResponse(apiNotes), nil
 }
+
+func (h *Handler) AddCollaborator(ctx context.Context, request api.AddCollaboratorRequestObject) (api.AddCollaboratorResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return nil, models.ErrInvalidToken
+	}
+
+	noteID, err := uuid.FromString(request.Id.String())
+	if err != nil {
+		return nil, models.ErrValidation
+	}
+
+	err = h.uc.AddCollaborator(ctx, userID, noteID, request.Body.Login, string(request.Body.Role))
+	if err != nil {
+		return nil, err
+	}
+
+	return api.AddCollaborator201Response{}, nil
+}
+
+func (h *Handler) RemoveCollaborator(ctx context.Context, request api.RemoveCollaboratorRequestObject) (api.RemoveCollaboratorResponseObject, error) {
+	userID, ok := ctxutil.GetUserID(ctx)
+	if !ok {
+		return nil, models.ErrInvalidToken
+	}
+
+	noteID, err := uuid.FromString(request.Id.String())
+	if err != nil {
+		return nil, models.ErrValidation
+	}
+
+	targetUserID, err := uuid.FromString(request.UserId.String())
+	if err != nil {
+		return nil, models.ErrValidation
+	}
+
+	err = h.uc.RemoveCollaborator(ctx, userID, noteID, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.RemoveCollaborator204Response{}, nil
+}

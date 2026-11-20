@@ -128,11 +128,11 @@ func (c *Client) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (str
 	return resp.Role, nil
 }
 
-func (c *Client) AddCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID, role string) error {
+func (c *Client) AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login string, role string) error {
 	_, err := c.client.AddCollaborator(ctx, &gen.AddCollaboratorRequest{
 		UserId:       userID.String(),
 		NoteId:       noteID.String(),
-		TargetUserId: targetUserID.String(),
+		TargetUserId: login,
 		Role:         role,
 	})
 	return grpcerr.FromStatus(err)

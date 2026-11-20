@@ -1,9 +1,0 @@
-$kind: http-request
-name: http://localhost:5458/api/auth/signup
-description: ""
-url: http://localhost:5458/api/notes/all
-method: GET
-body:
-  type: json
-  content: ""
-order: 1000

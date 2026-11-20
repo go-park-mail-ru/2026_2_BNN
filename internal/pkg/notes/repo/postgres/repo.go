@@ -82,19 +82,29 @@ func (r *Repo) ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error) 
 func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	rows, err := r.db.Query(ctx, readNotesQuery, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read notes: %w", err)
 	}
 	defer rows.Close()
 
-	notes := make([]models.Note, 0)
+	var notes []models.Note
 	for rows.Next() {
-		var note models.Note
-		err := rows.Scan(&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title, &note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt)
+		var n models.Note
+		err := rows.Scan(
+			&n.ID,
+			&n.ParentNoteID,
+			&n.CreatedBy,
+			&n.Title,
+			&n.Header,
+			&n.Icon,
+			&n.CreatedAt,
+			&n.UpdatedAt,
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan note: %w", err)
 		}
-		notes = append(notes, note)
+		notes = append(notes, n)
 	}
+
 	return notes, rows.Err()
 }
 
@@ -282,19 +292,4 @@ func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUI
 		return "", err
 	}
 	return role, nil
-}
-
-func (r *Repo) HasAccess(ctx context.Context, noteID, userID uuid.UUID) (bool, error) {
-	query := `
-		SELECT EXISTS (
-			-- Пользователь является владельцем
-			SELECT 1 FROM notes WHERE id = $1 AND created_by = $2
-			UNION
-			-- Пользователь является участником
-			SELECT 1 FROM note_collaborators WHERE note_id = $1 AND user_id = $2
-		)
-	`
-	var exists bool
-	err := r.db.QueryRow(ctx, query, noteID, userID).Scan(&exists)
-	return exists, err
 }

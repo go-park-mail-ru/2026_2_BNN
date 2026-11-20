@@ -153,6 +153,21 @@ func (mr *MockRepoMockRecorder) ReadAttachment(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAttachment", reflect.TypeOf((*MockRepo)(nil).ReadAttachment), ctx, id)
 }
 
+// ReadBlockNoteID mocks base method.
+func (m *MockRepo) ReadBlockNoteID(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadBlockNoteID", ctx, blockID)
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadBlockNoteID indicates an expected call of ReadBlockNoteID.
+func (mr *MockRepoMockRecorder) ReadBlockNoteID(ctx, blockID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlockNoteID", reflect.TypeOf((*MockRepo)(nil).ReadBlockNoteID), ctx, blockID)
+}
+
 // ReadBlockOwner mocks base method.
 func (m *MockRepo) ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
 	m.ctrl.T.Helper()

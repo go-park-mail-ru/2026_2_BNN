@@ -34,6 +34,8 @@ const (
 	Auth_Disable2FA_FullMethodName          = "/auth.Auth/Disable2FA"
 	Auth_GetOAuthURL_FullMethodName         = "/auth.Auth/GetOAuthURL"
 	Auth_HandleOAuthCallback_FullMethodName = "/auth.Auth/HandleOAuthCallback"
+	Auth_CheckUserExists_FullMethodName     = "/auth.Auth/CheckUserExists"
+	Auth_GetUserByLogin_FullMethodName      = "/auth.Auth/GetUserByLogin"
 )
 
 // AuthClient is the client API for Auth service.
@@ -54,6 +56,8 @@ type AuthClient interface {
 	Disable2FA(ctx context.Context, in *TwoFactorCodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetOAuthURL(ctx context.Context, in *OAuthURLRequest, opts ...grpc.CallOption) (*OAuthURLResponse, error)
 	HandleOAuthCallback(ctx context.Context, in *OAuthCallbackRequest, opts ...grpc.CallOption) (*Session, error)
+	CheckUserExists(ctx context.Context, in *UserRequest, opts ...grpc.CallOption) (*CheckUserExistsResponse, error)
+	GetUserByLogin(ctx context.Context, in *GetUserByLoginRequest, opts ...grpc.CallOption) (*User, error)
 }
 
 type authClient struct {
@@ -204,6 +208,26 @@ func (c *authClient) HandleOAuthCallback(ctx context.Context, in *OAuthCallbackR
 	return out, nil
 }
 
+func (c *authClient) CheckUserExists(ctx context.Context, in *UserRequest, opts ...grpc.CallOption) (*CheckUserExistsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckUserExistsResponse)
+	err := c.cc.Invoke(ctx, Auth_CheckUserExists_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authClient) GetUserByLogin(ctx context.Context, in *GetUserByLoginRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, Auth_GetUserByLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility.
@@ -222,6 +246,8 @@ type AuthServer interface {
 	Disable2FA(context.Context, *TwoFactorCodeRequest) (*emptypb.Empty, error)
 	GetOAuthURL(context.Context, *OAuthURLRequest) (*OAuthURLResponse, error)
 	HandleOAuthCallback(context.Context, *OAuthCallbackRequest) (*Session, error)
+	CheckUserExists(context.Context, *UserRequest) (*CheckUserExistsResponse, error)
+	GetUserByLogin(context.Context, *GetUserByLoginRequest) (*User, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -273,6 +299,12 @@ func (UnimplementedAuthServer) GetOAuthURL(context.Context, *OAuthURLRequest) (*
 }
 func (UnimplementedAuthServer) HandleOAuthCallback(context.Context, *OAuthCallbackRequest) (*Session, error) {
 	return nil, status.Error(codes.Unimplemented, "method HandleOAuthCallback not implemented")
+}
+func (UnimplementedAuthServer) CheckUserExists(context.Context, *UserRequest) (*CheckUserExistsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckUserExists not implemented")
+}
+func (UnimplementedAuthServer) GetUserByLogin(context.Context, *GetUserByLoginRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserByLogin not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 func (UnimplementedAuthServer) testEmbeddedByValue()              {}
@@ -547,6 +579,42 @@ func _Auth_HandleOAuthCallback_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_CheckUserExists_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).CheckUserExists(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_CheckUserExists_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).CheckUserExists(ctx, req.(*UserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Auth_GetUserByLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserByLoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).GetUserByLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_GetUserByLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).GetUserByLogin(ctx, req.(*GetUserByLoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -609,6 +677,14 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleOAuthCallback",
 			Handler:    _Auth_HandleOAuthCallback_Handler,
+		},
+		{
+			MethodName: "CheckUserExists",
+			Handler:    _Auth_CheckUserExists_Handler,
+		},
+		{
+			MethodName: "GetUserByLogin",
+			Handler:    _Auth_GetUserByLogin_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -10,10 +10,12 @@ import (
 	attachmentsRepo "bnn/internal/pkg/attachments/repo/postgres"
 	attachmentsFiles "bnn/internal/pkg/attachments/repo/s3"
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
+	authClient "bnn/internal/pkg/auth/client"
 	"bnn/internal/pkg/database"
 	"bnn/internal/pkg/env"
 	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/logger"
+	notesClient "bnn/internal/pkg/notes/client"
 	notesGrpc "bnn/internal/pkg/notes/delivery/grpc"
 	notesGen "bnn/internal/pkg/notes/delivery/grpc/gen"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
@@ -25,9 +27,13 @@ import (
 	tagsUsecase "bnn/internal/pkg/tags/usecase"
 
 	"github.com/joho/godotenv"
+	"github.com/samber/lo"
 )
 
-const grpcAddr = ":9002"
+const (
+	grpcAddr        = ":9002"
+	defaultAuthAddr = "localhost:9001"
+)
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -44,6 +50,21 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	authAddr := lo.CoalesceOrEmpty(os.Getenv("AUTH_GRPC_ADDR"), defaultAuthAddr)
+	authConn, err := grpcutil.NewClient(authAddr)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to connect to auth service", "error", err)
+		os.Exit(1)
+	}
+	defer authConn.Close()
+
+	authService := authClient.NewClient(authConn)
+
+	notesAddr := lo.CoalesceOrEmpty(os.Getenv("NOTES_GRPC_ADDR"), grpcAddr)
+	notesConn, _ := grpcutil.NewClient(notesAddr)
+	defer notesConn.Close()
+	notesService := notesClient.NewClient(notesConn)
 
 	minioClient, err := s3.Connect(s3.Config{
 		Endpoint:  env.Must("S3_ENDPOINT"),
@@ -62,14 +83,14 @@ func main() {
 	}
 
 	server := grpcutil.NewServer()
-	notesGen.RegisterNotesServer(server, notesGrpc.NewHandler(
-		notesUsecase.NewUsecase(notesRepo.NewRepo(db)),
-	))
+	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db), authService)
+	notesGen.RegisterNotesServer(server, notesGrpc.NewHandler(notesUC))
+
+	attachmentsUC := attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage, notesService)
+	attachmentsGen.RegisterAttachmentsServer(server, attachmentsGrpc.NewHandler(attachmentsUC))
+
 	tagsGen.RegisterTagsServer(server, tagsGrpc.NewHandler(
 		tagsUsecase.NewUsecase(tagsRepo.NewRepo(db)),
-	))
-	attachmentsGen.RegisterAttachmentsServer(server, attachmentsGrpc.NewHandler(
-		attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage),
 	))
 
 	if err := grpcutil.Serve(server, grpcAddr); err != nil {

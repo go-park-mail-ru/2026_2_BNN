@@ -17,6 +17,34 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AddCollaboratorRequestRole.
+const (
+	Editor AddCollaboratorRequestRole = "editor"
+	Viewer AddCollaboratorRequestRole = "viewer"
+)
+
+// Valid indicates whether the value is a known member of the AddCollaboratorRequestRole enum.
+func (e AddCollaboratorRequestRole) Valid() bool {
+	switch e {
+	case Editor:
+		return true
+	case Viewer:
+		return true
+	default:
+		return false
+	}
+}
+
+// AddCollaboratorRequest defines model for AddCollaboratorRequest.
+type AddCollaboratorRequest struct {
+	// Login Example: vasya1111
+	Login string                     `json:"login"`
+	Role  AddCollaboratorRequestRole `json:"role"`
+}
+
+// AddCollaboratorRequestRole defines model for AddCollaboratorRequest.Role.
+type AddCollaboratorRequestRole string
+
 // Block defines model for Block.
 type Block struct {
 	// Content Произвольный JSON блока
@@ -132,6 +160,9 @@ type CreateNoteJSONRequestBody = CreateNoteRequest
 // UpdateNoteJSONRequestBody defines body for UpdateNote for application/json ContentType.
 type UpdateNoteJSONRequestBody = UpdateNoteRequest
 
+// AddCollaboratorJSONRequestBody defines body for AddCollaborator for application/json ContentType.
+type AddCollaboratorJSONRequestBody = AddCollaboratorRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// CreateNote Создать заметку
@@ -152,6 +183,12 @@ type ServerInterface interface {
 	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(w http.ResponseWriter, r *http.Request, id NoteID)
+	// AddCollaborator Добавить коллаборатора к заметке
+	// (POST /notes/{id}/collaborators)
+	AddCollaborator(w http.ResponseWriter, r *http.Request, id NoteID)
+	// RemoveCollaborator Удалить коллаборатора из заметки
+	// (DELETE /notes/{id}/collaborators/{user_id})
+	RemoveCollaborator(w http.ResponseWriter, r *http.Request, id NoteID, userId openapi_types.UUID)
 	// RemoveFavorite Удалить заметку из избранного
 	// (DELETE /notes/{id}/favorite)
 	RemoveFavorite(w http.ResponseWriter, r *http.Request, id NoteID)
@@ -312,6 +349,67 @@ func (siw *ServerInterfaceWrapper) UpdateNote(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateNote(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddCollaborator operation middleware
+func (siw *ServerInterfaceWrapper) AddCollaborator(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id NoteID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddCollaborator(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveCollaborator operation middleware
+func (siw *ServerInterfaceWrapper) RemoveCollaborator(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id NoteID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", mux.Vars(r)["user_id"], &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveCollaborator(w, r, id, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -501,6 +599,10 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.RemoveFavorite).Methods(http.MethodDelete)
 
 	r.HandleFunc(options.BaseURL+"/notes/{id}/favorite", wrapper.AddFavorite).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/notes/{id}/collaborators", wrapper.AddCollaborator).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/notes/{id}/collaborators/{user_id}", wrapper.RemoveCollaborator).Methods(http.MethodDelete)
 
 	return r
 }
@@ -767,6 +869,96 @@ func (response UpdateNote413Response) VisitUpdateNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type AddCollaboratorRequestObject struct {
+	Id   NoteID `json:"id"`
+	Body *AddCollaboratorJSONRequestBody
+}
+
+type AddCollaboratorResponseObject interface {
+	VisitAddCollaboratorResponse(w http.ResponseWriter) error
+}
+
+type AddCollaborator201Response struct {
+}
+
+func (response AddCollaborator201Response) VisitAddCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(201)
+	return nil
+}
+
+type AddCollaborator400Response struct {
+}
+
+func (response AddCollaborator400Response) VisitAddCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type AddCollaborator401Response struct {
+}
+
+func (response AddCollaborator401Response) VisitAddCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type AddCollaborator403Response struct {
+}
+
+func (response AddCollaborator403Response) VisitAddCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type AddCollaborator404Response struct {
+}
+
+func (response AddCollaborator404Response) VisitAddCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type RemoveCollaboratorRequestObject struct {
+	Id     NoteID             `json:"id"`
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type RemoveCollaboratorResponseObject interface {
+	VisitRemoveCollaboratorResponse(w http.ResponseWriter) error
+}
+
+type RemoveCollaborator204Response struct {
+}
+
+func (response RemoveCollaborator204Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveCollaborator401Response struct {
+}
+
+func (response RemoveCollaborator401Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type RemoveCollaborator403Response struct {
+}
+
+func (response RemoveCollaborator403Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type RemoveCollaborator404Response struct {
+}
+
+func (response RemoveCollaborator404Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
 type RemoveFavoriteRequestObject struct {
 	Id NoteID `json:"id"`
 }
@@ -851,6 +1043,12 @@ type StrictServerInterface interface {
 	// UpdateNote Сохранить заметку целиком
 	// (PUT /notes/{id})
 	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
+	// AddCollaborator Добавить коллаборатора к заметке
+	// (POST /notes/{id}/collaborators)
+	AddCollaborator(ctx context.Context, request AddCollaboratorRequestObject) (AddCollaboratorResponseObject, error)
+	// RemoveCollaborator Удалить коллаборатора из заметки
+	// (DELETE /notes/{id}/collaborators/{user_id})
+	RemoveCollaborator(ctx context.Context, request RemoveCollaboratorRequestObject) (RemoveCollaboratorResponseObject, error)
 	// RemoveFavorite Удалить заметку из избранного
 	// (DELETE /notes/{id}/favorite)
 	RemoveFavorite(ctx context.Context, request RemoveFavoriteRequestObject) (RemoveFavoriteResponseObject, error)
@@ -1057,6 +1255,66 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, id N
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateNoteResponseObject); ok {
 		if err := validResponse.VisitUpdateNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddCollaborator operation middleware
+func (sh *strictHandler) AddCollaborator(w http.ResponseWriter, r *http.Request, id NoteID) {
+	var request AddCollaboratorRequestObject
+
+	request.Id = id
+
+	var body AddCollaboratorJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddCollaborator(ctx, request.(AddCollaboratorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddCollaborator")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddCollaboratorResponseObject); ok {
+		if err := validResponse.VisitAddCollaboratorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveCollaborator operation middleware
+func (sh *strictHandler) RemoveCollaborator(w http.ResponseWriter, r *http.Request, id NoteID, userId openapi_types.UUID) {
+	var request RemoveCollaboratorRequestObject
+
+	request.Id = id
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveCollaborator(ctx, request.(RemoveCollaboratorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveCollaborator")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveCollaboratorResponseObject); ok {
+		if err := validResponse.VisitRemoveCollaboratorResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

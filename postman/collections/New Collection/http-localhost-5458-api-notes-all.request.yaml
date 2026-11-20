@@ -1,6 +1,0 @@
-$kind: http-request
-name: GET /api/notes/all
-description: Get all notes for the authenticated user. Requires the bnn_access cookie set by /api/auth/signin or /api/auth/signup.
-url: http://localhost:5458/api/
-method: GET
-order: 1100

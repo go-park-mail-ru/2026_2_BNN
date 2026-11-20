@@ -54,9 +54,21 @@ func TestReadProfile(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "public email",
-			user:     `{"email":"a@b.ru","avatar_url":"https://avatars/1"}`,
-			expected: models.OAuthProfile{Email: "a@b.ru", AvatarURL: "https://avatars/1"},
+			name:     "public email ignored, verified primary used",
+			user:     `{"email":"public@b.ru","avatar_url":"https://avatars/1"}`,
+			emails:   `[{"email":"public@b.ru","primary":false,"verified":false},{"email":"main@b.ru","primary":true,"verified":true}]`,
+			expected: models.OAuthProfile{Email: "main@b.ru", AvatarURL: "https://avatars/1"},
+		},
+		{
+			name:    "public email without verified primary",
+			user:    `{"email":"public@b.ru"}`,
+			emails:  `[{"email":"public@b.ru","primary":true,"verified":false}]`,
+			wantErr: true,
+		},
+		{
+			name:    "public email and emails request failed",
+			user:    `{"email":"public@b.ru"}`,
+			wantErr: true,
 		},
 		{
 			name:     "primary verified email",

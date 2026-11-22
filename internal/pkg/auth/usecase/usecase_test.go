@@ -197,22 +197,52 @@ func TestRefresh(t *testing.T) {
 		{
 			name: "ok",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().DeleteRefreshToken(gomock.Any(), hash).
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).
 					Return(models.RefreshToken{UserID: userID, ExpiresAt: time.Now().Add(time.Hour)}, nil)
 				repo.EXPECT().CreateRefreshToken(gomock.Any(), gomock.Any()).Return(nil)
+				repo.EXPECT().IsSessionActive(gomock.Any(), gomock.Any()).Return(true, nil)
 			},
 		},
 		{
 			name: "unknown token",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().DeleteRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
+				repo.EXPECT().ReadRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
 			},
 			expectedErr: models.ErrInvalidToken,
 		},
 		{
+			name: "reused token revokes all sessions",
+			prepare: func(repo *mocks.MockRepo) {
+				revokedAt := time.Now()
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
+				repo.EXPECT().ReadRefreshToken(gomock.Any(), hash).
+					Return(models.RefreshToken{UserID: userID, RevokedAt: &revokedAt}, nil)
+				repo.EXPECT().DeleteUserRefreshTokens(gomock.Any(), userID).Return(nil)
+			},
+			expectedErr: models.ErrInvalidToken,
+		},
+		{
+			name: "reused token and delete failed",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
+				repo.EXPECT().ReadRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{UserID: userID}, nil)
+				repo.EXPECT().DeleteUserRefreshTokens(gomock.Any(), userID).Return(errDB)
+			},
+			expectedErr: errDB,
+		},
+		{
+			name: "read token db error",
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, models.ErrRefreshTokenNotFound)
+				repo.EXPECT().ReadRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, errDB)
+			},
+			expectedErr: errDB,
+		},
+		{
 			name: "expired token",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().DeleteRefreshToken(gomock.Any(), hash).
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).
 					Return(models.RefreshToken{UserID: userID, ExpiresAt: time.Now().Add(-time.Hour)}, nil)
 			},
 			expectedErr: models.ErrInvalidToken,
@@ -220,7 +250,7 @@ func TestRefresh(t *testing.T) {
 		{
 			name: "db error",
 			prepare: func(repo *mocks.MockRepo) {
-				repo.EXPECT().DeleteRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, errDB)
+				repo.EXPECT().RevokeRefreshToken(gomock.Any(), hash).Return(models.RefreshToken{}, errDB)
 			},
 			expectedErr: errDB,
 		},
@@ -283,26 +313,50 @@ func TestLogout(t *testing.T) {
 
 func TestAuthenticate(t *testing.T) {
 	userID := uuid.NewV4()
+	sessionID := uuid.NewV4()
 	u := NewUsecase(nil, nil, nil, secret)
 
-	valid, err := u.newToken(userID, accessAudience, time.Now().Add(time.Minute))
+	valid, err := u.newToken(userID, sessionID, accessAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
-	expired, err := u.newToken(userID, accessAudience, time.Now().Add(-time.Minute))
+	expired, err := u.newToken(userID, sessionID, accessAudience, time.Now().Add(-time.Minute))
 	require.NoError(t, err)
 
-	foreign, err := NewUsecase(nil, nil, nil, "other_secret").newToken(userID, accessAudience, time.Now().Add(time.Minute))
+	foreign, err := NewUsecase(nil, nil, nil, "other_secret").newToken(userID, sessionID, accessAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
-	twoFactor, err := u.newToken(userID, twoFactorAudience, time.Now().Add(time.Minute))
+	twoFactor, err := u.newToken(userID, uuid.Nil, twoFactorAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
 		token       string
+		prepare     func(repo *mocks.MockRepo)
 		expectedErr error
 	}{
-		{name: "ok", token: valid},
+		{
+			name:  "ok",
+			token: valid,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().IsSessionActive(gomock.Any(), sessionID).Return(true, nil)
+			},
+		},
+		{
+			name:  "session revoked",
+			token: valid,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().IsSessionActive(gomock.Any(), sessionID).Return(false, nil)
+			},
+			expectedErr: models.ErrInvalidToken,
+		},
+		{
+			name:  "db error",
+			token: valid,
+			prepare: func(repo *mocks.MockRepo) {
+				repo.EXPECT().IsSessionActive(gomock.Any(), sessionID).Return(false, errDB)
+			},
+			expectedErr: errDB,
+		},
 		{name: "2fa token", token: twoFactor, expectedErr: models.ErrInvalidToken},
 		{name: "expired", token: expired, expectedErr: models.ErrInvalidToken},
 		{name: "other secret", token: foreign, expectedErr: models.ErrInvalidToken},
@@ -311,7 +365,13 @@ func TestAuthenticate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			id, err := u.Authenticate(context.Background(), tt.token)
+			ctrl := gomock.NewController(t)
+			repo := mocks.NewMockRepo(ctrl)
+			if tt.prepare != nil {
+				tt.prepare(repo)
+			}
+
+			id, err := NewUsecase(repo, nil, nil, secret).Authenticate(context.Background(), tt.token)
 
 			if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
@@ -598,7 +658,7 @@ func TestSignInWithTwoFactor(t *testing.T) {
 	assert.Empty(t, tokens.RefreshToken)
 	assert.NotEmpty(t, tokens.TwoFactorToken)
 
-	id, err := u.parseToken(tokens.TwoFactorToken, twoFactorAudience)
+	id, _, err := u.parseToken(tokens.TwoFactorToken, twoFactorAudience)
 	require.NoError(t, err)
 	assert.Equal(t, user.ID, id)
 }
@@ -606,9 +666,9 @@ func TestSignInWithTwoFactor(t *testing.T) {
 func TestVerifyTwoFactor(t *testing.T) {
 	userID := uuid.NewV4()
 	u := NewUsecase(nil, nil, nil, secret)
-	pending, err := u.newToken(userID, twoFactorAudience, time.Now().Add(time.Minute))
+	pending, err := u.newToken(userID, uuid.Nil, twoFactorAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
-	access, err := u.newToken(userID, accessAudience, time.Now().Add(time.Minute))
+	access, err := u.newToken(userID, uuid.NewV4(), accessAudience, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 	user := models.User{ID: userID, Is2FAEnabled: true, TOTPSecret: totpSecret}
 

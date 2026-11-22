@@ -35,8 +35,11 @@ type Repo interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, hash []byte) error
 
 	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
+	RevokeRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
+	ReadRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
 	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error)
 
 	Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error
 	UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error

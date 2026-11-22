@@ -650,3 +650,76 @@ func TestAddCollaborator(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateIcon(t *testing.T) {
+	tests := []struct {
+		name    string
+		icon    string
+		wantErr bool
+	}{
+		{name: "empty", icon: ""},
+		{name: "simple emoji", icon: "👋"},
+		{name: "emoji with skin tone", icon: "👍🏽"},
+		{name: "family with zero width joiner", icon: "👨‍👩‍👧"},
+		{name: "flag", icon: "🇷🇺"},
+		{name: "emoji with variation selector", icon: "❤️"},
+		{name: "letter", icon: "a", wantErr: true},
+		{name: "digit", icon: "1", wantErr: true},
+		{name: "space", icon: " ", wantErr: true},
+		{name: "ascii symbol", icon: "^", wantErr: true},
+		{name: "html", icon: "<script>", wantErr: true},
+		{name: "emoji with text", icon: "👋 hi", wantErr: true},
+		{name: "too long", icon: strings.Repeat("👋", maxIconLength+1), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateIcon(tt.icon)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, models.ErrValidation)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateHeader(t *testing.T) {
+	tests := []struct {
+		name    string
+		header  string
+		wantErr bool
+	}{
+		{name: "empty", header: ""},
+		{name: "text", header: "Планы на неделю"},
+		{name: "max length", header: strings.Repeat("я", maxHeaderLength)},
+		{name: "too long", header: strings.Repeat("я", maxHeaderLength+1), wantErr: true},
+		{name: "new line", header: "раз\nдва", wantErr: true},
+		{name: "null byte", header: "a\x00b", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateHeader(tt.header)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, models.ErrValidation)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestNoteInvalidIconAndHeader(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	u := NewUsecase(mocks.NewMockRepo(ctrl), &mockAuthClient{})
+	userID := uuid.NewV4()
+	badIcon := "<script>"
+	badHeader := strings.Repeat("я", maxHeaderLength+1)
+
+	_, err := u.CreateNote(context.Background(), userID, notes.CreateNoteRequest{Title: "ok", Icon: &badIcon})
+	assert.ErrorIs(t, err, models.ErrValidation)
+
+	_, err = u.UpdateNote(context.Background(), userID, uuid.NewV4(), notes.UpdateNoteRequest{Title: "ok", Header: &badHeader})
+	assert.ErrorIs(t, err, models.ErrValidation)
+}

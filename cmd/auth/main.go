@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
 	authGrpc "bnn/internal/pkg/auth/delivery/grpc"
 	authGen "bnn/internal/pkg/auth/delivery/grpc/gen"
@@ -15,14 +18,18 @@ import (
 	"bnn/internal/pkg/env"
 	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/logger"
+	"bnn/internal/pkg/metrics"
 	"bnn/internal/pkg/s3"
 
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 )
 
 const (
 	grpcAddr          = ":9001"
+	metricsAddr       = ":9102"
+	shutdownTimeout   = 5 * time.Second
 	defaultAppBaseURL = "http://localhost:5458"
 )
 
@@ -67,8 +74,23 @@ func main() {
 
 	uc := authUsecase.NewUsecase(authRepo.NewRepo(db), avatarStorage, githubRepo, env.Must("JWT_SECRET"))
 
-	server := grpcutil.NewServer()
+	grpcMetrics := metrics.NewGRPC(prometheus.DefaultRegisterer)
+	server := grpcutil.NewServer(grpcMetrics)
 	authGen.RegisterAuthServer(server, authGrpc.NewHandler(uc))
+
+	metricsServer := metrics.NewServer(metricsAddr)
+	go func() {
+		slog.InfoContext(ctx, "Starting metrics server", "address", metricsAddr)
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.ErrorContext(ctx, "Metrics server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = metricsServer.Shutdown(shutdownCtx)
+	}()
 
 	if err := grpcutil.Serve(server, grpcAddr); err != nil {
 		slog.ErrorContext(ctx, "gRPC server failed", "error", err)

@@ -25,6 +25,7 @@ type Usecase interface {
 	RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error
 	GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error)
 	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
+	GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error)
 }
 
 type Repo interface {

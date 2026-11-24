@@ -431,3 +431,12 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 
 	return user, nil
 }
+
+func (u *Usecase) GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error) {
+	user, err := u.repo.ReadUserByLogin(ctx, login)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return user.ID, nil
+}

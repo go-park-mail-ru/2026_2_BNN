@@ -57,7 +57,12 @@ services:
         condition: service_completed_successfully
       s3:
         condition: service_started
+    volumes:
+      - ./certs:/certs:ro
     environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
       S3_ENDPOINT: s3:9000
@@ -81,8 +86,14 @@ services:
         condition: service_completed_successfully
       s3:
         condition: service_started
+    volumes:
+      - ./certs:/certs:ro
     environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      AUTH_GRPC_ADDR: auth:9001
       S3_ENDPOINT: s3:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
@@ -103,12 +114,16 @@ services:
         condition: service_started
     ports:
       - "127.0.0.1:5458:5458"
+    volumes:
+      - ./certs:/certs:ro
     environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is not set}
       FRONTEND_URL: ${FRONTEND_URL}
       AUTH_GRPC_ADDR: auth:9001
       NOTES_GRPC_ADDR: notes:9002
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     restart: unless-stopped
 
   prometheus:

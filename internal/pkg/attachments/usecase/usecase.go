@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"bnn/internal/models"
@@ -95,6 +96,9 @@ func (u *Usecase) readAttachmentForRead(ctx context.Context, userID, attachmentI
 	}
 
 	if err := u.checkReadAccess(ctx, userID, attachment.BlockID); err != nil {
+		if errors.Is(err, models.ErrForbidden) {
+			return models.Attachment{}, models.ErrForbidden
+		}
 		return models.Attachment{}, models.ErrAttachmentNotFound
 	}
 
@@ -108,6 +112,9 @@ func (u *Usecase) readAttachmentForEdit(ctx context.Context, userID, attachmentI
 	}
 
 	if err := u.checkEditAccess(ctx, userID, attachment.BlockID); err != nil {
+		if errors.Is(err, models.ErrForbidden) {
+			return models.Attachment{}, models.ErrForbidden
+		}
 		return models.Attachment{}, models.ErrAttachmentNotFound
 	}
 
@@ -120,8 +127,7 @@ func (u *Usecase) checkReadAccess(ctx context.Context, userID, blockID uuid.UUID
 		return models.ErrBlockNotFound
 	}
 
-	_, err = u.notesClient.CheckAccess(ctx, userID, noteID)
-	return err
+	return u.ensureReadAccess(ctx, userID, noteID)
 }
 
 func (u *Usecase) checkEditAccess(ctx context.Context, userID, blockID uuid.UUID) error {
@@ -130,14 +136,21 @@ func (u *Usecase) checkEditAccess(ctx context.Context, userID, blockID uuid.UUID
 		return models.ErrBlockNotFound
 	}
 
+	return u.ensureWriteAccess(ctx, userID, noteID)
+}
+
+func (u *Usecase) ensureWriteAccess(ctx context.Context, userID, noteID uuid.UUID) error {
 	role, err := u.notesClient.CheckAccess(ctx, userID, noteID)
 	if err != nil {
 		return err
 	}
-
-	if role == "viewer" {
+	if role != "owner" && role != "editor" {
 		return models.ErrForbidden
 	}
-
 	return nil
+}
+
+func (u *Usecase) ensureReadAccess(ctx context.Context, userID, noteID uuid.UUID) error {
+	_, err := u.notesClient.CheckAccess(ctx, userID, noteID)
+	return err
 }

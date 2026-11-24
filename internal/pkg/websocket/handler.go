@@ -6,36 +6,28 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
-	"strings"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/middleware"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 )
 
-type NotesGetter interface {
-	GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error)
+type NotesAccessChecker interface {
 	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
 }
 
 type Handler struct {
 	hub      *Hub
 	upgrader websocket.Upgrader
-	notes    NotesGetter
+	notes    NotesAccessChecker
 }
 
-func NewHandler(hub *Hub, allowedOrigins string, notes NotesGetter) *Handler {
-	allowed := make([]string, 0)
-	for _, origin := range strings.Split(allowedOrigins, ",") {
-		origin = strings.TrimSpace(origin)
-		origin = strings.TrimSuffix(origin, "/")
-		if origin != "" {
-			allowed = append(allowed, origin)
-		}
-	}
+func NewHandler(hub *Hub, allowedOrigins string, notes NotesAccessChecker) *Handler {
+	allowed := middleware.ParseOrigins(allowedOrigins)
 
 	return &Handler{
 		hub:   hub,
@@ -78,7 +70,7 @@ func (h *Handler) ServeNoteWS(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
-		slog.ErrorContext(r.Context(), "Failed to check access", "error", err)
+		slog.ErrorContext(r.Context(), "Failed to check role", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

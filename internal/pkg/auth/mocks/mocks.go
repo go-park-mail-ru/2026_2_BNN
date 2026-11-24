@@ -145,6 +145,21 @@ func (mr *MockUsecaseMockRecorder) GetUser(ctx, userID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockUsecase)(nil).GetUser), ctx, userID)
 }
 
+// GetUserByLogin mocks base method.
+func (m *MockUsecase) GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserByLogin", ctx, login)
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserByLogin indicates an expected call of GetUserByLogin.
+func (mr *MockUsecaseMockRecorder) GetUserByLogin(ctx, login any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByLogin", reflect.TypeOf((*MockUsecase)(nil).GetUserByLogin), ctx, login)
+}
+
 // HandleOAuthCallback mocks base method.
 func (m *MockUsecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
 	m.ctrl.T.Helper()

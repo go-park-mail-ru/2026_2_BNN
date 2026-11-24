@@ -46,6 +46,9 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 	contentType := http.DetectContentType(data)
 
 	attachment, err := h.uc.UploadAttachment(ctx, userID, uuid.UUID(req.Id), data, contentType)
+	if errors.Is(err, models.ErrForbidden) {
+		return api.UploadAttachment403Response{}, nil
+	}
 	if errors.Is(err, models.ErrBlockNotFound) {
 		return api.UploadAttachment404Response{}, nil
 	}
@@ -70,6 +73,9 @@ func (h *Handler) GetAttachment(ctx context.Context, req api.GetAttachmentReques
 	}
 
 	file, err := h.uc.GetAttachment(ctx, userID, uuid.UUID(req.Id))
+	if errors.Is(err, models.ErrForbidden) {
+		return api.GetAttachment403Response{}, nil
+	}
 	if errors.Is(err, models.ErrAttachmentNotFound) {
 		return api.GetAttachment404Response{}, nil
 	}
@@ -91,6 +97,9 @@ func (h *Handler) DeleteAttachment(ctx context.Context, req api.DeleteAttachment
 	}
 
 	err := h.uc.DeleteAttachment(ctx, userID, uuid.UUID(req.Id))
+	if errors.Is(err, models.ErrForbidden) {
+		return api.DeleteAttachment403Response{}, nil
+	}
 	if errors.Is(err, models.ErrAttachmentNotFound) {
 		return api.DeleteAttachment404Response{}, nil
 	}

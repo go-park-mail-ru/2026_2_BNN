@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
 	attachmentsGrpc "bnn/internal/pkg/attachments/delivery/grpc"
 	attachmentsGen "bnn/internal/pkg/attachments/delivery/grpc/gen"
@@ -15,7 +18,7 @@ import (
 	"bnn/internal/pkg/env"
 	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/logger"
-	notesClient "bnn/internal/pkg/notes/client"
+	"bnn/internal/pkg/metrics"
 	notesGrpc "bnn/internal/pkg/notes/delivery/grpc"
 	notesGen "bnn/internal/pkg/notes/delivery/grpc/gen"
 	notesRepo "bnn/internal/pkg/notes/repo/postgres"
@@ -27,11 +30,14 @@ import (
 	tagsUsecase "bnn/internal/pkg/tags/usecase"
 
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 )
 
 const (
 	grpcAddr        = ":9002"
+	metricsAddr     = ":9103"
+	shutdownTimeout = 5 * time.Second
 	defaultAuthAddr = "localhost:9001"
 )
 
@@ -61,11 +67,6 @@ func main() {
 
 	authService := authClient.NewClient(authConn)
 
-	notesAddr := lo.CoalesceOrEmpty(os.Getenv("NOTES_GRPC_ADDR"), grpcAddr)
-	notesConn, _ := grpcutil.NewClient(notesAddr)
-	defer notesConn.Close()
-	notesService := notesClient.NewClient(notesConn)
-
 	minioClient, err := s3.Connect(s3.Config{
 		Endpoint:  env.Must("S3_ENDPOINT"),
 		AccessKey: env.Must("S3_ACCESS_KEY"),
@@ -82,16 +83,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	server := grpcutil.NewServer()
+	grpcMetrics := metrics.NewGRPC(prometheus.DefaultRegisterer)
+	server := grpcutil.NewServer(grpcMetrics)
+
 	notesUC := notesUsecase.NewUsecase(notesRepo.NewRepo(db), authService)
 	notesGen.RegisterNotesServer(server, notesGrpc.NewHandler(notesUC))
 
-	attachmentsUC := attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage, notesService)
+	attachmentsUC := attachmentsUsecase.NewUsecase(attachmentsRepo.NewRepo(db), attachmentsStorage, notesUC)
 	attachmentsGen.RegisterAttachmentsServer(server, attachmentsGrpc.NewHandler(attachmentsUC))
 
 	tagsGen.RegisterTagsServer(server, tagsGrpc.NewHandler(
 		tagsUsecase.NewUsecase(tagsRepo.NewRepo(db)),
 	))
+
+	metricsServer := metrics.NewServer(metricsAddr)
+	go func() {
+		slog.InfoContext(ctx, "Starting metrics server", "address", metricsAddr)
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.ErrorContext(ctx, "Metrics server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = metricsServer.Shutdown(shutdownCtx)
+	}()
 
 	if err := grpcutil.Serve(server, grpcAddr); err != nil {
 		slog.ErrorContext(ctx, "gRPC server failed", "error", err)

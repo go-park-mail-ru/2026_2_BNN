@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 	"unicode/utf8"
@@ -10,7 +9,6 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/notes"
 
-	"github.com/jackc/pgx/v5"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -35,8 +33,7 @@ func NewUsecase(repo notes.Repo, authClient AuthClient) *Usecase {
 }
 
 func (u *Usecase) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
-	_, err := u.CheckAccess(ctx, userID, noteID)
-	if err != nil {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
 		return models.Note{}, err
 	}
 	note, err := u.repo.ReadNote(ctx, noteID)
@@ -66,15 +63,12 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 		return models.Note{}, err
 	}
 	if req.ParentNoteID != nil {
-		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
+		role, err := u.CheckAccess(ctx, userID, *req.ParentNoteID)
 		if err != nil {
-			if errors.Is(err, models.ErrNoteNotFound) {
-				return models.Note{}, models.ErrNoteNotFound
-			}
 			return models.Note{}, err
 		}
-		if parentNote.CreatedBy != userID {
-			return models.Note{}, models.ErrNoteNotFound
+		if role != RoleOwner && role != RoleEditor {
+			return models.Note{}, models.ErrForbidden
 		}
 	}
 
@@ -108,7 +102,7 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 	if err != nil {
 		return models.Note{}, err
 	}
-	if role == RoleViewer {
+	if role != RoleOwner && role != RoleEditor {
 		return models.Note{}, models.ErrForbidden
 	}
 
@@ -136,8 +130,8 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		oldIDs[b.ID] = true
 	}
 
-	var blocksToSave []models.Block
-	var finalBlockIDs []uuid.UUID
+	blocksToSave := make([]models.Block, 0, len(req.Blocks))
+	finalBlockIDs := make([]uuid.UUID, 0, len(req.Blocks))
 
 	for _, b := range req.Blocks {
 		id := uuid.NewV4()
@@ -171,7 +165,7 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		}
 	}
 
-	tags, err := u.noteTags(ctx, userID, noteID, req.TagIDs)
+	tags, err := u.noteTags(ctx, note.CreatedBy, noteID, req.TagIDs)
 	if err != nil {
 		return models.Note{}, err
 	}
@@ -214,14 +208,16 @@ func (u *Usecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) erro
 }
 
 func (u *Usecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
-	_, err := u.CheckAccess(ctx, userID, noteID)
-	if err != nil {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
 		return err
 	}
 	return u.repo.AddFavorite(ctx, userID, noteID)
 }
 
 func (u *Usecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
+		return err
+	}
 	return u.repo.RemoveFavorite(ctx, userID, noteID)
 }
 
@@ -250,19 +246,14 @@ func (u *Usecase) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (st
 		return RoleOwner, nil
 	}
 
-	role, err := u.repo.ReadCollaboratorRole(ctx, noteID, userID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", models.ErrNoteNotFound
-		}
-		return "", err
-	}
-
-	return role, nil
+	return u.repo.ReadCollaboratorRole(ctx, noteID, userID)
 }
 
 func (u *Usecase) AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login string, role string) error {
 	if role != RoleEditor && role != RoleViewer {
+		return models.ErrValidation
+	}
+	if login == "" {
 		return models.ErrValidation
 	}
 
@@ -301,4 +292,22 @@ func (u *Usecase) RemoveCollaborator(ctx context.Context, userID, noteID, target
 type AuthClient interface {
 	CheckUserExists(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error)
+}
+
+func (u *Usecase) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error) {
+	updatedAt, err := u.repo.GetNoteUpdatedAt(ctx, noteID)
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	if since != nil && !updatedAt.After(*since) {
+		return updatedAt, nil, nil
+	}
+
+	blocks, err := u.repo.ReadBlocks(ctx, noteID)
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	return updatedAt, blocks, nil
 }

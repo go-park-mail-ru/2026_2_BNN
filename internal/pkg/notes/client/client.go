@@ -14,6 +14,7 @@ import (
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ notes.Usecase = (*Client)(nil)
@@ -117,6 +118,32 @@ func (c *Client) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.T
 	return resp.UpdatedAt.AsTime(), nil
 }
 
+func (c *Client) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error) {
+	req := &gen.GetNoteUpdatesRequest{
+		NoteId: noteID.String(),
+	}
+	if since != nil {
+		req.Since = timestamppb.New(*since)
+	}
+
+	resp, err := c.client.GetNoteUpdates(ctx, req)
+	if err != nil {
+		return time.Time{}, nil, grpcerr.FromStatus(err)
+	}
+
+	blocks, err := notesgrpc.BlocksFromProto(resp.GetBlocks())
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	var updatedAt time.Time
+	if resp.GetUpdatedAt() != nil {
+		updatedAt = resp.GetUpdatedAt().AsTime()
+	}
+
+	return updatedAt, blocks, nil
+}
+
 func (c *Client) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
 	resp, err := c.client.CheckAccess(ctx, &gen.CheckAccessRequest{
 		UserId: userID.String(),
@@ -130,10 +157,10 @@ func (c *Client) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (str
 
 func (c *Client) AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login string, role string) error {
 	_, err := c.client.AddCollaborator(ctx, &gen.AddCollaboratorRequest{
-		UserId:       userID.String(),
-		NoteId:       noteID.String(),
-		TargetUserId: login,
-		Role:         role,
+		UserId: userID.String(),
+		NoteId: noteID.String(),
+		Login:  login,
+		Role:   role,
 	})
 	return grpcerr.FromStatus(err)
 }

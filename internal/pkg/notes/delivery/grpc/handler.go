@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/grpcconv"
@@ -195,22 +196,6 @@ func toNotesResponse(list []models.Note) *gen.NotesResponse {
 	}
 }
 
-func (h *Handler) GetNoteUpdatedAt(ctx context.Context, req *gen.GetNoteUpdatedAtRequest) (*gen.GetNoteUpdatedAtResponse, error) {
-	noteID, err := uuid.FromString(req.NoteId)
-	if err != nil {
-		return nil, grpcerr.ToStatus(models.ErrValidation)
-	}
-
-	updatedAt, err := h.uc.GetNoteUpdatedAt(ctx, noteID)
-	if err != nil {
-		return nil, grpcerr.ToStatus(err)
-	}
-
-	return &gen.GetNoteUpdatedAtResponse{
-		UpdatedAt: timestamppb.New(updatedAt),
-	}, nil
-}
-
 func (h *Handler) CheckAccess(ctx context.Context, req *gen.CheckAccessRequest) (*gen.CheckAccessResponse, error) {
 	userID, err := uuid.FromString(req.UserId)
 	if err != nil {
@@ -230,16 +215,16 @@ func (h *Handler) CheckAccess(ctx context.Context, req *gen.CheckAccessRequest) 
 }
 
 func (h *Handler) AddCollaborator(ctx context.Context, req *gen.AddCollaboratorRequest) (*emptypb.Empty, error) {
-	userID, err := uuid.FromString(req.UserId)
+	userID, err := uuid.FromString(req.GetUserId())
 	if err != nil {
 		return nil, grpcerr.ToStatus(models.ErrValidation)
 	}
-	noteID, err := uuid.FromString(req.NoteId)
+	noteID, err := uuid.FromString(req.GetNoteId())
 	if err != nil {
 		return nil, grpcerr.ToStatus(models.ErrValidation)
 	}
 
-	err = h.uc.AddCollaborator(ctx, userID, noteID, req.TargetUserId, req.Role)
+	err = h.uc.AddCollaborator(ctx, userID, noteID, req.GetLogin(), req.GetRole())
 	if err != nil {
 		return nil, grpcerr.ToStatus(err)
 	}
@@ -267,4 +252,48 @@ func (h *Handler) RemoveCollaborator(ctx context.Context, req *gen.RemoveCollabo
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (h *Handler) GetNoteUpdates(ctx context.Context, req *gen.GetNoteUpdatesRequest) (*gen.GetNoteUpdatesResponse, error) {
+	noteID, err := uuid.FromString(req.GetNoteId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	var since *time.Time
+	if req.GetSince() != nil {
+		t := req.GetSince().AsTime()
+		since = &t
+	}
+
+	updatedAt, blocks, err := h.uc.GetNoteUpdates(ctx, noteID, since)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	protoBlocks := make([]*gen.Block, 0, len(blocks))
+	for _, b := range blocks {
+		protoBlocks = append(protoBlocks, BlockToProto(b))
+	}
+
+	return &gen.GetNoteUpdatesResponse{
+		UpdatedAt: timestamppb.New(updatedAt),
+		Blocks:    protoBlocks,
+	}, nil
+}
+
+func (h *Handler) GetNoteUpdatedAt(ctx context.Context, req *gen.GetNoteUpdatedAtRequest) (*gen.GetNoteUpdatedAtResponse, error) {
+	noteID, err := uuid.FromString(req.GetNoteId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	updatedAt, err := h.uc.GetNoteUpdatedAt(ctx, noteID)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &gen.GetNoteUpdatedAtResponse{
+		UpdatedAt: timestamppb.New(updatedAt),
+	}, nil
 }

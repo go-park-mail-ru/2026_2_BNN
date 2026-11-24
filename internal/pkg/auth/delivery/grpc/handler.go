@@ -192,3 +192,12 @@ func (h *Handler) CheckUserExists(ctx context.Context, req *gen.UserRequest) (*g
 
 	return &gen.CheckUserExistsResponse{Exists: true}, nil
 }
+
+func (h *Handler) GetUserByLogin(ctx context.Context, in *gen.GetUserByLoginRequest) (*gen.User, error) {
+	userID, err := h.uc.GetUserByLogin(ctx, in.GetLogin())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &gen.User{Id: userID.String()}, nil
+}

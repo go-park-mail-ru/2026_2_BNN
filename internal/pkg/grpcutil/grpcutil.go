@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"syscall"
+	"time"
+
+	"bnn/internal/pkg/metrics"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,11 +21,21 @@ import (
 
 const maxMessageSize = 20 << 20
 
-func NewServer() *grpc.Server {
+func NewServer(grpcMetrics ...metrics.GRPC) *grpc.Server {
+	interceptors := []grpc.UnaryServerInterceptor{
+		loggingInterceptor,
+	}
+
+	if len(grpcMetrics) > 0 && grpcMetrics[0] != nil {
+		interceptors = append(interceptors, metricsInterceptor(grpcMetrics[0]))
+	}
+
+	interceptors = append(interceptors, recoveryInterceptor)
+
 	return grpc.NewServer(
 		grpc.MaxRecvMsgSize(maxMessageSize),
 		grpc.MaxSendMsgSize(maxMessageSize),
-		grpc.UnaryInterceptor(recoveryInterceptor),
+		grpc.ChainUnaryInterceptor(interceptors...),
 	)
 }
 
@@ -70,4 +83,44 @@ func recoveryInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInf
 	}()
 
 	return handler(ctx, req)
+}
+
+func loggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	start := time.Now()
+	resp, err := handler(ctx, req)
+	duration := time.Since(start)
+	code := status.Code(err)
+
+	if err != nil {
+		slog.WarnContext(ctx, "gRPC request failed",
+			"method", info.FullMethod,
+			"code", code.String(),
+			"duration", duration,
+			"error", err,
+		)
+	} else {
+		slog.InfoContext(ctx, "gRPC request handled",
+			"method", info.FullMethod,
+			"code", code.String(),
+			"duration", duration,
+		)
+	}
+
+	return resp, err
+}
+
+func metricsInterceptor(m metrics.GRPC) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		duration := time.Since(start)
+
+		m.IncreaseHits(info.FullMethod)
+		m.ObserveDuration(info.FullMethod, duration)
+		if err != nil {
+			m.IncreaseErr(info.FullMethod, status.Code(err).String())
+		}
+
+		return resp, err
+	}
 }

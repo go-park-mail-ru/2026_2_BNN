@@ -15,7 +15,7 @@ const (
 
 var ErrNoOrigins = errors.New("no valid CORS origins")
 
-func parseOrigins(rawOrigins string) []string {
+func ParseOrigins(rawOrigins string) []string {
 	origins := make([]string, 0, 2)
 
 	for _, origin := range strings.Split(rawOrigins, ",") {
@@ -31,7 +31,7 @@ func parseOrigins(rawOrigins string) []string {
 }
 
 func NewCORS(rawOrigins string) (func(http.Handler) http.Handler, error) {
-	origins := parseOrigins(rawOrigins)
+	origins := ParseOrigins(rawOrigins)
 	if len(origins) == 0 {
 		return nil, ErrNoOrigins
 	}

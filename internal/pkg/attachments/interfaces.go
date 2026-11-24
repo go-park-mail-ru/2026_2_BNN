@@ -16,7 +16,6 @@ type Usecase interface {
 }
 
 type Repo interface {
-	ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error)
 	CreateAttachment(ctx context.Context, attachment models.Attachment) error
 	ReadAttachment(ctx context.Context, id uuid.UUID) (models.Attachment, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error

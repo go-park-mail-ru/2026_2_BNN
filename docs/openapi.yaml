@@ -449,6 +449,8 @@ paths:
           description: Не прошла валидация, битый JSON, id не UUID, чужой блок или тег
         '401':
           description: Нет куки или она истекла
+        '403':
+          description: Forbidden
         '404':
           description: Заметки нет или она чужая
         '413':
@@ -467,6 +469,8 @@ paths:
           description: id не UUID
         '401':
           description: Нет куки или она истекла
+        '403':
+          description: Forbidden
         '404':
           description: Заметки нет или она чужая
 
@@ -545,6 +549,8 @@ paths:
       responses:
         '204':
           description: "Участник удален"
+        '400':
+          description: "Неверные данные (невалидная роль)"
         '401':
           description: "Нет куки или она истекла"
         '403':
@@ -584,6 +590,8 @@ paths:
           description: Нет файла в поле file или id не UUID
         '401':
           description: Нет куки или она истекла
+        '403':
+          description: Forbidden
         '404':
           description: Блока нет или он в чужой заметке
         '413':
@@ -612,6 +620,8 @@ paths:
           description: id не UUID
         '401':
           description: Нет куки или она истекла
+        '403':
+          description: Forbidden
         '404':
           description: Файла нет или он в чужой заметке
     delete:
@@ -627,6 +637,8 @@ paths:
           description: id не UUID
         '401':
           description: Нет куки или она истекла
+        '403':
+          description: Forbidden
         '404':
           description: Файла нет или он в чужой заметке
   /tags:

@@ -761,6 +761,110 @@ func (x *GetNoteUpdatedAtResponse) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type GetNoteUpdatesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NoteId        string                 `protobuf:"bytes,1,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
+	Since         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=since,proto3" json:"since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNoteUpdatesRequest) Reset() {
+	*x = GetNoteUpdatesRequest{}
+	mi := &file_proto_notes_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNoteUpdatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNoteUpdatesRequest) ProtoMessage() {}
+
+func (x *GetNoteUpdatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_notes_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNoteUpdatesRequest.ProtoReflect.Descriptor instead.
+func (*GetNoteUpdatesRequest) Descriptor() ([]byte, []int) {
+	return file_proto_notes_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetNoteUpdatesRequest) GetNoteId() string {
+	if x != nil {
+		return x.NoteId
+	}
+	return ""
+}
+
+func (x *GetNoteUpdatesRequest) GetSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Since
+	}
+	return nil
+}
+
+type GetNoteUpdatesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Blocks        []*Block               `protobuf:"bytes,2,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNoteUpdatesResponse) Reset() {
+	*x = GetNoteUpdatesResponse{}
+	mi := &file_proto_notes_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNoteUpdatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNoteUpdatesResponse) ProtoMessage() {}
+
+func (x *GetNoteUpdatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_notes_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNoteUpdatesResponse.ProtoReflect.Descriptor instead.
+func (*GetNoteUpdatesResponse) Descriptor() ([]byte, []int) {
+	return file_proto_notes_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetNoteUpdatesResponse) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *GetNoteUpdatesResponse) GetBlocks() []*Block {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
 type CheckAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -771,7 +875,7 @@ type CheckAccessRequest struct {
 
 func (x *CheckAccessRequest) Reset() {
 	*x = CheckAccessRequest{}
-	mi := &file_proto_notes_proto_msgTypes[12]
+	mi := &file_proto_notes_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +887,7 @@ func (x *CheckAccessRequest) String() string {
 func (*CheckAccessRequest) ProtoMessage() {}
 
 func (x *CheckAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_notes_proto_msgTypes[12]
+	mi := &file_proto_notes_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +900,7 @@ func (x *CheckAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckAccessRequest.ProtoReflect.Descriptor instead.
 func (*CheckAccessRequest) Descriptor() ([]byte, []int) {
-	return file_proto_notes_proto_rawDescGZIP(), []int{12}
+	return file_proto_notes_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CheckAccessRequest) GetUserId() string {
@@ -822,7 +926,7 @@ type CheckAccessResponse struct {
 
 func (x *CheckAccessResponse) Reset() {
 	*x = CheckAccessResponse{}
-	mi := &file_proto_notes_proto_msgTypes[13]
+	mi := &file_proto_notes_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +938,7 @@ func (x *CheckAccessResponse) String() string {
 func (*CheckAccessResponse) ProtoMessage() {}
 
 func (x *CheckAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_notes_proto_msgTypes[13]
+	mi := &file_proto_notes_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +951,7 @@ func (x *CheckAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckAccessResponse.ProtoReflect.Descriptor instead.
 func (*CheckAccessResponse) Descriptor() ([]byte, []int) {
-	return file_proto_notes_proto_rawDescGZIP(), []int{13}
+	return file_proto_notes_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CheckAccessResponse) GetRole() string {
@@ -861,7 +965,7 @@ type AddCollaboratorRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	NoteId        string                 `protobuf:"bytes,2,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
-	TargetUserId  string                 `protobuf:"bytes,3,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Login         string                 `protobuf:"bytes,3,opt,name=login,proto3" json:"login,omitempty"`
 	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -869,7 +973,7 @@ type AddCollaboratorRequest struct {
 
 func (x *AddCollaboratorRequest) Reset() {
 	*x = AddCollaboratorRequest{}
-	mi := &file_proto_notes_proto_msgTypes[14]
+	mi := &file_proto_notes_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -881,7 +985,7 @@ func (x *AddCollaboratorRequest) String() string {
 func (*AddCollaboratorRequest) ProtoMessage() {}
 
 func (x *AddCollaboratorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_notes_proto_msgTypes[14]
+	mi := &file_proto_notes_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -894,7 +998,7 @@ func (x *AddCollaboratorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddCollaboratorRequest.ProtoReflect.Descriptor instead.
 func (*AddCollaboratorRequest) Descriptor() ([]byte, []int) {
-	return file_proto_notes_proto_rawDescGZIP(), []int{14}
+	return file_proto_notes_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AddCollaboratorRequest) GetUserId() string {
@@ -911,9 +1015,9 @@ func (x *AddCollaboratorRequest) GetNoteId() string {
 	return ""
 }
 
-func (x *AddCollaboratorRequest) GetTargetUserId() string {
+func (x *AddCollaboratorRequest) GetLogin() string {
 	if x != nil {
-		return x.TargetUserId
+		return x.Login
 	}
 	return ""
 }
@@ -936,7 +1040,7 @@ type RemoveCollaboratorRequest struct {
 
 func (x *RemoveCollaboratorRequest) Reset() {
 	*x = RemoveCollaboratorRequest{}
-	mi := &file_proto_notes_proto_msgTypes[15]
+	mi := &file_proto_notes_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +1052,7 @@ func (x *RemoveCollaboratorRequest) String() string {
 func (*RemoveCollaboratorRequest) ProtoMessage() {}
 
 func (x *RemoveCollaboratorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_notes_proto_msgTypes[15]
+	mi := &file_proto_notes_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +1065,7 @@ func (x *RemoveCollaboratorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveCollaboratorRequest.ProtoReflect.Descriptor instead.
 func (*RemoveCollaboratorRequest) Descriptor() ([]byte, []int) {
-	return file_proto_notes_proto_rawDescGZIP(), []int{15}
+	return file_proto_notes_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RemoveCollaboratorRequest) GetUserId() string {
@@ -1054,21 +1158,28 @@ const file_proto_notes_proto_rawDesc = "" +
 	"\anote_id\x18\x01 \x01(\tR\x06noteId\"U\n" +
 	"\x18GetNoteUpdatedAtResponse\x129\n" +
 	"\n" +
-	"updated_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"F\n" +
+	"updated_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"b\n" +
+	"\x15GetNoteUpdatesRequest\x12\x17\n" +
+	"\anote_id\x18\x01 \x01(\tR\x06noteId\x120\n" +
+	"\x05since\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\"y\n" +
+	"\x16GetNoteUpdatesResponse\x129\n" +
+	"\n" +
+	"updated_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12$\n" +
+	"\x06blocks\x18\x02 \x03(\v2\f.notes.BlockR\x06blocks\"F\n" +
 	"\x12CheckAccessRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\anote_id\x18\x02 \x01(\tR\x06noteId\")\n" +
 	"\x13CheckAccessResponse\x12\x12\n" +
-	"\x04role\x18\x01 \x01(\tR\x04role\"\x84\x01\n" +
+	"\x04role\x18\x01 \x01(\tR\x04role\"t\n" +
 	"\x16AddCollaboratorRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
-	"\anote_id\x18\x02 \x01(\tR\x06noteId\x12$\n" +
-	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId\x12\x12\n" +
+	"\anote_id\x18\x02 \x01(\tR\x06noteId\x12\x14\n" +
+	"\x05login\x18\x03 \x01(\tR\x05login\x12\x12\n" +
 	"\x04role\x18\x04 \x01(\tR\x04role\"s\n" +
 	"\x19RemoveCollaboratorRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\anote_id\x18\x02 \x01(\tR\x06noteId\x12$\n" +
-	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId2\xbd\b\n" +
+	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId2\x8c\t\n" +
 	"\x05Notes\x12T\n" +
 	"\aGetNote\x12\x12.notes.NoteRequest\x1a\v.notes.Note\"(\x82\xd3\xe4\x93\x02\"\x12 /users/{user_id}/notes/{note_id}\x12X\n" +
 	"\bGetNotes\x12\x16.notes.GetNotesRequest\x1a\x14.notes.NotesResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/users/{user_id}/notes\x12V\n" +
@@ -1081,7 +1192,8 @@ const file_proto_notes_proto_rawDesc = "" +
 	"\vAddFavorite\x12\x12.notes.NoteRequest\x1a\x16.google.protobuf.Empty\",\x82\xd3\xe4\x93\x02&\x1a$/users/{user_id}/favorites/{note_id}\x12j\n" +
 	"\x0eRemoveFavorite\x12\x12.notes.NoteRequest\x1a\x16.google.protobuf.Empty\",\x82\xd3\xe4\x93\x02&*$/users/{user_id}/favorites/{note_id}\x12\\\n" +
 	"\fGetFavorites\x12\x12.notes.UserRequest\x1a\x14.notes.NotesResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/users/{user_id}/favorites\x12S\n" +
-	"\x10GetNoteUpdatedAt\x12\x1e.notes.GetNoteUpdatedAtRequest\x1a\x1f.notes.GetNoteUpdatedAtResponse\x12D\n" +
+	"\x10GetNoteUpdatedAt\x12\x1e.notes.GetNoteUpdatedAtRequest\x1a\x1f.notes.GetNoteUpdatedAtResponse\x12M\n" +
+	"\x0eGetNoteUpdates\x12\x1c.notes.GetNoteUpdatesRequest\x1a\x1d.notes.GetNoteUpdatesResponse\x12D\n" +
 	"\vCheckAccess\x12\x19.notes.CheckAccessRequest\x1a\x1a.notes.CheckAccessResponse\x12H\n" +
 	"\x0fAddCollaborator\x12\x1d.notes.AddCollaboratorRequest\x1a\x16.google.protobuf.Empty\x12N\n" +
 	"\x12RemoveCollaborator\x12 .notes.RemoveCollaboratorRequest\x1a\x16.google.protobuf.EmptyB.Z,bnn/internal/pkg/notes/delivery/grpc/gen;genb\x06proto3"
@@ -1098,7 +1210,7 @@ func file_proto_notes_proto_rawDescGZIP() []byte {
 	return file_proto_notes_proto_rawDescData
 }
 
-var file_proto_notes_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_proto_notes_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_proto_notes_proto_goTypes = []any{
 	(*Note)(nil),                      // 0: notes.Note
 	(*Block)(nil),                     // 1: notes.Block
@@ -1112,54 +1224,61 @@ var file_proto_notes_proto_goTypes = []any{
 	(*TagIDs)(nil),                    // 9: notes.TagIDs
 	(*GetNoteUpdatedAtRequest)(nil),   // 10: notes.GetNoteUpdatedAtRequest
 	(*GetNoteUpdatedAtResponse)(nil),  // 11: notes.GetNoteUpdatedAtResponse
-	(*CheckAccessRequest)(nil),        // 12: notes.CheckAccessRequest
-	(*CheckAccessResponse)(nil),       // 13: notes.CheckAccessResponse
-	(*AddCollaboratorRequest)(nil),    // 14: notes.AddCollaboratorRequest
-	(*RemoveCollaboratorRequest)(nil), // 15: notes.RemoveCollaboratorRequest
-	(*gen.Tag)(nil),                   // 16: tags.Tag
-	(*timestamppb.Timestamp)(nil),     // 17: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),             // 18: google.protobuf.Empty
+	(*GetNoteUpdatesRequest)(nil),     // 12: notes.GetNoteUpdatesRequest
+	(*GetNoteUpdatesResponse)(nil),    // 13: notes.GetNoteUpdatesResponse
+	(*CheckAccessRequest)(nil),        // 14: notes.CheckAccessRequest
+	(*CheckAccessResponse)(nil),       // 15: notes.CheckAccessResponse
+	(*AddCollaboratorRequest)(nil),    // 16: notes.AddCollaboratorRequest
+	(*RemoveCollaboratorRequest)(nil), // 17: notes.RemoveCollaboratorRequest
+	(*gen.Tag)(nil),                   // 18: tags.Tag
+	(*timestamppb.Timestamp)(nil),     // 19: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),             // 20: google.protobuf.Empty
 }
 var file_proto_notes_proto_depIdxs = []int32{
 	1,  // 0: notes.Note.blocks:type_name -> notes.Block
-	16, // 1: notes.Note.tags:type_name -> tags.Tag
-	17, // 2: notes.Note.created_at:type_name -> google.protobuf.Timestamp
-	17, // 3: notes.Note.updated_at:type_name -> google.protobuf.Timestamp
-	17, // 4: notes.Block.created_at:type_name -> google.protobuf.Timestamp
-	17, // 5: notes.Block.updated_at:type_name -> google.protobuf.Timestamp
+	18, // 1: notes.Note.tags:type_name -> tags.Tag
+	19, // 2: notes.Note.created_at:type_name -> google.protobuf.Timestamp
+	19, // 3: notes.Note.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 4: notes.Block.created_at:type_name -> google.protobuf.Timestamp
+	19, // 5: notes.Block.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 6: notes.NotesResponse.notes:type_name -> notes.Note
 	8,  // 7: notes.UpdateNoteRequest.blocks:type_name -> notes.BlockInput
 	9,  // 8: notes.UpdateNoteRequest.tag_ids:type_name -> notes.TagIDs
-	17, // 9: notes.GetNoteUpdatedAtResponse.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 10: notes.Notes.GetNote:input_type -> notes.NoteRequest
-	5,  // 11: notes.Notes.GetNotes:input_type -> notes.GetNotesRequest
-	6,  // 12: notes.Notes.CreateNote:input_type -> notes.CreateNoteRequest
-	7,  // 13: notes.Notes.UpdateNote:input_type -> notes.UpdateNoteRequest
-	4,  // 14: notes.Notes.DeleteNote:input_type -> notes.NoteRequest
-	4,  // 15: notes.Notes.AddFavorite:input_type -> notes.NoteRequest
-	4,  // 16: notes.Notes.RemoveFavorite:input_type -> notes.NoteRequest
-	3,  // 17: notes.Notes.GetFavorites:input_type -> notes.UserRequest
-	10, // 18: notes.Notes.GetNoteUpdatedAt:input_type -> notes.GetNoteUpdatedAtRequest
-	12, // 19: notes.Notes.CheckAccess:input_type -> notes.CheckAccessRequest
-	14, // 20: notes.Notes.AddCollaborator:input_type -> notes.AddCollaboratorRequest
-	15, // 21: notes.Notes.RemoveCollaborator:input_type -> notes.RemoveCollaboratorRequest
-	0,  // 22: notes.Notes.GetNote:output_type -> notes.Note
-	2,  // 23: notes.Notes.GetNotes:output_type -> notes.NotesResponse
-	0,  // 24: notes.Notes.CreateNote:output_type -> notes.Note
-	0,  // 25: notes.Notes.UpdateNote:output_type -> notes.Note
-	18, // 26: notes.Notes.DeleteNote:output_type -> google.protobuf.Empty
-	18, // 27: notes.Notes.AddFavorite:output_type -> google.protobuf.Empty
-	18, // 28: notes.Notes.RemoveFavorite:output_type -> google.protobuf.Empty
-	2,  // 29: notes.Notes.GetFavorites:output_type -> notes.NotesResponse
-	11, // 30: notes.Notes.GetNoteUpdatedAt:output_type -> notes.GetNoteUpdatedAtResponse
-	13, // 31: notes.Notes.CheckAccess:output_type -> notes.CheckAccessResponse
-	18, // 32: notes.Notes.AddCollaborator:output_type -> google.protobuf.Empty
-	18, // 33: notes.Notes.RemoveCollaborator:output_type -> google.protobuf.Empty
-	22, // [22:34] is the sub-list for method output_type
-	10, // [10:22] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	19, // 9: notes.GetNoteUpdatedAtResponse.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 10: notes.GetNoteUpdatesRequest.since:type_name -> google.protobuf.Timestamp
+	19, // 11: notes.GetNoteUpdatesResponse.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 12: notes.GetNoteUpdatesResponse.blocks:type_name -> notes.Block
+	4,  // 13: notes.Notes.GetNote:input_type -> notes.NoteRequest
+	5,  // 14: notes.Notes.GetNotes:input_type -> notes.GetNotesRequest
+	6,  // 15: notes.Notes.CreateNote:input_type -> notes.CreateNoteRequest
+	7,  // 16: notes.Notes.UpdateNote:input_type -> notes.UpdateNoteRequest
+	4,  // 17: notes.Notes.DeleteNote:input_type -> notes.NoteRequest
+	4,  // 18: notes.Notes.AddFavorite:input_type -> notes.NoteRequest
+	4,  // 19: notes.Notes.RemoveFavorite:input_type -> notes.NoteRequest
+	3,  // 20: notes.Notes.GetFavorites:input_type -> notes.UserRequest
+	10, // 21: notes.Notes.GetNoteUpdatedAt:input_type -> notes.GetNoteUpdatedAtRequest
+	12, // 22: notes.Notes.GetNoteUpdates:input_type -> notes.GetNoteUpdatesRequest
+	14, // 23: notes.Notes.CheckAccess:input_type -> notes.CheckAccessRequest
+	16, // 24: notes.Notes.AddCollaborator:input_type -> notes.AddCollaboratorRequest
+	17, // 25: notes.Notes.RemoveCollaborator:input_type -> notes.RemoveCollaboratorRequest
+	0,  // 26: notes.Notes.GetNote:output_type -> notes.Note
+	2,  // 27: notes.Notes.GetNotes:output_type -> notes.NotesResponse
+	0,  // 28: notes.Notes.CreateNote:output_type -> notes.Note
+	0,  // 29: notes.Notes.UpdateNote:output_type -> notes.Note
+	20, // 30: notes.Notes.DeleteNote:output_type -> google.protobuf.Empty
+	20, // 31: notes.Notes.AddFavorite:output_type -> google.protobuf.Empty
+	20, // 32: notes.Notes.RemoveFavorite:output_type -> google.protobuf.Empty
+	2,  // 33: notes.Notes.GetFavorites:output_type -> notes.NotesResponse
+	11, // 34: notes.Notes.GetNoteUpdatedAt:output_type -> notes.GetNoteUpdatedAtResponse
+	13, // 35: notes.Notes.GetNoteUpdates:output_type -> notes.GetNoteUpdatesResponse
+	15, // 36: notes.Notes.CheckAccess:output_type -> notes.CheckAccessResponse
+	20, // 37: notes.Notes.AddCollaborator:output_type -> google.protobuf.Empty
+	20, // 38: notes.Notes.RemoveCollaborator:output_type -> google.protobuf.Empty
+	26, // [26:39] is the sub-list for method output_type
+	13, // [13:26] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_proto_notes_proto_init() }
@@ -1177,7 +1296,7 @@ func file_proto_notes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_notes_proto_rawDesc), len(file_proto_notes_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

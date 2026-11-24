@@ -3,9 +3,12 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
+
+	"bnn/internal/models"
 
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
@@ -20,17 +23,45 @@ const (
 )
 
 type Repo interface {
-	GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error)
+	GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error)
 	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
+}
+
+type noteUpdatedPayload struct {
+	UpdatedAt time.Time      `json:"updated_at"`
+	Blocks    []models.Block `json:"blocks,omitempty"`
 }
 
 type Client struct {
 	conn   *websocket.Conn
 	userID uuid.UUID
 	noteID uuid.UUID
+
+	roleMu sync.RWMutex
 	role   string
-	send   chan []byte
-	done   chan struct{}
+
+	send      chan []byte
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+func (c *Client) getRole() string {
+	c.roleMu.RLock()
+	defer c.roleMu.RUnlock()
+	return c.role
+}
+
+func (c *Client) setRole(role string) {
+	c.roleMu.Lock()
+	defer c.roleMu.Unlock()
+	c.role = role
+}
+
+func (c *Client) shutdown() {
+	c.closeOnce.Do(func() {
+		close(c.done)
+		_ = c.conn.Close()
+	})
 }
 
 type Hub struct {
@@ -57,9 +88,15 @@ func (h *Hub) AddClient(userID, noteID uuid.UUID, role string, conn *websocket.C
 		done:   make(chan struct{}),
 	}
 
+	h.mu.Lock()
+	if _, exists := h.lastKnownUpdate[noteID]; !exists {
+		h.lastKnownUpdate[noteID] = time.Now().UTC()
+	}
+	h.mu.Unlock()
+
 	h.connect.Store(client, userID)
 	conn.SetCloseHandler(func(code int, text string) error {
-		h.connect.Delete(client)
+		h.removeClient(client)
 		return nil
 	})
 
@@ -72,8 +109,7 @@ func (h *Hub) AddClient(userID, noteID uuid.UUID, role string, conn *websocket.C
 func (c *Client) readPump(h *Hub) {
 	defer func() {
 		h.removeClient(c)
-		close(c.done)
-		_ = c.conn.Close()
+		c.shutdown()
 		h.notifyPresence(c, EventUserLeft)
 	}()
 
@@ -99,7 +135,7 @@ func (c *Client) readPump(h *Hub) {
 		incoming.NoteID = c.noteID
 
 		if incoming.Type == EventCursorMove {
-			if c.role == "viewer" {
+			if c.getRole() == "viewer" {
 				continue
 			}
 			h.broadcastCursor(c, incoming)
@@ -111,7 +147,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		_ = c.conn.Close()
+		c.shutdown()
 	}()
 
 	for {
@@ -140,36 +176,62 @@ func (h *Hub) removeClient(client *Client) {
 	h.connect.Delete(client)
 }
 
+func (h *Hub) sendToPeer(peer *Client, raw []byte) {
+	if peer.send == nil {
+		return
+	}
+	select {
+	case peer.send <- raw:
+	case <-peer.done:
+	default:
+	}
+}
+
 func (h *Hub) notifyPresence(client *Client, eventType string) {
 	msg := Message{Type: eventType, NoteID: client.noteID, UserID: client.userID}
-	raw, _ := json.Marshal(msg)
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("WS: failed to marshal presence message", "error", err)
+		return
+	}
 	h.connect.Range(func(key, value any) bool {
 		peer := key.(*Client)
 		if peer != client && peer.noteID == client.noteID {
-			select {
-			case peer.send <- raw:
-			case <-peer.done:
-			default:
-			}
+			h.sendToPeer(peer, raw)
 		}
 		return true
 	})
 }
 
 func (h *Hub) broadcastCursor(sender *Client, msg Message) {
-	raw, _ := json.Marshal(msg)
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("WS: failed to marshal cursor message", "error", err)
+		return
+	}
 	h.connect.Range(func(key, value any) bool {
 		peer := key.(*Client)
 		if peer == sender || peer.noteID != sender.noteID {
 			return true
 		}
-		select {
-		case peer.send <- raw:
-		case <-peer.done:
-		default:
+		h.sendToPeer(peer, raw)
+		return true
+	})
+}
+
+func (h *Hub) closeNoteClients(noteID uuid.UUID) {
+	h.connect.Range(func(key, value any) bool {
+		client := key.(*Client)
+		if client.noteID == noteID {
+			h.removeClient(client)
+			client.shutdown()
 		}
 		return true
 	})
+
+	h.mu.Lock()
+	delete(h.lastKnownUpdate, noteID)
+	h.mu.Unlock()
 }
 
 func (h *Hub) Run(ctx context.Context) {
@@ -186,59 +248,91 @@ func (h *Hub) Run(ctx context.Context) {
 				return true
 			})
 
+			h.mu.Lock()
+			for noteID := range h.lastKnownUpdate {
+				if !activeNotes[noteID] {
+					delete(h.lastKnownUpdate, noteID)
+				}
+			}
+			h.mu.Unlock()
+
 			for noteID := range activeNotes {
-				updatedAt, err := h.repo.GetNoteUpdatedAt(ctx, noteID)
-				if err != nil {
-					slog.ErrorContext(ctx, "WS: failed to get updated_at", "error", err)
-					continue
-				}
-
-				h.mu.Lock()
-				lastUpdate, exists := h.lastKnownUpdate[noteID]
-				if !exists {
-					h.lastKnownUpdate[noteID] = updatedAt
-					h.mu.Unlock()
-				} else if updatedAt.After(lastUpdate) {
-					h.lastKnownUpdate[noteID] = updatedAt
-					h.mu.Unlock()
-
-					msg, _ := json.Marshal(Message{Type: EventNoteUpdated, NoteID: noteID})
-					h.connect.Range(func(key, value any) bool {
-						peer := key.(*Client)
-						if peer.noteID == noteID {
-							select {
-							case peer.send <- msg:
-							case <-peer.done:
-							default:
-							}
-						}
-						return true
-					})
-				} else {
-					h.mu.Unlock()
-				}
-
 				h.connect.Range(func(key, value any) bool {
 					client := key.(*Client)
 					if client.noteID == noteID {
 						newRole, err := h.repo.CheckAccess(ctx, client.userID, noteID)
 						if err != nil {
-							slog.Info("WS: access revoked", "user_id", client.userID, "note_id", noteID)
-							_ = client.conn.Close()
-							h.connect.Delete(client)
+							slog.InfoContext(ctx, "WS: access revoked", "user_id", client.userID, "note_id", noteID)
+							h.removeClient(client)
+							client.shutdown()
 							return true
 						}
-						client.role = newRole
+						client.setRole(newRole)
 					}
 					return true
 				})
+
+				h.mu.Lock()
+				var since *time.Time
+				if last, ok := h.lastKnownUpdate[noteID]; ok {
+					tCopy := last
+					since = &tCopy
+				}
+				h.mu.Unlock()
+
+				updatedAt, blocks, err := h.repo.GetNoteUpdates(ctx, noteID, since)
+				if err != nil {
+					if errors.Is(err, models.ErrNoteNotFound) {
+						h.closeNoteClients(noteID)
+						continue
+					}
+					slog.ErrorContext(ctx, "WS: failed to get note updates", "error", err)
+					continue
+				}
+
+				h.mu.Lock()
+				lastUpdate, exists := h.lastKnownUpdate[noteID]
+				hasNewUpdate := !exists || updatedAt.After(lastUpdate)
+				if hasNewUpdate {
+					h.lastKnownUpdate[noteID] = updatedAt
+				}
+				h.mu.Unlock()
+
+				if hasNewUpdate {
+					payloadBytes, err := json.Marshal(noteUpdatedPayload{
+						UpdatedAt: updatedAt,
+						Blocks:    blocks,
+					})
+					if err != nil {
+						slog.ErrorContext(ctx, "WS: failed to marshal note_updated payload", "error", err)
+						continue
+					}
+
+					msgBytes, err := json.Marshal(Message{
+						Type:    EventNoteUpdated,
+						NoteID:  noteID,
+						Payload: payloadBytes,
+					})
+					if err != nil {
+						slog.ErrorContext(ctx, "WS: failed to marshal note_updated", "error", err)
+						continue
+					}
+
+					h.connect.Range(func(key, value any) bool {
+						peer := key.(*Client)
+						if peer.noteID == noteID {
+							h.sendToPeer(peer, msgBytes)
+						}
+						return true
+					})
+				}
 			}
 
 		case <-ctx.Done():
 			h.connect.Range(func(key, value any) bool {
 				client := key.(*Client)
-				_ = client.conn.Close()
-				h.connect.Delete(client)
+				h.removeClient(client)
+				client.shutdown()
 				return true
 			})
 			return

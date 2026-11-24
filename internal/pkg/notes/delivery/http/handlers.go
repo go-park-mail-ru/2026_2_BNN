@@ -143,6 +143,9 @@ func (h *Handler) UpdateNote(ctx context.Context, req api.UpdateNoteRequestObjec
 		Blocks: blocks,
 		TagIDs: tagIDs,
 	})
+	if errors.Is(err, models.ErrForbidden) {
+		return api.UpdateNote403Response{}, nil
+	}
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.UpdateNote404Response{}, nil
 	}
@@ -162,6 +165,9 @@ func (h *Handler) DeleteNote(ctx context.Context, req api.DeleteNoteRequestObjec
 	}
 
 	err := h.uc.DeleteNote(ctx, userID, uuid.UUID(req.Id))
+	if errors.Is(err, models.ErrForbidden) {
+		return api.DeleteNote403Response{}, nil
+	}
 	if errors.Is(err, models.ErrNoteNotFound) {
 		return api.DeleteNote404Response{}, nil
 	}
@@ -221,7 +227,14 @@ func toAPINote(n models.Note) api.Note {
 
 func toAPIBlock(b models.Block) api.Block {
 	var content map[string]interface{}
-	_ = json.Unmarshal(b.Content, &content)
+	if len(b.Content) > 0 {
+		if err := json.Unmarshal(b.Content, &content); err != nil {
+			var raw any
+			if errAny := json.Unmarshal(b.Content, &raw); errAny == nil {
+				content = map[string]interface{}{"value": raw}
+			}
+		}
+	}
 	return api.Block{
 		Id:        openapi_types.UUID(b.ID),
 		Content:   content,
@@ -292,15 +305,19 @@ func (h *Handler) ListFavorites(ctx context.Context, req api.ListFavoritesReques
 func (h *Handler) AddCollaborator(ctx context.Context, request api.AddCollaboratorRequestObject) (api.AddCollaboratorResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
-		return nil, models.ErrInvalidToken
+		return api.AddCollaborator401Response{}, nil
 	}
 
-	noteID, err := uuid.FromString(request.Id.String())
-	if err != nil {
-		return nil, models.ErrValidation
+	err := h.uc.AddCollaborator(ctx, userID, uuid.UUID(request.Id), request.Body.Login, string(request.Body.Role))
+	if errors.Is(err, models.ErrValidation) {
+		return api.AddCollaborator400Response{}, nil
 	}
-
-	err = h.uc.AddCollaborator(ctx, userID, noteID, request.Body.Login, string(request.Body.Role))
+	if errors.Is(err, models.ErrForbidden) {
+		return api.AddCollaborator403Response{}, nil
+	}
+	if errors.Is(err, models.ErrNoteNotFound) || errors.Is(err, models.ErrUserNotFound) {
+		return api.AddCollaborator404Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -311,20 +328,19 @@ func (h *Handler) AddCollaborator(ctx context.Context, request api.AddCollaborat
 func (h *Handler) RemoveCollaborator(ctx context.Context, request api.RemoveCollaboratorRequestObject) (api.RemoveCollaboratorResponseObject, error) {
 	userID, ok := ctxutil.GetUserID(ctx)
 	if !ok {
-		return nil, models.ErrInvalidToken
+		return api.RemoveCollaborator401Response{}, nil
 	}
 
-	noteID, err := uuid.FromString(request.Id.String())
-	if err != nil {
-		return nil, models.ErrValidation
+	err := h.uc.RemoveCollaborator(ctx, userID, uuid.UUID(request.Id), uuid.UUID(request.UserId))
+	if errors.Is(err, models.ErrValidation) {
+		return api.RemoveCollaborator400Response{}, nil
 	}
-
-	targetUserID, err := uuid.FromString(request.UserId.String())
-	if err != nil {
-		return nil, models.ErrValidation
+	if errors.Is(err, models.ErrForbidden) {
+		return api.RemoveCollaborator403Response{}, nil
 	}
-
-	err = h.uc.RemoveCollaborator(ctx, userID, noteID, targetUserID)
+	if errors.Is(err, models.ErrNoteNotFound) || errors.Is(err, models.ErrUserNotFound) {
+		return api.RemoveCollaborator404Response{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}

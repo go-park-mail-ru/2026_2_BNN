@@ -29,6 +29,7 @@ const (
 	Notes_RemoveFavorite_FullMethodName     = "/notes.Notes/RemoveFavorite"
 	Notes_GetFavorites_FullMethodName       = "/notes.Notes/GetFavorites"
 	Notes_GetNoteUpdatedAt_FullMethodName   = "/notes.Notes/GetNoteUpdatedAt"
+	Notes_GetNoteUpdates_FullMethodName     = "/notes.Notes/GetNoteUpdates"
 	Notes_CheckAccess_FullMethodName        = "/notes.Notes/CheckAccess"
 	Notes_AddCollaborator_FullMethodName    = "/notes.Notes/AddCollaborator"
 	Notes_RemoveCollaborator_FullMethodName = "/notes.Notes/RemoveCollaborator"
@@ -47,6 +48,7 @@ type NotesClient interface {
 	RemoveFavorite(ctx context.Context, in *NoteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetFavorites(ctx context.Context, in *UserRequest, opts ...grpc.CallOption) (*NotesResponse, error)
 	GetNoteUpdatedAt(ctx context.Context, in *GetNoteUpdatedAtRequest, opts ...grpc.CallOption) (*GetNoteUpdatedAtResponse, error)
+	GetNoteUpdates(ctx context.Context, in *GetNoteUpdatesRequest, opts ...grpc.CallOption) (*GetNoteUpdatesResponse, error)
 	CheckAccess(ctx context.Context, in *CheckAccessRequest, opts ...grpc.CallOption) (*CheckAccessResponse, error)
 	AddCollaborator(ctx context.Context, in *AddCollaboratorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	RemoveCollaborator(ctx context.Context, in *RemoveCollaboratorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -150,6 +152,16 @@ func (c *notesClient) GetNoteUpdatedAt(ctx context.Context, in *GetNoteUpdatedAt
 	return out, nil
 }
 
+func (c *notesClient) GetNoteUpdates(ctx context.Context, in *GetNoteUpdatesRequest, opts ...grpc.CallOption) (*GetNoteUpdatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNoteUpdatesResponse)
+	err := c.cc.Invoke(ctx, Notes_GetNoteUpdates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *notesClient) CheckAccess(ctx context.Context, in *CheckAccessRequest, opts ...grpc.CallOption) (*CheckAccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckAccessResponse)
@@ -193,6 +205,7 @@ type NotesServer interface {
 	RemoveFavorite(context.Context, *NoteRequest) (*emptypb.Empty, error)
 	GetFavorites(context.Context, *UserRequest) (*NotesResponse, error)
 	GetNoteUpdatedAt(context.Context, *GetNoteUpdatedAtRequest) (*GetNoteUpdatedAtResponse, error)
+	GetNoteUpdates(context.Context, *GetNoteUpdatesRequest) (*GetNoteUpdatesResponse, error)
 	CheckAccess(context.Context, *CheckAccessRequest) (*CheckAccessResponse, error)
 	AddCollaborator(context.Context, *AddCollaboratorRequest) (*emptypb.Empty, error)
 	RemoveCollaborator(context.Context, *RemoveCollaboratorRequest) (*emptypb.Empty, error)
@@ -232,6 +245,9 @@ func (UnimplementedNotesServer) GetFavorites(context.Context, *UserRequest) (*No
 }
 func (UnimplementedNotesServer) GetNoteUpdatedAt(context.Context, *GetNoteUpdatedAtRequest) (*GetNoteUpdatedAtResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetNoteUpdatedAt not implemented")
+}
+func (UnimplementedNotesServer) GetNoteUpdates(context.Context, *GetNoteUpdatesRequest) (*GetNoteUpdatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNoteUpdates not implemented")
 }
 func (UnimplementedNotesServer) CheckAccess(context.Context, *CheckAccessRequest) (*CheckAccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckAccess not implemented")
@@ -425,6 +441,24 @@ func _Notes_GetNoteUpdatedAt_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Notes_GetNoteUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNoteUpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotesServer).GetNoteUpdates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Notes_GetNoteUpdates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotesServer).GetNoteUpdates(ctx, req.(*GetNoteUpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Notes_CheckAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CheckAccessRequest)
 	if err := dec(in); err != nil {
@@ -521,6 +555,10 @@ var Notes_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetNoteUpdatedAt",
 			Handler:    _Notes_GetNoteUpdatedAt_Handler,
+		},
+		{
+			MethodName: "GetNoteUpdates",
+			Handler:    _Notes_GetNoteUpdates_Handler,
 		},
 		{
 			MethodName: "CheckAccess",

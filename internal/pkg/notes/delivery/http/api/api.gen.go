@@ -760,6 +760,14 @@ func (response DeleteNote401Response) VisitDeleteNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type DeleteNote403Response struct {
+}
+
+func (response DeleteNote403Response) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type DeleteNote404Response struct {
 }
 
@@ -853,6 +861,14 @@ func (response UpdateNote401Response) VisitUpdateNoteResponse(w http.ResponseWri
 	return nil
 }
 
+type UpdateNote403Response struct {
+}
+
+func (response UpdateNote403Response) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type UpdateNote404Response struct {
 }
 
@@ -932,6 +948,14 @@ type RemoveCollaborator204Response struct {
 
 func (response RemoveCollaborator204Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveCollaborator400Response struct {
+}
+
+func (response RemoveCollaborator400Response) VisitRemoveCollaboratorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
 	return nil
 }
 

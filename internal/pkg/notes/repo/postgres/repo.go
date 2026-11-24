@@ -59,6 +59,18 @@ var removeFavoriteQuery string
 //go:embed queries/read_favorites.sql
 var readFavoritesQuery string
 
+//go:embed queries/get_note_updated_at.sql
+var getNoteUpdatedAtQuery string
+
+//go:embed queries/add_collaborator.sql
+var addCollaboratorQuery string
+
+//go:embed queries/remove_collaborator.sql
+var removeCollaboratorQuery string
+
+//go:embed queries/read_collaborator_role.sql
+var readCollaboratorRoleQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -86,7 +98,7 @@ func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset in
 	}
 	defer rows.Close()
 
-	var notes []models.Note
+	notes := make([]models.Note, 0)
 	for rows.Next() {
 		var n models.Note
 		err := rows.Scan(
@@ -256,35 +268,35 @@ func (r *Repo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.No
 
 func (r *Repo) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
 	var updatedAt time.Time
-	query := `SELECT updated_at FROM notes WHERE id = $1`
-	err := r.db.QueryRow(ctx, query, noteID).Scan(&updatedAt)
+	err := r.db.QueryRow(ctx, getNoteUpdatedAtQuery, noteID).Scan(&updatedAt)
 	if err != nil {
-		return time.Time{}, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, models.ErrNoteNotFound
+		}
+		return time.Time{}, fmt.Errorf("get note updated_at: %w", err)
 	}
 	return updatedAt, nil
 }
 
 func (r *Repo) AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error {
-	query := `
-		INSERT INTO note_collaborators (note_id, user_id, role)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (note_id, user_id) 
-		DO UPDATE SET role = EXCLUDED.role
-	`
-	_, err := r.db.Exec(ctx, query, noteID, userID, role)
+	_, err := r.db.Exec(ctx, addCollaboratorQuery, noteID, userID, role)
 	return err
 }
 
 func (r *Repo) RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error {
-	query := `DELETE FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
-	_, err := r.db.Exec(ctx, query, noteID, userID)
-	return err
+	tag, err := r.db.Exec(ctx, removeCollaboratorQuery, noteID, userID)
+	if err != nil {
+		return fmt.Errorf("remove collaborator: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrNoteNotFound
+	}
+	return nil
 }
 
 func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error) {
 	var role string
-	query := `SELECT role FROM note_collaborators WHERE note_id = $1 AND user_id = $2`
-	err := r.db.QueryRow(ctx, query, noteID, userID).Scan(&role)
+	err := r.db.QueryRow(ctx, readCollaboratorRoleQuery, noteID, userID).Scan(&role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", models.ErrNoteNotFound

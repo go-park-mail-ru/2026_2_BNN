@@ -173,6 +173,7 @@ func TestGetNotes(t *testing.T) {
 }
 
 func TestCreateNote(t *testing.T) {
+
 	userID := uuid.NewV4()
 	parentID := uuid.NewV4()
 	header := "Шапка"
@@ -212,6 +213,7 @@ func TestCreateNote(t *testing.T) {
 			req:  notes.CreateNoteRequest{ParentNoteID: &parentID},
 			prepare: func(repo *mocks.MockRepo) {
 				repo.EXPECT().ReadNote(gomock.Any(), parentID).Return(models.Note{ID: parentID, CreatedBy: uuid.NewV4()}, nil)
+				repo.EXPECT().ReadCollaboratorRole(gomock.Any(), parentID, userID).Return("", models.ErrNoteNotFound)
 			},
 			expectedErr: models.ErrNoteNotFound,
 		},

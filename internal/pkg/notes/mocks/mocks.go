@@ -161,6 +161,22 @@ func (mr *MockUsecaseMockRecorder) GetNoteUpdatedAt(ctx, noteID any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNoteUpdatedAt", reflect.TypeOf((*MockUsecase)(nil).GetNoteUpdatedAt), ctx, noteID)
 }
 
+// GetNoteUpdates mocks base method.
+func (m *MockUsecase) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNoteUpdates", ctx, noteID, since)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].([]models.Block)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetNoteUpdates indicates an expected call of GetNoteUpdates.
+func (mr *MockUsecaseMockRecorder) GetNoteUpdates(ctx, noteID, since any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNoteUpdates", reflect.TypeOf((*MockUsecase)(nil).GetNoteUpdates), ctx, noteID, since)
+}
+
 // GetNotes mocks base method.
 func (m *MockUsecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	m.ctrl.T.Helper()

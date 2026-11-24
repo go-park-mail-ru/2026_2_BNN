@@ -13,9 +13,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-//go:embed queries/read_block_owner.sql
-var readBlockOwnerQuery string
-
 //go:embed queries/create_attachment.sql
 var createAttachmentQuery string
 
@@ -34,20 +31,6 @@ type Repo struct {
 
 func NewRepo(db database.DB) *Repo {
 	return &Repo{db: db}
-}
-
-func (r *Repo) ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
-	var ownerID uuid.UUID
-
-	err := r.db.QueryRow(ctx, readBlockOwnerQuery, blockID).Scan(&ownerID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, models.ErrBlockNotFound
-	}
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("read block owner: %w", err)
-	}
-
-	return ownerID, nil
 }
 
 func (r *Repo) CreateAttachment(ctx context.Context, attachment models.Attachment) error {

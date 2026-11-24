@@ -302,6 +302,14 @@ func (response DeleteAttachment401Response) VisitDeleteAttachmentResponse(w http
 	return nil
 }
 
+type DeleteAttachment403Response struct {
+}
+
+func (response DeleteAttachment403Response) VisitDeleteAttachmentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type DeleteAttachment404Response struct {
 }
 
@@ -355,6 +363,14 @@ func (response GetAttachment401Response) VisitGetAttachmentResponse(w http.Respo
 	return nil
 }
 
+type GetAttachment403Response struct {
+}
+
+func (response GetAttachment403Response) VisitGetAttachmentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type GetAttachment404Response struct {
 }
 
@@ -399,6 +415,14 @@ type UploadAttachment401Response struct {
 
 func (response UploadAttachment401Response) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(401)
+	return nil
+}
+
+type UploadAttachment403Response struct {
+}
+
+func (response UploadAttachment403Response) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
 	return nil
 }
 

@@ -108,7 +108,6 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       AUTH_GRPC_ADDR: auth:9001
       NOTES_GRPC_ADDR: notes:9002
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     restart: unless-stopped
 
   prometheus:

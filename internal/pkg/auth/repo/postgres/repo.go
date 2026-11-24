@@ -31,6 +31,15 @@ var createRefreshTokenQuery string
 //go:embed queries/delete_refresh_token.sql
 var deleteRefreshTokenQuery string
 
+//go:embed queries/revoke_refresh_token.sql
+var revokeRefreshTokenQuery string
+
+//go:embed queries/read_refresh_token.sql
+var readRefreshTokenQuery string
+
+//go:embed queries/is_session_active.sql
+var isSessionActiveQuery string
+
 //go:embed queries/update_password.sql
 var updatePasswordQuery string
 
@@ -92,6 +101,7 @@ func (r *Repo) ReadUserByID(ctx context.Context, id uuid.UUID) (models.User, err
 
 func (r *Repo) CreateRefreshToken(ctx context.Context, token models.RefreshToken) error {
 	_, err := r.db.Exec(ctx, createRefreshTokenQuery,
+		token.ID,
 		token.TokenHash,
 		token.UserID,
 		token.ExpiresAt,
@@ -121,6 +131,57 @@ func (r *Repo) DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models
 	}
 
 	return token, nil
+}
+
+func (r *Repo) RevokeRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
+	var token models.RefreshToken
+
+	err := r.db.QueryRow(ctx, revokeRefreshTokenQuery, tokenHash).Scan(
+		&token.ID,
+		&token.TokenHash,
+		&token.UserID,
+		&token.ExpiresAt,
+		&token.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.RefreshToken{}, models.ErrRefreshTokenNotFound
+	}
+	if err != nil {
+		return models.RefreshToken{}, fmt.Errorf("revoke refresh token: %w", err)
+	}
+
+	return token, nil
+}
+
+func (r *Repo) ReadRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
+	var token models.RefreshToken
+
+	err := r.db.QueryRow(ctx, readRefreshTokenQuery, tokenHash).Scan(
+		&token.ID,
+		&token.TokenHash,
+		&token.UserID,
+		&token.ExpiresAt,
+		&token.CreatedAt,
+		&token.RevokedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.RefreshToken{}, models.ErrRefreshTokenNotFound
+	}
+	if err != nil {
+		return models.RefreshToken{}, fmt.Errorf("read refresh token: %w", err)
+	}
+
+	return token, nil
+}
+
+func (r *Repo) IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error) {
+	var active bool
+
+	if err := r.db.QueryRow(ctx, isSessionActiveQuery, sessionID).Scan(&active); err != nil {
+		return false, fmt.Errorf("check session: %w", err)
+	}
+
+	return active, nil
 }
 
 func (r *Repo) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash []byte) error {

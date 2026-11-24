@@ -349,6 +349,36 @@ func (mr *MockRepoMockRecorder) DeleteUserRefreshTokens(ctx, userID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRefreshTokens", reflect.TypeOf((*MockRepo)(nil).DeleteUserRefreshTokens), ctx, userID)
 }
 
+// IsSessionActive mocks base method.
+func (m *MockRepo) IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSessionActive", ctx, sessionID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsSessionActive indicates an expected call of IsSessionActive.
+func (mr *MockRepoMockRecorder) IsSessionActive(ctx, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSessionActive", reflect.TypeOf((*MockRepo)(nil).IsSessionActive), ctx, sessionID)
+}
+
+// ReadRefreshToken mocks base method.
+func (m *MockRepo) ReadRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRefreshToken", ctx, tokenHash)
+	ret0, _ := ret[0].(models.RefreshToken)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRefreshToken indicates an expected call of ReadRefreshToken.
+func (mr *MockRepoMockRecorder) ReadRefreshToken(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRefreshToken", reflect.TypeOf((*MockRepo)(nil).ReadRefreshToken), ctx, tokenHash)
+}
+
 // ReadUserByEmail mocks base method.
 func (m *MockRepo) ReadUserByEmail(ctx context.Context, email string) (models.User, error) {
 	m.ctrl.T.Helper()
@@ -392,6 +422,21 @@ func (m *MockRepo) ReadUserByLogin(ctx context.Context, login string) (models.Us
 func (mr *MockRepoMockRecorder) ReadUserByLogin(ctx, login any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadUserByLogin", reflect.TypeOf((*MockRepo)(nil).ReadUserByLogin), ctx, login)
+}
+
+// RevokeRefreshToken mocks base method.
+func (m *MockRepo) RevokeRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeRefreshToken", ctx, tokenHash)
+	ret0, _ := ret[0].(models.RefreshToken)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RevokeRefreshToken indicates an expected call of RevokeRefreshToken.
+func (mr *MockRepoMockRecorder) RevokeRefreshToken(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRefreshToken", reflect.TypeOf((*MockRepo)(nil).RevokeRefreshToken), ctx, tokenHash)
 }
 
 // Set2FAStatus mocks base method.

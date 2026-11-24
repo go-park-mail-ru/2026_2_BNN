@@ -3,7 +3,9 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"bnn/internal/models"
@@ -12,7 +14,17 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const maxTitleLength = 255
+const (
+	maxTitleLength  = 255
+	maxHeaderLength = 500
+	maxIconLength   = 16
+
+	zeroWidthJoiner   = '\u200d'
+	variationSelector = '\ufe0f'
+	keycapMark        = '\u20e3'
+	tagFirst          = '\U000e0020'
+	tagLast           = '\U000e007f'
+)
 
 const (
 	RoleOwner  = "owner"
@@ -59,7 +71,7 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
-	if err := validateTitle(req.Title); err != nil {
+	if err := validateTitle(req.Title, req.Header, req.Icon); err != nil {
 		return models.Note{}, err
 	}
 	if req.ParentNoteID != nil {
@@ -95,7 +107,7 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 }
 
 func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
-	if err := validateTitle(req.Title); err != nil {
+	if err := validateTitle(req.Title, req.Header, req.Icon); err != nil {
 		return models.Note{}, err
 	}
 	role, err := u.CheckAccess(ctx, userID, noteID)
@@ -225,11 +237,50 @@ func (u *Usecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.
 	return u.repo.ReadFavorites(ctx, userID)
 }
 
-func validateTitle(title string) error {
+func validateTitle(title string, header, icon *string) error {
 	if utf8.RuneCountInString(title) > maxTitleLength {
 		return fmt.Errorf("%w: title too long", models.ErrValidation)
 	}
+	if header != nil {
+		if err := validateHeader(*header); err != nil {
+			return err
+		}
+	}
+	if icon != nil {
+		if err := validateIcon(*icon); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func validateHeader(header string) error {
+	if utf8.RuneCountInString(header) > maxHeaderLength {
+		return fmt.Errorf("%w: header too long", models.ErrValidation)
+	}
+	if strings.ContainsFunc(header, unicode.IsControl) {
+		return fmt.Errorf("%w: header has control characters", models.ErrValidation)
+	}
+	return nil
+}
+
+func validateIcon(icon string) error {
+	if utf8.RuneCountInString(icon) > maxIconLength {
+		return fmt.Errorf("%w: icon too long", models.ErrValidation)
+	}
+	for _, r := range icon {
+		if !isEmojiRune(r) {
+			return fmt.Errorf("%w: icon must be emoji", models.ErrValidation)
+		}
+	}
+	return nil
+}
+
+func isEmojiRune(r rune) bool {
+	if r > unicode.MaxASCII && (unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r)) {
+		return true
+	}
+	return r == zeroWidthJoiner || r == variationSelector || r == keycapMark || (r >= tagFirst && r <= tagLast)
 }
 
 func (u *Usecase) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {

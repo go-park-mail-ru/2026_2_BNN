@@ -20,6 +20,7 @@ import (
 	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/logger"
+	bnnmcp "bnn/internal/pkg/mcp"
 	"bnn/internal/pkg/metrics"
 	"bnn/internal/pkg/middleware"
 	notesClient "bnn/internal/pkg/notes/client"
@@ -129,6 +130,8 @@ func main() {
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
+
+	router.PathPrefix("/mcp").Handler(bnnmcp.NewHandler(authService, notesService))
 
 	swagger.Register(router)
 

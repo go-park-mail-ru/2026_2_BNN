@@ -405,7 +405,7 @@ func TestHandler(t *testing.T) {
 				uc.EXPECT().AddCollaborator(gomock.Any(), userID, noteID, "liza", "editor").Return(nil)
 			},
 			call: func(h *Handler) error {
-				_, err := h.AddCollaborator(ctx, &gen.AddCollaboratorRequest{UserId: userID.String(), NoteId: noteID.String(), TargetUserId: "liza", Role: "editor"})
+				_, err := h.AddCollaborator(ctx, &gen.AddCollaboratorRequest{UserId: userID.String(), NoteId: noteID.String(), Login: "liza", Role: "editor"})
 				return err
 			},
 		},
@@ -433,7 +433,7 @@ func TestHandler(t *testing.T) {
 				uc.EXPECT().AddCollaborator(gomock.Any(), userID, noteID, "liza", "owner").Return(models.ErrValidation)
 			},
 			call: func(h *Handler) error {
-				_, err := h.AddCollaborator(ctx, &gen.AddCollaboratorRequest{UserId: userID.String(), NoteId: noteID.String(), TargetUserId: "liza", Role: "owner"})
+				_, err := h.AddCollaborator(ctx, &gen.AddCollaboratorRequest{UserId: userID.String(), NoteId: noteID.String(), Login: "liza", Role: "owner"})
 				return err
 			},
 			code: codes.InvalidArgument,

@@ -4,7 +4,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 
-	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/utils/ctxutil"
 )
 
 const csrfHeaderName = "X-CSRF-Token"

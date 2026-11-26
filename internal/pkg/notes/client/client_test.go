@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcutil/grpctest"
 	"bnn/internal/pkg/notes"
 	notesgrpc "bnn/internal/pkg/notes/delivery/grpc"
 	"bnn/internal/pkg/notes/delivery/grpc/gen"
 	"bnn/internal/pkg/notes/mocks"
+	"bnn/internal/pkg/utils/grpcutil/grpctest"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"

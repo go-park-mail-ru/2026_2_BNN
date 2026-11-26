@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
 	"bnn/internal/pkg/notes"
+	"bnn/internal/pkg/notes/delivery/grpc/convert"
 	"bnn/internal/pkg/notes/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
@@ -36,7 +37,7 @@ func (h *Handler) GetNote(ctx context.Context, in *gen.NoteRequest) (*gen.Note, 
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return NoteToProto(note), nil
+	return convert.NoteToProto(note), nil
 }
 
 func (h *Handler) GetNotes(ctx context.Context, in *gen.GetNotesRequest) (*gen.NotesResponse, error) {
@@ -74,7 +75,7 @@ func (h *Handler) CreateNote(ctx context.Context, in *gen.CreateNoteRequest) (*g
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return NoteToProto(note), nil
+	return convert.NoteToProto(note), nil
 }
 
 func (h *Handler) UpdateNote(ctx context.Context, in *gen.UpdateNoteRequest) (*gen.Note, error) {
@@ -120,7 +121,7 @@ func (h *Handler) UpdateNote(ctx context.Context, in *gen.UpdateNoteRequest) (*g
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return NoteToProto(note), nil
+	return convert.NoteToProto(note), nil
 }
 
 func (h *Handler) DeleteNote(ctx context.Context, in *gen.NoteRequest) (*emptypb.Empty, error) {
@@ -192,7 +193,7 @@ func parseNoteRequest(in *gen.NoteRequest) (uuid.UUID, uuid.UUID, error) {
 
 func toNotesResponse(list []models.Note) *gen.NotesResponse {
 	return &gen.NotesResponse{
-		Notes: lo.Map(list, func(n models.Note, _ int) *gen.Note { return NoteToProto(n) }),
+		Notes: lo.Map(list, func(n models.Note, _ int) *gen.Note { return convert.NoteToProto(n) }),
 	}
 }
 
@@ -273,7 +274,7 @@ func (h *Handler) GetNoteUpdates(ctx context.Context, req *gen.GetNoteUpdatesReq
 
 	protoBlocks := make([]*gen.Block, 0, len(blocks))
 	for _, b := range blocks {
-		protoBlocks = append(protoBlocks, BlockToProto(b))
+		protoBlocks = append(protoBlocks, convert.BlockToProto(b))
 	}
 
 	return &gen.GetNoteUpdatesResponse{
@@ -296,4 +297,27 @@ func (h *Handler) GetNoteUpdatedAt(ctx context.Context, req *gen.GetNoteUpdatedA
 	return &gen.GetNoteUpdatedAtResponse{
 		UpdatedAt: timestamppb.New(updatedAt),
 	}, nil
+}
+
+func (h *Handler) SetChecklistItem(ctx context.Context, in *gen.SetChecklistItemRequest) (*emptypb.Empty, error) {
+	userID, err := grpcconv.ParseUUID(in.GetUserId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	noteID, err := grpcconv.ParseUUID(in.GetNoteId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	blockID, err := grpcconv.ParseUUID(in.GetBlockId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	if err := h.uc.SetChecklistItem(ctx, userID, noteID, blockID, in.GetChecked()); err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &emptypb.Empty{}, nil
 }

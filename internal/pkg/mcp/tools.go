@@ -16,6 +16,9 @@ import (
 const (
 	defaultNotesLimit = 20
 	maxNotesLimit     = 100
+
+	itemChecked   = "Готово: пункт отмечен как сделанный"
+	itemUnchecked = "Готово: отметка с пункта снята"
 )
 
 var (
@@ -23,7 +26,9 @@ var (
 	errInvalidArgs     = errors.New("неверные параметры")
 	errInvalidPage     = errors.New("limit должен быть от 1 до 100, offset не меньше 0")
 	errInvalidNoteID   = errors.New("note_id должен быть uuid заметки из list_notes")
+	errInvalidBlockID  = errors.New("block_id должен быть uuid блока из get_note")
 	errNoteNotFound    = errors.New("заметка не найдена")
+	errBlockNotFound   = errors.New("пункт не найден в этой заметке")
 	errForbidden       = errors.New("нет доступа к заметке")
 	errInternal        = errors.New("внутренняя ошибка, попробуйте позже")
 )
@@ -35,6 +40,12 @@ type listNotesArgs struct {
 
 type getNoteArgs struct {
 	NoteID string `json:"note_id" jsonschema:"id заметки из list_notes"`
+}
+
+type setChecklistItemArgs struct {
+	NoteID  string `json:"note_id" jsonschema:"id заметки"`
+	BlockID string `json:"block_id" jsonschema:"id блока из строки [ ] или [x] в get_note"`
+	Checked bool   `json:"checked" jsonschema:"true — отметить как сделанное, false — снять отметку"`
 }
 
 func registerNoteTools(server *mcp.Server, uc notes.Usecase) {
@@ -49,6 +60,12 @@ func registerNoteTools(server *mcp.Server, uc notes.Usecase) {
 		Description: "содержимое заметки: название, теги и блоки по порядку. Пункты чек-листа показаны как [ ] (не сделано) и [x] (сделано), у каждого указан id блока",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, getNote(uc))
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "set_checklist_item",
+		Description: "Отметить пункт чек-листа как сделанный (checked=true) или снять отметку (checked=false). Меняет только один пункт, остальное содержимое заметки не трогает.",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: true, DestructiveHint: lo.ToPtr(false)},
+	}, setChecklistItem(uc))
 }
 
 func listNotes(uc notes.Usecase) mcp.ToolHandlerFor[listNotesArgs, any] {
@@ -93,6 +110,31 @@ func getNote(uc notes.Usecase) mcp.ToolHandlerFor[getNoteArgs, any] {
 	}
 }
 
+func setChecklistItem(uc notes.Usecase) mcp.ToolHandlerFor[setChecklistItemArgs, any] {
+	return func(ctx context.Context, req *mcp.CallToolRequest, args setChecklistItemArgs) (*mcp.CallToolResult, any, error) {
+		userID, err := userIDFromRequest(req)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		noteID, err := uuid.FromString(args.NoteID)
+		if err != nil {
+			return nil, nil, errInvalidNoteID
+		}
+
+		blockID, err := uuid.FromString(args.BlockID)
+		if err != nil {
+			return nil, nil, errInvalidBlockID
+		}
+
+		if err := uc.SetChecklistItem(ctx, userID, noteID, blockID, args.Checked); err != nil {
+			return nil, nil, toolError(ctx, err)
+		}
+
+		return textResult(lo.Ternary(args.Checked, itemChecked, itemUnchecked)), nil, nil
+	}
+}
+
 func userIDFromRequest(req *mcp.CallToolRequest) (uuid.UUID, error) {
 	if req.Extra == nil || req.Extra.TokenInfo == nil {
 		return uuid.Nil, errUnauthenticated
@@ -110,6 +152,8 @@ func toolError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, models.ErrNoteNotFound):
 		return errNoteNotFound
+	case errors.Is(err, models.ErrBlockNotFound):
+		return errBlockNotFound
 	case errors.Is(err, models.ErrForbidden):
 		return errForbidden
 	case errors.Is(err, models.ErrValidation):

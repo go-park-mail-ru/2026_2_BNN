@@ -15,11 +15,11 @@ import (
 	authFiles "bnn/internal/pkg/auth/repo/s3"
 	authUsecase "bnn/internal/pkg/auth/usecase"
 	"bnn/internal/pkg/database"
-	"bnn/internal/pkg/env"
-	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/logger"
 	"bnn/internal/pkg/metrics"
 	"bnn/internal/pkg/s3"
+	"bnn/internal/pkg/utils/env"
+	"bnn/internal/pkg/utils/grpcutil"
 
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"

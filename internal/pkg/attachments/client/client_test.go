@@ -10,7 +10,7 @@ import (
 	attachmentsgrpc "bnn/internal/pkg/attachments/delivery/grpc"
 	"bnn/internal/pkg/attachments/delivery/grpc/gen"
 	"bnn/internal/pkg/attachments/mocks"
-	"bnn/internal/pkg/grpcutil/grpctest"
+	"bnn/internal/pkg/utils/grpcutil/grpctest"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"

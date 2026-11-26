@@ -1,11 +1,11 @@
-package grpc
+package convert
 
 import (
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcconv"
 	"bnn/internal/pkg/notes/delivery/grpc/gen"
-	tagsgrpc "bnn/internal/pkg/tags/delivery/grpc"
+	tagsconvert "bnn/internal/pkg/tags/delivery/grpc/convert"
 	tagsgen "bnn/internal/pkg/tags/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcconv"
 
 	"github.com/samber/lo"
 )
@@ -15,7 +15,7 @@ func NoteToProto(n models.Note) *gen.Note {
 		Id:           n.ID.String(),
 		ParentNoteId: grpcconv.OptionalUUIDToString(n.ParentNoteID),
 		Blocks:       lo.Map(n.Blocks, func(b models.Block, _ int) *gen.Block { return BlockToProto(b) }),
-		Tags:         lo.Map(n.Tags, func(t models.Tag, _ int) *tagsgen.Tag { return tagsgrpc.TagToProto(t) }),
+		Tags:         lo.Map(n.Tags, func(t models.Tag, _ int) *tagsgen.Tag { return tagsconvert.TagToProto(t) }),
 		CreatedBy:    n.CreatedBy.String(),
 		Title:        n.Title,
 		Header:       n.Header,
@@ -60,7 +60,7 @@ func NoteFromProto(n *gen.Note) (models.Note, error) {
 	}
 
 	if len(n.GetTags()) > 0 {
-		note.Tags, err = tagsgrpc.TagsFromProto(n.GetTags())
+		note.Tags, err = tagsconvert.TagsFromProto(n.GetTags())
 		if err != nil {
 			return models.Note{}, err
 		}

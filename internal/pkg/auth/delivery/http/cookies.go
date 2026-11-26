@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/utils/cookies"
 )
 
 const (

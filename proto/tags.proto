@@ -4,36 +4,17 @@ package tags;
 
 option go_package = "bnn/internal/pkg/tags/delivery/grpc/gen;gen";
 
-import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 service Tags {
-  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
-    option (google.api.http) = {
-      get: "/users/{user_id}/tags"
-    };
-  }
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
 
-  rpc CreateTag(CreateTagRequest) returns (Tag) {
-    option (google.api.http) = {
-      post: "/users/{user_id}/tags"
-      body: "*"
-    };
-  }
+  rpc CreateTag(CreateTagRequest) returns (Tag);
 
-  rpc UpdateTag(UpdateTagRequest) returns (Tag) {
-    option (google.api.http) = {
-      put: "/users/{user_id}/tags/{tag_id}"
-      body: "*"
-    };
-  }
+  rpc UpdateTag(UpdateTagRequest) returns (Tag);
 
-  rpc DeleteTag(DeleteTagRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      delete: "/users/{user_id}/tags/{tag_id}"
-    };
-  }
+  rpc DeleteTag(DeleteTagRequest) returns (google.protobuf.Empty);
 }
 
 message Tag {

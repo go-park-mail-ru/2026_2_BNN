@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
 	"bnn/internal/pkg/tags"
+	"bnn/internal/pkg/tags/delivery/grpc/convert"
 	"bnn/internal/pkg/tags/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -34,7 +35,7 @@ func (h *Handler) ListTags(ctx context.Context, in *gen.ListTagsRequest) (*gen.L
 	}
 
 	return &gen.ListTagsResponse{
-		Tags: lo.Map(list, func(t models.Tag, _ int) *gen.Tag { return TagToProto(t) }),
+		Tags: lo.Map(list, func(t models.Tag, _ int) *gen.Tag { return convert.TagToProto(t) }),
 	}, nil
 }
 
@@ -49,7 +50,7 @@ func (h *Handler) CreateTag(ctx context.Context, in *gen.CreateTagRequest) (*gen
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return TagToProto(tag), nil
+	return convert.TagToProto(tag), nil
 }
 
 func (h *Handler) UpdateTag(ctx context.Context, in *gen.UpdateTagRequest) (*gen.Tag, error) {
@@ -68,7 +69,7 @@ func (h *Handler) UpdateTag(ctx context.Context, in *gen.UpdateTagRequest) (*gen
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return TagToProto(tag), nil
+	return convert.TagToProto(tag), nil
 }
 
 func (h *Handler) DeleteTag(ctx context.Context, in *gen.DeleteTagRequest) (*emptypb.Empty, error) {

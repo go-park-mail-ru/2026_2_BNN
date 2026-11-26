@@ -7,9 +7,9 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments"
-	attachmentsgrpc "bnn/internal/pkg/attachments/delivery/grpc"
+	"bnn/internal/pkg/attachments/delivery/grpc/convert"
 	"bnn/internal/pkg/attachments/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcerr"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc"
@@ -36,7 +36,7 @@ func (c *Client) UploadAttachment(ctx context.Context, userID, blockID uuid.UUID
 		return models.Attachment{}, grpcerr.FromStatus(err)
 	}
 
-	return attachmentsgrpc.AttachmentFromProto(resp)
+	return convert.AttachmentFromProto(resp)
 }
 
 func (c *Client) GetAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (models.File, error) {

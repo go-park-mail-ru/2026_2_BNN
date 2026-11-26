@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcerr"
 	"bnn/internal/pkg/tags"
-	tagsgrpc "bnn/internal/pkg/tags/delivery/grpc"
+	"bnn/internal/pkg/tags/delivery/grpc/convert"
 	"bnn/internal/pkg/tags/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc"
@@ -29,7 +29,7 @@ func (c *Client) ListTags(ctx context.Context, userID uuid.UUID) ([]models.Tag, 
 		return nil, grpcerr.FromStatus(err)
 	}
 
-	return tagsgrpc.TagsFromProto(resp.GetTags())
+	return convert.TagsFromProto(resp.GetTags())
 }
 
 func (c *Client) CreateTag(ctx context.Context, userID uuid.UUID, name, color string) (models.Tag, error) {
@@ -42,7 +42,7 @@ func (c *Client) CreateTag(ctx context.Context, userID uuid.UUID, name, color st
 		return models.Tag{}, grpcerr.FromStatus(err)
 	}
 
-	return tagsgrpc.TagFromProto(resp)
+	return convert.TagFromProto(resp)
 }
 
 func (c *Client) UpdateTag(ctx context.Context, userID, tagID uuid.UUID, name, color string) (models.Tag, error) {
@@ -56,7 +56,7 @@ func (c *Client) UpdateTag(ctx context.Context, userID, tagID uuid.UUID, name, c
 		return models.Tag{}, grpcerr.FromStatus(err)
 	}
 
-	return tagsgrpc.TagFromProto(resp)
+	return convert.TagFromProto(resp)
 }
 
 func (c *Client) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {

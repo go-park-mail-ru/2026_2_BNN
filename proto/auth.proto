@@ -4,118 +4,42 @@ package auth;
 
 option go_package = "bnn/internal/pkg/auth/delivery/grpc/gen;gen";
 
-import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 service Auth {
-  rpc SignUp(Credentials) returns (Session) {
-    option (google.api.http) = {
-      post: "/auth/signup"
-      body: "*"
-    };
-  }
+  rpc SignUp(Credentials) returns (Session);
 
-  rpc SignIn(Credentials) returns (Session) {
-    option (google.api.http) = {
-      post: "/auth/signin"
-      body: "*"
-    };
-  }
+  rpc SignIn(Credentials) returns (Session);
 
-  rpc VerifyTwoFactor(VerifyTwoFactorRequest) returns (Session) {
-    option (google.api.http) = {
-      post: "/auth/2fa/verify"
-      body: "*"
-    };
-  }
+  rpc VerifyTwoFactor(VerifyTwoFactorRequest) returns (Session);
 
-  rpc Refresh(RefreshRequest) returns (Tokens) {
-    option (google.api.http) = {
-      post: "/auth/refresh"
-      body: "*"
-    };
-  }
+  rpc Refresh(RefreshRequest) returns (Tokens);
 
-  rpc Logout(RefreshRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/auth/logout"
-      body: "*"
-    };
-  }
+  rpc Logout(RefreshRequest) returns (google.protobuf.Empty);
 
-  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {
-    option (google.api.http) = {
-      post: "/auth/authenticate"
-      body: "*"
-    };
-  }
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
 
-  rpc GetUser(UserRequest) returns (User) {
-    option (google.api.http) = {
-      get: "/auth/users/{user_id}"
-    };
-  }
+  rpc GetUser(UserRequest) returns (User);
 
-  rpc ChangePassword(ChangePasswordRequest) returns (Tokens) {
-    option (google.api.http) = {
-      put: "/auth/users/{user_id}/password"
-      body: "*"
-    };
-  }
+  rpc ChangePassword(ChangePasswordRequest) returns (Tokens);
 
-  rpc UpdateAvatar(UpdateAvatarRequest) returns (User) {
-    option (google.api.http) = {
-      put: "/auth/users/{user_id}/avatar"
-      body: "*"
-    };
-  }
+  rpc UpdateAvatar(UpdateAvatarRequest) returns (User);
 
-  rpc Generate2FA(UserRequest) returns (Generate2FAResponse) {
-    option (google.api.http) = {
-      post: "/auth/users/{user_id}/2fa/generate"
-    };
-  }
+  rpc Generate2FA(UserRequest) returns (Generate2FAResponse);
 
-  rpc Enable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/auth/users/{user_id}/2fa/enable"
-      body: "*"
-    };
-  }
+  rpc Enable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty);
 
-  rpc Disable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/auth/users/{user_id}/2fa/disable"
-      body: "*"
-    };
-  }
+  rpc Disable2FA(TwoFactorCodeRequest) returns (google.protobuf.Empty);
 
-  rpc GetOAuthURL(OAuthURLRequest) returns (OAuthURLResponse) {
-    option (google.api.http) = {
-      get: "/auth/oauth/{provider}/url"
-    };
-  }
+  rpc GetOAuthURL(OAuthURLRequest) returns (OAuthURLResponse);
 
-  rpc HandleOAuthCallback(OAuthCallbackRequest) returns (Session) {
-    option (google.api.http) = {
-      post: "/auth/oauth/{provider}/callback"
-      body: "*"
-    };
-  }
+  rpc HandleOAuthCallback(OAuthCallbackRequest) returns (Session);
 
-  rpc CheckUserExists(UserRequest) returns (CheckUserExistsResponse) {
-    option (google.api.http) = {
-      get: "/auth/users/{user_id}/exists"
-    };
-  }
+  rpc CheckUserExists(UserRequest) returns (CheckUserExistsResponse);
 
 
-rpc GetUserByLogin(GetUserByLoginRequest) returns (User) {
-    option (google.api.http) = {
-      get: "/auth/users/by-login/{login}"
-    };
-  }
+rpc GetUserByLogin(GetUserByLoginRequest) returns (User);
 }
 
 message User {

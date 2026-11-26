@@ -15,8 +15,6 @@ import (
 	attachmentsUsecase "bnn/internal/pkg/attachments/usecase"
 	authClient "bnn/internal/pkg/auth/client"
 	"bnn/internal/pkg/database"
-	"bnn/internal/pkg/env"
-	"bnn/internal/pkg/grpcutil"
 	"bnn/internal/pkg/logger"
 	"bnn/internal/pkg/metrics"
 	notesGrpc "bnn/internal/pkg/notes/delivery/grpc"
@@ -28,6 +26,8 @@ import (
 	tagsGen "bnn/internal/pkg/tags/delivery/grpc/gen"
 	tagsRepo "bnn/internal/pkg/tags/repo/postgres"
 	tagsUsecase "bnn/internal/pkg/tags/usecase"
+	"bnn/internal/pkg/utils/env"
+	"bnn/internal/pkg/utils/grpcutil"
 
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"

@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/utils/ctxutil"
 
 	uuid "github.com/satori/go.uuid"
 )

@@ -10,9 +10,9 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/auth/delivery/http/api"
-	"bnn/internal/pkg/cookies"
-	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/upload"
+	"bnn/internal/pkg/utils/cookies"
+	"bnn/internal/pkg/utils/ctxutil"
+	"bnn/internal/pkg/utils/upload"
 
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"

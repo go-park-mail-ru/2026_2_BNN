@@ -1,9 +1,9 @@
-package grpc
+package convert
 
 import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcconv"
+	"bnn/internal/pkg/utils/grpcconv"
 )
 
 func UserToProto(u models.User) *gen.User {

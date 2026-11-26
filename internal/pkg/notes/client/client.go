@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
 	"bnn/internal/pkg/notes"
-	notesgrpc "bnn/internal/pkg/notes/delivery/grpc"
+	"bnn/internal/pkg/notes/delivery/grpc/convert"
 	"bnn/internal/pkg/notes/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
@@ -44,7 +44,7 @@ func (c *Client) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset i
 	if err != nil {
 		return nil, grpcerr.FromStatus(err)
 	}
-	return notesgrpc.NotesFromProto(resp.GetNotes())
+	return convert.NotesFromProto(resp.GetNotes())
 }
 
 func (c *Client) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
@@ -58,7 +58,7 @@ func (c *Client) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cre
 	if err != nil {
 		return models.Note{}, grpcerr.FromStatus(err)
 	}
-	return notesgrpc.NoteFromProto(resp)
+	return convert.NoteFromProto(resp)
 }
 
 func (c *Client) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
@@ -105,7 +105,7 @@ func (c *Client) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.N
 	if err != nil {
 		return nil, grpcerr.FromStatus(err)
 	}
-	return notesgrpc.NotesFromProto(resp.GetNotes())
+	return convert.NotesFromProto(resp.GetNotes())
 }
 
 func (c *Client) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
@@ -131,7 +131,7 @@ func (c *Client) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *ti
 		return time.Time{}, nil, grpcerr.FromStatus(err)
 	}
 
-	blocks, err := notesgrpc.BlocksFromProto(resp.GetBlocks())
+	blocks, err := convert.BlocksFromProto(resp.GetBlocks())
 	if err != nil {
 		return time.Time{}, nil, err
 	}
@@ -174,8 +174,18 @@ func (c *Client) RemoveCollaborator(ctx context.Context, userID, noteID, targetU
 	return grpcerr.FromStatus(err)
 }
 
+func (c *Client) SetChecklistItem(ctx context.Context, userID, noteID, blockID uuid.UUID, checked bool) error {
+	_, err := c.client.SetChecklistItem(ctx, &gen.SetChecklistItemRequest{
+		UserId:  userID.String(),
+		NoteId:  noteID.String(),
+		BlockId: blockID.String(),
+		Checked: checked,
+	})
+	return grpcerr.FromStatus(err)
+}
+
 func fullNoteFromProto(n *gen.Note) (models.Note, error) {
-	note, err := notesgrpc.NoteFromProto(n)
+	note, err := convert.NoteFromProto(n)
 	if err != nil {
 		return models.Note{}, err
 	}

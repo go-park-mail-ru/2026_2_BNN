@@ -1,4 +1,4 @@
-package grpc
+package convert
 
 import (
 	"testing"

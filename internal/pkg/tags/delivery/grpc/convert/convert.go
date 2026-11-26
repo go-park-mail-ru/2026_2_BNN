@@ -1,9 +1,9 @@
-package grpc
+package convert
 
 import (
 	"bnn/internal/models"
-	"bnn/internal/pkg/grpcconv"
 	"bnn/internal/pkg/tags/delivery/grpc/gen"
+	"bnn/internal/pkg/utils/grpcconv"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

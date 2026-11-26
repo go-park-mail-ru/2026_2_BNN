@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/notes"
 
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -30,6 +32,12 @@ const (
 	RoleOwner  = "owner"
 	RoleEditor = "editor"
 	RoleViewer = "viewer"
+)
+
+const (
+	blockTypeKey       = "type"
+	blockCheckedKey    = "checked"
+	blockTypeChecklist = "checklist"
 )
 
 type Usecase struct {
@@ -361,4 +369,41 @@ func (u *Usecase) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *t
 	}
 
 	return updatedAt, blocks, nil
+}
+
+func (u *Usecase) SetChecklistItem(ctx context.Context, userID, noteID, blockID uuid.UUID, checked bool) error {
+	role, err := u.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return err
+	}
+	if role != RoleOwner && role != RoleEditor {
+		return models.ErrForbidden
+	}
+
+	blocks, err := u.repo.ReadBlocks(ctx, noteID)
+	if err != nil {
+		return err
+	}
+
+	block, ok := lo.Find(blocks, func(b models.Block) bool { return b.ID == blockID })
+	if !ok {
+		return models.ErrBlockNotFound
+	}
+
+	var content map[string]any
+	if err := json.Unmarshal(block.Content, &content); err != nil {
+		return fmt.Errorf("decode block content: %w", err)
+	}
+	if content[blockTypeKey] != blockTypeChecklist {
+		return fmt.Errorf("%w: block is not a checklist item", models.ErrValidation)
+	}
+
+	content[blockCheckedKey] = checked
+	block.Content, err = json.Marshal(content)
+	if err != nil {
+		return fmt.Errorf("encode block content: %w", err)
+	}
+	block.UpdatedAt = time.Now().UTC()
+
+	return u.repo.UpdateBlock(ctx, noteID, block)
 }

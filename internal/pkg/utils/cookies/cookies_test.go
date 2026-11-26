@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"bnn/internal/pkg/cookies"
+	"bnn/internal/pkg/utils/cookies"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

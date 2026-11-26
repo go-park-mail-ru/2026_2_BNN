@@ -16,10 +16,8 @@ import (
 	authClient "bnn/internal/pkg/auth/client"
 	authDelivery "bnn/internal/pkg/auth/delivery/http"
 	authapi "bnn/internal/pkg/auth/delivery/http/api"
-	"bnn/internal/pkg/cookies"
-	"bnn/internal/pkg/grpcutil"
-	"bnn/internal/pkg/httpjson"
 	"bnn/internal/pkg/logger"
+	bnnmcp "bnn/internal/pkg/mcp"
 	"bnn/internal/pkg/metrics"
 	"bnn/internal/pkg/middleware"
 	notesClient "bnn/internal/pkg/notes/client"
@@ -29,6 +27,9 @@ import (
 	tagsClient "bnn/internal/pkg/tags/client"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
 	tagsapi "bnn/internal/pkg/tags/delivery/http/api"
+	"bnn/internal/pkg/utils/cookies"
+	"bnn/internal/pkg/utils/grpcutil"
+	"bnn/internal/pkg/utils/httpjson"
 	ws "bnn/internal/pkg/websocket"
 
 	"github.com/gorilla/mux"
@@ -129,6 +130,8 @@ func main() {
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
+
+	router.PathPrefix("/mcp").Handler(bnnmcp.NewHandler(authService, notesService))
 
 	swagger.Register(router)
 

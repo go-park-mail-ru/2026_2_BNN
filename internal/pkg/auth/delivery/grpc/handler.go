@@ -6,9 +6,10 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
+	"bnn/internal/pkg/auth/delivery/grpc/convert"
 	"bnn/internal/pkg/auth/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -29,7 +30,7 @@ func (h *Handler) SignUp(ctx context.Context, in *gen.Credentials) (*gen.Session
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return SessionToProto(user, tokens), nil
+	return convert.SessionToProto(user, tokens), nil
 }
 
 func (h *Handler) SignIn(ctx context.Context, in *gen.Credentials) (*gen.Session, error) {
@@ -38,7 +39,7 @@ func (h *Handler) SignIn(ctx context.Context, in *gen.Credentials) (*gen.Session
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return SessionToProto(user, tokens), nil
+	return convert.SessionToProto(user, tokens), nil
 }
 
 func (h *Handler) VerifyTwoFactor(ctx context.Context, in *gen.VerifyTwoFactorRequest) (*gen.Session, error) {
@@ -47,7 +48,7 @@ func (h *Handler) VerifyTwoFactor(ctx context.Context, in *gen.VerifyTwoFactorRe
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return SessionToProto(user, tokens), nil
+	return convert.SessionToProto(user, tokens), nil
 }
 
 func (h *Handler) Refresh(ctx context.Context, in *gen.RefreshRequest) (*gen.Tokens, error) {
@@ -56,7 +57,7 @@ func (h *Handler) Refresh(ctx context.Context, in *gen.RefreshRequest) (*gen.Tok
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return TokensToProto(tokens), nil
+	return convert.TokensToProto(tokens), nil
 }
 
 func (h *Handler) Logout(ctx context.Context, in *gen.RefreshRequest) (*emptypb.Empty, error) {
@@ -87,7 +88,7 @@ func (h *Handler) GetUser(ctx context.Context, in *gen.UserRequest) (*gen.User, 
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return UserToProto(user), nil
+	return convert.UserToProto(user), nil
 }
 
 func (h *Handler) ChangePassword(ctx context.Context, in *gen.ChangePasswordRequest) (*gen.Tokens, error) {
@@ -101,7 +102,7 @@ func (h *Handler) ChangePassword(ctx context.Context, in *gen.ChangePasswordRequ
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return TokensToProto(tokens), nil
+	return convert.TokensToProto(tokens), nil
 }
 
 func (h *Handler) UpdateAvatar(ctx context.Context, in *gen.UpdateAvatarRequest) (*gen.User, error) {
@@ -115,7 +116,7 @@ func (h *Handler) UpdateAvatar(ctx context.Context, in *gen.UpdateAvatarRequest)
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return UserToProto(user), nil
+	return convert.UserToProto(user), nil
 }
 
 func (h *Handler) Generate2FA(ctx context.Context, in *gen.UserRequest) (*gen.Generate2FAResponse, error) {
@@ -173,7 +174,7 @@ func (h *Handler) HandleOAuthCallback(ctx context.Context, in *gen.OAuthCallback
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return SessionToProto(user, tokens), nil
+	return convert.SessionToProto(user, tokens), nil
 }
 
 func (h *Handler) CheckUserExists(ctx context.Context, req *gen.UserRequest) (*gen.CheckUserExistsResponse, error) {

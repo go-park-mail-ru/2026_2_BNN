@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/utils/ctxutil"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"

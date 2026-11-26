@@ -5,9 +5,10 @@ import (
 	"io"
 
 	"bnn/internal/pkg/attachments"
+	"bnn/internal/pkg/attachments/delivery/grpc/convert"
 	"bnn/internal/pkg/attachments/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -37,7 +38,7 @@ func (h *Handler) UploadAttachment(ctx context.Context, in *gen.UploadAttachment
 		return nil, grpcerr.ToStatus(err)
 	}
 
-	return AttachmentToProto(attachment), nil
+	return convert.AttachmentToProto(attachment), nil
 }
 
 func (h *Handler) GetAttachment(ctx context.Context, in *gen.AttachmentRequest) (*gen.File, error) {

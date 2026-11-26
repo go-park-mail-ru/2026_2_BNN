@@ -71,6 +71,9 @@ var removeCollaboratorQuery string
 //go:embed queries/read_collaborator_role.sql
 var readCollaboratorRoleQuery string
 
+//go:embed queries/update_block.sql
+var updateBlockQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -304,4 +307,15 @@ func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUI
 		return "", err
 	}
 	return role, nil
+}
+
+func (r *Repo) UpdateBlock(ctx context.Context, noteID uuid.UUID, block models.Block) error {
+	tag, err := r.db.Exec(ctx, updateBlockQuery, block.ID, noteID, block.Content, block.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("update block: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrBlockNotFound
+	}
+	return nil
 }

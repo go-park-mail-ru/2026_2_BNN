@@ -8,8 +8,8 @@ import (
 	"slices"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/middleware"
+	"bnn/internal/pkg/utils/ctxutil"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"

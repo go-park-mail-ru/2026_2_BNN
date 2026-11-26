@@ -9,8 +9,8 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments"
 	"bnn/internal/pkg/attachments/delivery/http/api"
-	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/upload"
+	"bnn/internal/pkg/utils/ctxutil"
+	"bnn/internal/pkg/utils/upload"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"

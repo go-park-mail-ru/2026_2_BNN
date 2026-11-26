@@ -220,6 +220,20 @@ func (mr *MockUsecaseMockRecorder) RemoveFavorite(ctx, userID, noteID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveFavorite", reflect.TypeOf((*MockUsecase)(nil).RemoveFavorite), ctx, userID, noteID)
 }
 
+// SetChecklistItem mocks base method.
+func (m *MockUsecase) SetChecklistItem(ctx context.Context, userID, noteID, blockID uuid.UUID, checked bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetChecklistItem", ctx, userID, noteID, blockID, checked)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetChecklistItem indicates an expected call of SetChecklistItem.
+func (mr *MockUsecaseMockRecorder) SetChecklistItem(ctx, userID, noteID, blockID, checked any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetChecklistItem", reflect.TypeOf((*MockUsecase)(nil).SetChecklistItem), ctx, userID, noteID, blockID, checked)
+}
+
 // UpdateNote mocks base method.
 func (m *MockUsecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
 	m.ctrl.T.Helper()
@@ -461,6 +475,20 @@ func (m *MockRepo) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID)
 func (mr *MockRepoMockRecorder) RemoveFavorite(ctx, userID, noteID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveFavorite", reflect.TypeOf((*MockRepo)(nil).RemoveFavorite), ctx, userID, noteID)
+}
+
+// UpdateBlock mocks base method.
+func (m *MockRepo) UpdateBlock(ctx context.Context, noteID uuid.UUID, block models.Block) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBlock", ctx, noteID, block)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBlock indicates an expected call of UpdateBlock.
+func (mr *MockRepoMockRecorder) UpdateBlock(ctx, noteID, block any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlock", reflect.TypeOf((*MockRepo)(nil).UpdateBlock), ctx, noteID, block)
 }
 
 // UpdateNote mocks base method.

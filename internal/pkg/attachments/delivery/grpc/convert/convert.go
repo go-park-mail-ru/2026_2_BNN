@@ -1,9 +1,9 @@
-package grpc
+package convert
 
 import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcconv"
+	"bnn/internal/pkg/utils/grpcconv"
 )
 
 func AttachmentToProto(a models.Attachment) *gen.Attachment {

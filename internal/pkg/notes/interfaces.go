@@ -25,6 +25,7 @@ type Usecase interface {
 	RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error
 	GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error)
 	CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error)
+	SetChecklistItem(ctx context.Context, userID, noteID, blockID uuid.UUID, checked bool) error
 	GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error)
 }
 
@@ -48,6 +49,8 @@ type Repo interface {
 	AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error
 	RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error
 	ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error)
+
+	UpdateBlock(ctx context.Context, noteID uuid.UUID, block models.Block) error
 }
 
 type CreateNoteRequest struct {

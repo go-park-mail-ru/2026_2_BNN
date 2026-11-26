@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"bnn/internal/pkg/grpcutil"
+	"bnn/internal/pkg/utils/grpcutil"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

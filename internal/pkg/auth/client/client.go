@@ -5,10 +5,10 @@ import (
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
-	authgrpc "bnn/internal/pkg/auth/delivery/grpc"
+	"bnn/internal/pkg/auth/delivery/grpc/convert"
 	"bnn/internal/pkg/auth/delivery/grpc/gen"
-	"bnn/internal/pkg/grpcconv"
-	"bnn/internal/pkg/grpcerr"
+	"bnn/internal/pkg/utils/grpcconv"
+	"bnn/internal/pkg/utils/grpcerr"
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc"
@@ -30,7 +30,7 @@ func (c *Client) SignUp(ctx context.Context, login, password string) (models.Use
 		return models.User{}, models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.SessionFromProto(resp)
+	return convert.SessionFromProto(resp)
 }
 
 func (c *Client) SignIn(ctx context.Context, login, password string) (models.User, models.AuthTokens, error) {
@@ -39,7 +39,7 @@ func (c *Client) SignIn(ctx context.Context, login, password string) (models.Use
 		return models.User{}, models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.SessionFromProto(resp)
+	return convert.SessionFromProto(resp)
 }
 
 func (c *Client) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
@@ -48,7 +48,7 @@ func (c *Client) VerifyTwoFactor(ctx context.Context, twoFactorToken, code strin
 		return models.User{}, models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.SessionFromProto(resp)
+	return convert.SessionFromProto(resp)
 }
 
 func (c *Client) Refresh(ctx context.Context, refreshToken string) (models.AuthTokens, error) {
@@ -57,7 +57,7 @@ func (c *Client) Refresh(ctx context.Context, refreshToken string) (models.AuthT
 		return models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.TokensFromProto(resp), nil
+	return convert.TokensFromProto(resp), nil
 }
 
 func (c *Client) Logout(ctx context.Context, refreshToken string) error {
@@ -80,7 +80,7 @@ func (c *Client) GetUser(ctx context.Context, userID uuid.UUID) (models.User, er
 		return models.User{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.UserFromProto(resp)
+	return convert.UserFromProto(resp)
 }
 
 func (c *Client) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) (models.AuthTokens, error) {
@@ -93,7 +93,7 @@ func (c *Client) ChangePassword(ctx context.Context, userID uuid.UUID, oldPasswo
 		return models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.TokensFromProto(resp), nil
+	return convert.TokensFromProto(resp), nil
 }
 
 func (c *Client) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error) {
@@ -106,7 +106,7 @@ func (c *Client) UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte
 		return models.User{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.UserFromProto(resp)
+	return convert.UserFromProto(resp)
 }
 
 func (c *Client) Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error) {
@@ -143,7 +143,7 @@ func (c *Client) HandleOAuthCallback(ctx context.Context, provider, code string)
 		return models.User{}, models.AuthTokens{}, grpcerr.FromStatus(err)
 	}
 
-	return authgrpc.SessionFromProto(resp)
+	return convert.SessionFromProto(resp)
 }
 
 func (c *Client) CheckUserExists(ctx context.Context, userID uuid.UUID) (bool, error) {

@@ -11,6 +11,7 @@ import (
 	"bnn/internal/pkg/utils/grpcconv"
 	"bnn/internal/pkg/utils/grpcerr"
 
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -201,4 +202,28 @@ func (h *Handler) GetUserByLogin(ctx context.Context, in *gen.GetUserByLoginRequ
 	}
 
 	return &gen.User{Id: userID.String()}, nil
+}
+
+func (h *Handler) ListAdmins(ctx context.Context, _ *emptypb.Empty) (*gen.UsersResponse, error) {
+	users, err := h.uc.ListAdmins(ctx)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return toUsersResponse(users), nil
+}
+
+func (h *Handler) SearchUsers(ctx context.Context, in *gen.SearchUsersRequest) (*gen.UsersResponse, error) {
+	users, err := h.uc.SearchUsers(ctx, in.GetQuery())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return toUsersResponse(users), nil
+}
+
+func toUsersResponse(users []models.User) *gen.UsersResponse {
+	return &gen.UsersResponse{
+		Users: lo.Map(users, func(u models.User, _ int) *gen.User { return convert.UserToProto(u) }),
+	}
 }

@@ -176,6 +176,21 @@ func (mr *MockUsecaseMockRecorder) HandleOAuthCallback(ctx, provider, code any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleOAuthCallback", reflect.TypeOf((*MockUsecase)(nil).HandleOAuthCallback), ctx, provider, code)
 }
 
+// ListAdmins mocks base method.
+func (m *MockUsecase) ListAdmins(ctx context.Context) ([]models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAdmins", ctx)
+	ret0, _ := ret[0].([]models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAdmins indicates an expected call of ListAdmins.
+func (mr *MockUsecaseMockRecorder) ListAdmins(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAdmins", reflect.TypeOf((*MockUsecase)(nil).ListAdmins), ctx)
+}
+
 // Logout mocks base method.
 func (m *MockUsecase) Logout(ctx context.Context, refreshToken string) error {
 	m.ctrl.T.Helper()
@@ -203,6 +218,21 @@ func (m *MockUsecase) Refresh(ctx context.Context, refreshToken string) (models.
 func (mr *MockUsecaseMockRecorder) Refresh(ctx, refreshToken any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refresh", reflect.TypeOf((*MockUsecase)(nil).Refresh), ctx, refreshToken)
+}
+
+// SearchUsers mocks base method.
+func (m *MockUsecase) SearchUsers(ctx context.Context, query string) ([]models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchUsers", ctx, query)
+	ret0, _ := ret[0].([]models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchUsers indicates an expected call of SearchUsers.
+func (mr *MockUsecaseMockRecorder) SearchUsers(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsers", reflect.TypeOf((*MockUsecase)(nil).SearchUsers), ctx, query)
 }
 
 // SignIn mocks base method.
@@ -364,6 +394,21 @@ func (mr *MockRepoMockRecorder) IsSessionActive(ctx, sessionID any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSessionActive", reflect.TypeOf((*MockRepo)(nil).IsSessionActive), ctx, sessionID)
 }
 
+// ReadAdmins mocks base method.
+func (m *MockRepo) ReadAdmins(ctx context.Context) ([]models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadAdmins", ctx)
+	ret0, _ := ret[0].([]models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadAdmins indicates an expected call of ReadAdmins.
+func (mr *MockRepoMockRecorder) ReadAdmins(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAdmins", reflect.TypeOf((*MockRepo)(nil).ReadAdmins), ctx)
+}
+
 // ReadRefreshToken mocks base method.
 func (m *MockRepo) ReadRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error) {
 	m.ctrl.T.Helper()
@@ -437,6 +482,21 @@ func (m *MockRepo) RevokeRefreshToken(ctx context.Context, tokenHash []byte) (mo
 func (mr *MockRepoMockRecorder) RevokeRefreshToken(ctx, tokenHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRefreshToken", reflect.TypeOf((*MockRepo)(nil).RevokeRefreshToken), ctx, tokenHash)
+}
+
+// SearchUsers mocks base method.
+func (m *MockRepo) SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchUsers", ctx, query, limit)
+	ret0, _ := ret[0].([]models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchUsers indicates an expected call of SearchUsers.
+func (mr *MockRepoMockRecorder) SearchUsers(ctx, query, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsers", reflect.TypeOf((*MockRepo)(nil).SearchUsers), ctx, query, limit)
 }
 
 // Set2FAStatus mocks base method.

@@ -58,6 +58,12 @@ var update2FAStatusQuery string
 //go:embed queries/read_user_by_email.sql
 var readUserByEmailQuery string
 
+//go:embed queries/read_admins.sql
+var readAdminsQuery string
+
+//go:embed queries/search_users.sql
+var searchUsersQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -256,4 +262,31 @@ func (r *Repo) Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool)
 
 func (r *Repo) ReadUserByEmail(ctx context.Context, email string) (models.User, error) {
 	return r.readUser(ctx, readUserByEmailQuery, email)
+}
+
+func (r *Repo) ReadAdmins(ctx context.Context) ([]models.User, error) {
+	return r.readShortUsers(ctx, readAdminsQuery)
+}
+
+func (r *Repo) SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error) {
+	return r.readShortUsers(ctx, searchUsersQuery, query, limit)
+}
+
+func (r *Repo) readShortUsers(ctx context.Context, query string, args ...any) ([]models.User, error) {
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]models.User, 0)
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Login); err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
 }

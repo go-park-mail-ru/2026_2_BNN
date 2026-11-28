@@ -23,6 +23,9 @@ import (
 	notesClient "bnn/internal/pkg/notes/client"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
+	"bnn/internal/pkg/onlineconf"
+	onlineconfDelivery "bnn/internal/pkg/onlineconf/delivery/http"
+	onlineconfapi "bnn/internal/pkg/onlineconf/delivery/http/api"
 	"bnn/internal/pkg/swagger"
 	tagsClient "bnn/internal/pkg/tags/client"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
@@ -94,6 +97,14 @@ func main() {
 	defer wsCancel()
 	go wsHub.Run(wsCtx)
 
+	onlineconfCtx, onlineconfCancel := context.WithCancel(context.Background())
+	defer onlineconfCancel()
+
+	adminCache := onlineconf.NewAdminCache(authService)
+	go adminCache.Run(onlineconfCtx)
+
+	onlineconfHandler := onlineconfDelivery.NewHandler(authService, adminCache)
+
 	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
 	httpMetrics := metrics.NewHTTP(prometheus.DefaultRegisterer)
@@ -131,6 +142,13 @@ func main() {
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
 
+	adminRouter := apiRouter.NewRoute().Subrouter()
+	adminRouter.Use(onlineconfDelivery.AdminOnly(adminCache))
+	onlineconfapi.HandlerFromMux(onlineconfapi.NewStrictHandlerWithOptions(onlineconfHandler, nil, onlineconfapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), adminRouter)
+
 	router.PathPrefix("/mcp").Handler(bnnmcp.NewHandler(authService, notesService))
 
 	swagger.Register(router)
@@ -165,6 +183,8 @@ func main() {
 	slog.InfoContext(ctx, "Received signal, shutting down", "signal", sig)
 
 	wsCancel()
+
+	onlineconfCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()

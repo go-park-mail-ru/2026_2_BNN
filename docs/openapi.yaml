@@ -23,6 +23,8 @@ tags:
     description: Файлы в блоках заметок
   - name: tags
     description: Теги заметок
+  - name: onlineconf
+    description: Админка OnlineConf, только для админов
 
 paths:
   /auth/signup:
@@ -316,6 +318,68 @@ paths:
                 type: string
         '400':
           description: Неверный state или отсутствует код
+  /onlineconf/admin/session:
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfSession
+      summary: Проверка доступа к админке
+      description: Админ получает 200, остальные 403. Признак админа в ответе не передаётся.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Пользователь — админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfUser'
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Не админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
+
+  /onlineconf/admin/users:
+    get:
+      tags: [onlineconf]
+      operationId: SearchOnlineConfUsers
+      summary: Поиск пользователей по логину
+      description: Для списков принудительного включения и исключения. Не больше 10 пользователей.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Часть логина, без учёта регистра
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Найденные пользователи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfUser'
+        '400':
+          description: Пустой или слишком длинный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Не админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
 
   /notes/all:
     get:
@@ -770,6 +834,27 @@ components:
         format: uuid
 
   schemas:
+
+    OnlineConfError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: FORBIDDEN
+        message:
+          type: string
+
+    OnlineConfUser:
+      type: object
+      required: [id, login]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+          example: seyran
 
     AddCollaboratorRequest:
       type: object

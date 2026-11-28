@@ -25,6 +25,8 @@ type Usecase interface {
 	HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error)
 	Disable2FA(ctx context.Context, userID uuid.UUID, code string) error
 	VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error)
+	ListAdmins(ctx context.Context) ([]models.User, error)
+	SearchUsers(ctx context.Context, query string) ([]models.User, error)
 	GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error)
 }
 
@@ -46,6 +48,8 @@ type Repo interface {
 	UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error
 
 	ReadUserByEmail(ctx context.Context, email string) (models.User, error)
+	ReadAdmins(ctx context.Context) ([]models.User, error)
+	SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error)
 }
 
 type Storage interface {

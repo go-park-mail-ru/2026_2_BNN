@@ -31,7 +31,7 @@ func newUsecase(t *testing.T) (*mocks.MockRepo, *mocks.MockAuthClient, *Usecase)
 
 func configInput(valueType, value string) onlineconf.KeyInput {
 	return onlineconf.KeyInput{
-		Scope: models.OnlineConfScopeBackend, Key: "test.value", Kind: models.OnlineConfKindConfig,
+		Scope: onlineconf.ScopeBackend, Key: "test.value", Kind: onlineconf.KindConfig,
 		Description: "Настройка", IsPublic: true,
 		Config: &models.OnlineConfConfig{ValueType: valueType, Value: json.RawMessage(value)},
 	}
@@ -39,7 +39,7 @@ func configInput(valueType, value string) onlineconf.KeyInput {
 
 func flagInput() onlineconf.KeyInput {
 	return onlineconf.KeyInput{
-		Scope: models.OnlineConfScopeBackend, Key: "test.flag", Kind: models.OnlineConfKindFlag,
+		Scope: onlineconf.ScopeBackend, Key: "test.flag", Kind: onlineconf.KindFlag,
 		Flag: &onlineconf.FlagInput{Enabled: true, RolloutPercent: 25},
 	}
 }

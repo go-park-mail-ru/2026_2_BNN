@@ -40,10 +40,10 @@ func NewUsecase(repo onlineconf.Repo, authClient onlineconf.AuthClient) *Usecase
 
 func (u *Usecase) ListScopes() []string {
 	return []string{
-		models.OnlineConfScopeFrontend,
-		models.OnlineConfScopeBackend,
-		models.OnlineConfScopeAuth,
-		models.OnlineConfScopeNotes,
+		onlineconf.ScopeFrontend,
+		onlineconf.ScopeBackend,
+		onlineconf.ScopeAuth,
+		onlineconf.ScopeNotes,
 	}
 }
 
@@ -51,7 +51,7 @@ func (u *Usecase) ListKeys(ctx context.Context, query, scope, kind string) ([]mo
 	if scope != "" && !validScope(scope) {
 		return nil, fmt.Errorf("%w: unknown scope", models.ErrValidation)
 	}
-	if kind != "" && kind != models.OnlineConfKindConfig && kind != models.OnlineConfKindFlag {
+	if kind != "" && kind != onlineconf.KindConfig && kind != onlineconf.KindFlag {
 		return nil, fmt.Errorf("%w: unknown kind", models.ErrValidation)
 	}
 	return u.repo.ReadKeys(ctx, query, scope, kind)
@@ -198,14 +198,14 @@ func validateInput(input onlineconf.KeyInput) error {
 		return fmt.Errorf("%w: invalid key name", models.ErrValidation)
 	}
 	switch input.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		if input.Config == nil || input.Flag != nil {
 			return fmt.Errorf("%w: config settings are required without flag settings", models.ErrValidation)
 		}
 		if err := validateConfig(*input.Config); err != nil {
 			return err
 		}
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		if input.Flag == nil || input.Config != nil {
 			return fmt.Errorf("%w: flag settings are required without config settings", models.ErrValidation)
 		}
@@ -220,8 +220,8 @@ func validateInput(input onlineconf.KeyInput) error {
 
 func validScope(scope string) bool {
 	switch scope {
-	case models.OnlineConfScopeFrontend, models.OnlineConfScopeBackend,
-		models.OnlineConfScopeAuth, models.OnlineConfScopeNotes:
+	case onlineconf.ScopeFrontend, onlineconf.ScopeBackend,
+		onlineconf.ScopeAuth, onlineconf.ScopeNotes:
 		return true
 	default:
 		return false
@@ -240,15 +240,15 @@ func validateConfig(config models.OnlineConfConfig) error {
 	}
 	var matches bool
 	switch config.ValueType {
-	case models.OnlineConfValueString:
+	case onlineconf.ValueString:
 		_, matches = value.(string)
-	case models.OnlineConfValueNumber:
+	case onlineconf.ValueNumber:
 		_, matches = value.(json.Number)
-	case models.OnlineConfValueBoolean:
+	case onlineconf.ValueBoolean:
 		_, matches = value.(bool)
-	case models.OnlineConfValueObject:
+	case onlineconf.ValueObject:
 		_, matches = value.(map[string]any)
-	case models.OnlineConfValueArray:
+	case onlineconf.ValueArray:
 		_, matches = value.([]any)
 	default:
 		return fmt.Errorf("%w: unknown value type", models.ErrValidation)
@@ -282,12 +282,12 @@ func validateFlag(flag onlineconf.FlagInput) error {
 }
 
 func validateKnownKey(input onlineconf.KeyInput) error {
-	if input.Scope != models.OnlineConfScopeBackend {
+	if input.Scope != onlineconf.ScopeBackend {
 		return nil
 	}
 	switch input.Key {
 	case attachmentSizeKey:
-		if input.Kind != models.OnlineConfKindConfig || input.Config.ValueType != models.OnlineConfValueNumber {
+		if input.Kind != onlineconf.KindConfig || input.Config.ValueType != onlineconf.ValueNumber {
 			return fmt.Errorf("%w: attachment size must be a number config", models.ErrValidation)
 		}
 		var size int64
@@ -295,7 +295,7 @@ func validateKnownKey(input onlineconf.KeyInput) error {
 			return fmt.Errorf("%w: attachment size must be an integer between 1 and 10 MiB", models.ErrValidation)
 		}
 	case attachmentUploadKey:
-		if input.Kind != models.OnlineConfKindFlag {
+		if input.Kind != onlineconf.KindFlag {
 			return fmt.Errorf("%w: attachment upload setting must be a flag", models.ErrValidation)
 		}
 	}

@@ -7,26 +7,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const (
-	OnlineConfScopeFrontend = "frontend"
-	OnlineConfScopeBackend  = "backend"
-	OnlineConfScopeAuth     = "auth"
-	OnlineConfScopeNotes    = "notes"
-)
-
-const (
-	OnlineConfKindConfig = "config"
-	OnlineConfKindFlag   = "flag"
-)
-
-const (
-	OnlineConfValueString  = "string"
-	OnlineConfValueNumber  = "number"
-	OnlineConfValueBoolean = "boolean"
-	OnlineConfValueObject  = "object"
-	OnlineConfValueArray   = "array"
-)
-
 type OnlineConfUser struct {
 	ID    uuid.UUID `json:"id"`
 	Login string    `json:"login"`

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/onlineconf"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -41,10 +42,10 @@ func newMock(t *testing.T) (pgxmock.PgxPoolIface, *Repo) {
 
 func newConfig() models.OnlineConfKey {
 	return models.OnlineConfKey{
-		ID: uuid.NewV4(), Scope: models.OnlineConfScopeBackend,
-		Key: "attachments.max_file_size_bytes", Kind: models.OnlineConfKindConfig,
+		ID: uuid.NewV4(), Scope: onlineconf.ScopeBackend,
+		Key: "attachments.max_file_size_bytes", Kind: onlineconf.KindConfig,
 		Description: "Лимит вложений", IsPublic: true, Version: 1,
-		Config:    &models.OnlineConfConfig{ValueType: models.OnlineConfValueNumber, Value: json.RawMessage("10485760")},
+		Config:    &models.OnlineConfConfig{ValueType: onlineconf.ValueNumber, Value: json.RawMessage("10485760")},
 		UpdatedBy: models.OnlineConfUser{ID: uuid.NewV4(), Login: "liza"},
 		UpdatedAt: time.Date(2026, 11, 28, 10, 0, 0, 0, time.UTC),
 	}
@@ -53,7 +54,7 @@ func newConfig() models.OnlineConfKey {
 func newFlag() models.OnlineConfKey {
 	key := newConfig()
 	key.Key = "attachments.upload_enabled"
-	key.Kind = models.OnlineConfKindFlag
+	key.Kind = onlineconf.KindFlag
 	key.Config = nil
 	key.Flag = &models.OnlineConfFlag{
 		Enabled: true, RolloutPercent: 25,
@@ -384,7 +385,7 @@ func TestUpdateKeyCannotChangeKind(t *testing.T) {
 func TestUpdateKeyRollback(t *testing.T) {
 	old := newConfig()
 	updated := old
-	updated.Config = &models.OnlineConfConfig{ValueType: models.OnlineConfValueNumber, Value: json.RawMessage("2097152")}
+	updated.Config = &models.OnlineConfConfig{ValueType: onlineconf.ValueNumber, Value: json.RawMessage("2097152")}
 	saved := updated
 	saved.Version++
 	for _, stage := range []string{"duplicate name", "no updated row", "delete overrides", "history"} {

@@ -19,6 +19,134 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockCoreUsecase is a mock of CoreUsecase interface.
+type MockCoreUsecase struct {
+	ctrl     *gomock.Controller
+	recorder *MockCoreUsecaseMockRecorder
+	isgomock struct{}
+}
+
+// MockCoreUsecaseMockRecorder is the mock recorder for MockCoreUsecase.
+type MockCoreUsecaseMockRecorder struct {
+	mock *MockCoreUsecase
+}
+
+// NewMockCoreUsecase creates a new mock instance.
+func NewMockCoreUsecase(ctrl *gomock.Controller) *MockCoreUsecase {
+	mock := &MockCoreUsecase{ctrl: ctrl}
+	mock.recorder = &MockCoreUsecaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCoreUsecase) EXPECT() *MockCoreUsecaseMockRecorder {
+	return m.recorder
+}
+
+// CreateKey mocks base method.
+func (m *MockCoreUsecase) CreateKey(ctx context.Context, userID uuid.UUID, input onlineconf.KeyInput) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateKey", ctx, userID, input)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateKey indicates an expected call of CreateKey.
+func (mr *MockCoreUsecaseMockRecorder) CreateKey(ctx, userID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateKey", reflect.TypeOf((*MockCoreUsecase)(nil).CreateKey), ctx, userID, input)
+}
+
+// DeleteKey mocks base method.
+func (m *MockCoreUsecase) DeleteKey(ctx context.Context, userID, id uuid.UUID, version int32) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteKey", ctx, userID, id, version)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteKey indicates an expected call of DeleteKey.
+func (mr *MockCoreUsecaseMockRecorder) DeleteKey(ctx, userID, id, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKey", reflect.TypeOf((*MockCoreUsecase)(nil).DeleteKey), ctx, userID, id, version)
+}
+
+// GetKey mocks base method.
+func (m *MockCoreUsecase) GetKey(ctx context.Context, id uuid.UUID) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetKey", ctx, id)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetKey indicates an expected call of GetKey.
+func (mr *MockCoreUsecaseMockRecorder) GetKey(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKey", reflect.TypeOf((*MockCoreUsecase)(nil).GetKey), ctx, id)
+}
+
+// GetSnapshot mocks base method.
+func (m *MockCoreUsecase) GetSnapshot(ctx context.Context, revision *int64) (models.Snapshot, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSnapshot", ctx, revision)
+	ret0, _ := ret[0].(models.Snapshot)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSnapshot indicates an expected call of GetSnapshot.
+func (mr *MockCoreUsecaseMockRecorder) GetSnapshot(ctx, revision any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSnapshot", reflect.TypeOf((*MockCoreUsecase)(nil).GetSnapshot), ctx, revision)
+}
+
+// ListKeys mocks base method.
+func (m *MockCoreUsecase) ListKeys(ctx context.Context, query, scope, kind string) ([]models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListKeys", ctx, query, scope, kind)
+	ret0, _ := ret[0].([]models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListKeys indicates an expected call of ListKeys.
+func (mr *MockCoreUsecaseMockRecorder) ListKeys(ctx, query, scope, kind any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListKeys", reflect.TypeOf((*MockCoreUsecase)(nil).ListKeys), ctx, query, scope, kind)
+}
+
+// ListScopes mocks base method.
+func (m *MockCoreUsecase) ListScopes() []string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListScopes")
+	ret0, _ := ret[0].([]string)
+	return ret0
+}
+
+// ListScopes indicates an expected call of ListScopes.
+func (mr *MockCoreUsecaseMockRecorder) ListScopes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListScopes", reflect.TypeOf((*MockCoreUsecase)(nil).ListScopes))
+}
+
+// UpdateKey mocks base method.
+func (m *MockCoreUsecase) UpdateKey(ctx context.Context, userID, id uuid.UUID, version int32, input onlineconf.KeyInput) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKey", ctx, userID, id, version, input)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateKey indicates an expected call of UpdateKey.
+func (mr *MockCoreUsecaseMockRecorder) UpdateKey(ctx, userID, id, version, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockCoreUsecase)(nil).UpdateKey), ctx, userID, id, version, input)
+}
+
 // MockUsecase is a mock of Usecase interface.
 type MockUsecase struct {
 	ctrl     *gomock.Controller
@@ -327,4 +455,83 @@ func (m *MockAuthClient) GetUser(ctx context.Context, userID uuid.UUID) (models.
 func (mr *MockAuthClientMockRecorder) GetUser(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockAuthClient)(nil).GetUser), ctx, userID)
+}
+
+// MockAdminSource is a mock of AdminSource interface.
+type MockAdminSource struct {
+	ctrl     *gomock.Controller
+	recorder *MockAdminSourceMockRecorder
+	isgomock struct{}
+}
+
+// MockAdminSourceMockRecorder is the mock recorder for MockAdminSource.
+type MockAdminSourceMockRecorder struct {
+	mock *MockAdminSource
+}
+
+// NewMockAdminSource creates a new mock instance.
+func NewMockAdminSource(ctrl *gomock.Controller) *MockAdminSource {
+	mock := &MockAdminSource{ctrl: ctrl}
+	mock.recorder = &MockAdminSourceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAdminSource) EXPECT() *MockAdminSourceMockRecorder {
+	return m.recorder
+}
+
+// ListAdmins mocks base method.
+func (m *MockAdminSource) ListAdmins(ctx context.Context) ([]models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAdmins", ctx)
+	ret0, _ := ret[0].([]models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAdmins indicates an expected call of ListAdmins.
+func (mr *MockAdminSourceMockRecorder) ListAdmins(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAdmins", reflect.TypeOf((*MockAdminSource)(nil).ListAdmins), ctx)
+}
+
+// MockSnapshotSource is a mock of SnapshotSource interface.
+type MockSnapshotSource struct {
+	ctrl     *gomock.Controller
+	recorder *MockSnapshotSourceMockRecorder
+	isgomock struct{}
+}
+
+// MockSnapshotSourceMockRecorder is the mock recorder for MockSnapshotSource.
+type MockSnapshotSourceMockRecorder struct {
+	mock *MockSnapshotSource
+}
+
+// NewMockSnapshotSource creates a new mock instance.
+func NewMockSnapshotSource(ctrl *gomock.Controller) *MockSnapshotSource {
+	mock := &MockSnapshotSource{ctrl: ctrl}
+	mock.recorder = &MockSnapshotSourceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSnapshotSource) EXPECT() *MockSnapshotSourceMockRecorder {
+	return m.recorder
+}
+
+// GetSnapshot mocks base method.
+func (m *MockSnapshotSource) GetSnapshot(ctx context.Context, revision *int64) (models.Snapshot, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSnapshot", ctx, revision)
+	ret0, _ := ret[0].(models.Snapshot)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSnapshot indicates an expected call of GetSnapshot.
+func (mr *MockSnapshotSourceMockRecorder) GetSnapshot(ctx, revision any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSnapshot", reflect.TypeOf((*MockSnapshotSource)(nil).GetSnapshot), ctx, revision)
 }

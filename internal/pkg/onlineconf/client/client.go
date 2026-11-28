@@ -48,10 +48,10 @@ func (c *Client) GetSnapshot(
 
 func (c *Client) ListScopes() []string {
 	return []string{
-		models.OnlineConfScopeFrontend,
-		models.OnlineConfScopeBackend,
-		models.OnlineConfScopeAuth,
-		models.OnlineConfScopeNotes,
+		onlineconf.ScopeFrontend,
+		onlineconf.ScopeBackend,
+		onlineconf.ScopeAuth,
+		onlineconf.ScopeNotes,
 	}
 }
 

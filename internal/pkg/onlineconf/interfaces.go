@@ -55,3 +55,11 @@ type FlagInput struct {
 	IncludeUserIDs []uuid.UUID
 	ExcludeUserIDs []uuid.UUID
 }
+
+type AdminSource interface {
+	ListAdmins(ctx context.Context) ([]models.User, error)
+}
+
+type SnapshotSource interface {
+	GetSnapshot(ctx context.Context, revision *int64) (models.Snapshot, bool, error)
+}

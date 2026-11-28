@@ -85,13 +85,13 @@ func KeyFromProto(key *gen.Key) (models.OnlineConfKey, error) {
 	}
 
 	switch result.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		result.Config, err = configFromProto(key.GetConfig())
 		if err != nil {
 			return models.OnlineConfKey{}, err
 		}
 
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		flag := key.GetFlag()
 		if flag == nil {
 			return models.OnlineConfKey{}, fmt.Errorf(
@@ -157,7 +157,7 @@ func InputToProto(input onlineconf.KeyInput) (*gen.KeyInput, error) {
 	}
 
 	switch input.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		if input.Config == nil || input.Flag != nil {
 			return nil, fmt.Errorf(
 				"%w: invalid config settings", models.ErrValidation,
@@ -168,7 +168,7 @@ func InputToProto(input onlineconf.KeyInput) (*gen.KeyInput, error) {
 			Config: configToProto(input.Config),
 		}
 
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		if input.Flag == nil || input.Config != nil {
 			return nil, fmt.Errorf(
 				"%w: invalid flag settings", models.ErrValidation,
@@ -209,14 +209,14 @@ func InputFromProto(input *gen.KeyInput) (onlineconf.KeyInput, error) {
 	}
 
 	switch result.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		config, err := configFromProto(input.GetConfig())
 		if err != nil {
 			return onlineconf.KeyInput{}, err
 		}
 		result.Config = config
 
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		flag := input.GetFlag()
 		if flag == nil {
 			return onlineconf.KeyInput{}, fmt.Errorf(

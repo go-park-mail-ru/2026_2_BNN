@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package onlineconf;
+
+option go_package = "bnn/internal/pkg/onlineconf/delivery/grpc/gen;gen";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service OnlineConf {
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+
+  rpc ListKeys(ListKeysRequest) returns (ListKeysResponse);
+
+  rpc GetKey(GetKeyRequest) returns (Key);
+
+  rpc CreateKey(CreateKeyRequest) returns (Key);
+
+  rpc UpdateKey(UpdateKeyRequest) returns (Key);
+
+  rpc DeleteKey(DeleteKeyRequest) returns (google.protobuf.Empty);
+
+  rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
+
+  rpc Evaluate(EvaluateRequest) returns (EvaluateResponse);
+}
+
+message UserRef {
+  string id = 1;
+  string login = 2;
+}
+
+message Config {
+  string value_type = 1;
+  bytes value_json = 2;
+}
+
+message Flag {
+  bool enabled = 1;
+  int32 rollout_percent = 2;
+  repeated UserRef include_users = 3;
+  repeated UserRef exclude_users = 4;
+}
+
+message Key {
+  string id = 1;
+  string scope = 2;
+  string key = 3;
+  string kind = 4;
+  string description = 5;
+  bool is_public = 6;
+  int32 version = 7;
+  UserRef updated_by = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  oneof settings {
+    Config config = 10;
+    Flag flag = 11;
+  }
+}
+
+message FlagInput {
+  bool enabled = 1;
+  int32 rollout_percent = 2;
+  repeated string include_user_ids = 3;
+  repeated string exclude_user_ids = 4;
+}
+
+message KeyInput {
+  string scope = 1;
+  string key = 2;
+  string kind = 3;
+  string description = 4;
+  bool is_public = 5;
+  oneof settings {
+    Config config = 6;
+    FlagInput flag = 7;
+  }
+}
+
+message Snapshot {
+  int64 revision = 1;
+  repeated Key keys = 2;
+}
+
+message GetSnapshotRequest {
+  // An absent revision requests a full snapshot, including revision zero.
+  optional int64 revision = 1;
+}
+
+message GetSnapshotResponse {
+  // If unchanged, snapshot is absent and the client retains its cached state.
+  bool changed = 1;
+  Snapshot snapshot = 2;
+}
+
+message ListKeysRequest {
+  string query = 1;
+  string scope = 2;
+  string kind = 3;
+}
+
+message ListKeysResponse {
+  repeated Key keys = 1;
+}
+
+message GetKeyRequest {
+  string key_id = 1;
+}
+
+message CreateKeyRequest {
+  string user_id = 1;
+  KeyInput key = 2;
+}
+
+message UpdateKeyRequest {
+  string user_id = 1;
+  string key_id = 2;
+  int32 version = 3;
+  KeyInput key = 4;
+}
+
+message DeleteKeyRequest {
+  string user_id = 1;
+  string key_id = 2;
+  int32 version = 3;
+}
+
+message HistoryEntry {
+  string id = 1;
+  string key_id = 2;
+  string action = 3;
+  Key old_value = 4;
+  Key new_value = 5;
+  UserRef user = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListHistoryRequest {
+  string key_id = 1;
+}
+
+message ListHistoryResponse {
+  repeated HistoryEntry entries = 1;
+}
+
+message EvaluateRequest {
+  string key_id = 1;
+  string user_id = 2;
+}
+
+message EvaluateResponse {
+  bool result = 1;
+  string reason = 2;
+  int64 revision = 3;
+}

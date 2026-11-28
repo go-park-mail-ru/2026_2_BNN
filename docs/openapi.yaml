@@ -555,7 +555,6 @@ paths:
         default:
           $ref: '#/components/responses/OnlineConfFailure'
 
-
   /onlineconf/admin/keys/{id}/history:
     parameters:
       - name: id
@@ -582,6 +581,39 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OnlineConfHistoryEntry'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/evaluate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [onlineconf]
+      operationId: EvaluateOnlineConfKey
+      summary: Проверить флаг для пользователя
+      description: Считается по снимку в памяти main, той же функцией, что и для продукта.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfEvaluateInput'
+      responses:
+        '200':
+          description: Результат для пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfEvaluation'
         '401':
           description: Нет действующей сессии
         default:
@@ -1066,6 +1098,28 @@ components:
         format: uuid
 
   schemas:
+
+    OnlineConfEvaluateInput:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+
+    OnlineConfEvaluation:
+      type: object
+      required: [result, reason, revision]
+      properties:
+        result:
+          type: boolean
+        reason:
+          type: string
+          enum: [disabled, excluded, included, rollout]
+        revision:
+          type: integer
+          format: int64
+          example: 42
 
     OnlineConfRuntime:
       type: object

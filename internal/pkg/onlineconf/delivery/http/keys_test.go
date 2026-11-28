@@ -58,7 +58,7 @@ func newKeysRouter(t *testing.T) (
 	admins := onlineconf.NewAdminCache(adminSource)
 	admins.Run(ctx)
 
-	handler := NewHandler(auth, admins, keys)
+	handler := NewHandler(auth, admins, keys, nil)
 	authHandler := authDelivery.NewHandler(auth, "")
 
 	router := mux.NewRouter()

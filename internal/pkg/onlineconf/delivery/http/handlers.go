@@ -15,20 +15,23 @@ import (
 )
 
 type Handler struct {
-	auth   auth.Usecase
-	admins *onlineconf.AdminCache
-	keys   onlineconf.Usecase
+	auth     auth.Usecase
+	admins   *onlineconf.AdminCache
+	keys     onlineconf.Usecase
+	snapshot *onlineconf.SnapshotCache
 }
 
 func NewHandler(
 	authUC auth.Usecase,
 	admins *onlineconf.AdminCache,
 	keys onlineconf.Usecase,
+	snapshot *onlineconf.SnapshotCache,
 ) *Handler {
 	return &Handler{
-		auth:   authUC,
-		admins: admins,
-		keys:   keys,
+		auth:     authUC,
+		admins:   admins,
+		keys:     keys,
+		snapshot: snapshot,
 	}
 }
 

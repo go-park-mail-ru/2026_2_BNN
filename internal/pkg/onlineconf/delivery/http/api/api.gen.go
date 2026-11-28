@@ -17,6 +17,30 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for OnlineConfEvaluationReason.
+const (
+	Disabled OnlineConfEvaluationReason = "disabled"
+	Excluded OnlineConfEvaluationReason = "excluded"
+	Included OnlineConfEvaluationReason = "included"
+	Rollout  OnlineConfEvaluationReason = "rollout"
+)
+
+// Valid indicates whether the value is a known member of the OnlineConfEvaluationReason enum.
+func (e OnlineConfEvaluationReason) Valid() bool {
+	switch e {
+	case Disabled:
+		return true
+	case Excluded:
+		return true
+	case Included:
+		return true
+	case Rollout:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OnlineConfHistoryEntryAction.
 const (
 	Create OnlineConfHistoryEntryAction = "create"
@@ -120,6 +144,23 @@ type OnlineConfError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
+
+// OnlineConfEvaluateInput defines model for OnlineConfEvaluateInput.
+type OnlineConfEvaluateInput struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+// OnlineConfEvaluation defines model for OnlineConfEvaluation.
+type OnlineConfEvaluation struct {
+	Reason OnlineConfEvaluationReason `json:"reason"`
+	Result bool                       `json:"result"`
+
+	// Revision Example: 42
+	Revision int64 `json:"revision"`
+}
+
+// OnlineConfEvaluationReason defines model for OnlineConfEvaluation.Reason.
+type OnlineConfEvaluationReason string
 
 // OnlineConfFlag defines model for OnlineConfFlag.
 type OnlineConfFlag struct {
@@ -317,6 +358,9 @@ type CreateOnlineConfKeyJSONRequestBody = OnlineConfKeyInput
 // UpdateOnlineConfKeyJSONRequestBody defines body for UpdateOnlineConfKey for application/json ContentType.
 type UpdateOnlineConfKeyJSONRequestBody = OnlineConfUpdateKeyInput
 
+// EvaluateOnlineConfKeyJSONRequestBody defines body for EvaluateOnlineConfKey for application/json ContentType.
+type EvaluateOnlineConfKeyJSONRequestBody = OnlineConfEvaluateInput
+
 // SetOnlineConfRolloutPlanJSONRequestBody defines body for SetOnlineConfRolloutPlan for application/json ContentType.
 type SetOnlineConfRolloutPlanJSONRequestBody = OnlineConfSetRolloutPlanInput
 
@@ -352,6 +396,9 @@ type ServerInterface interface {
 	// UpdateOnlineConfKey Заменить настройки ключа
 	// (PUT /onlineconf/admin/keys/{id})
 	UpdateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// EvaluateOnlineConfKey Проверить флаг для пользователя
+	// (POST /onlineconf/admin/keys/{id}/evaluate)
+	EvaluateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// ListOnlineConfHistory История изменений ключа
 	// (GET /onlineconf/admin/keys/{id}/history)
 	ListOnlineConfHistory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -569,6 +616,32 @@ func (siw *ServerInterfaceWrapper) UpdateOnlineConfKey(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateOnlineConfKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EvaluateOnlineConfKey operation middleware
+func (siw *ServerInterfaceWrapper) EvaluateOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EvaluateOnlineConfKey(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1117,6 +1190,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/schedules/{schedule_id}", wrapper.DeleteOnlineConfSchedule).Methods(http.MethodDelete)
 
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/evaluate", wrapper.EvaluateOnlineConfKey).Methods(http.MethodPost)
+
 	return r
 }
 
@@ -1342,6 +1417,54 @@ type UpdateOnlineConfKeydefaultJSONResponse struct {
 }
 
 func (response UpdateOnlineConfKeydefaultJSONResponse) VisitUpdateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EvaluateOnlineConfKeyRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *EvaluateOnlineConfKeyJSONRequestBody
+}
+
+type EvaluateOnlineConfKeyResponseObject interface {
+	VisitEvaluateOnlineConfKeyResponse(w http.ResponseWriter) error
+}
+
+type EvaluateOnlineConfKey200JSONResponse OnlineConfEvaluation
+
+func (response EvaluateOnlineConfKey200JSONResponse) VisitEvaluateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EvaluateOnlineConfKey401Response struct {
+}
+
+func (response EvaluateOnlineConfKey401Response) VisitEvaluateOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type EvaluateOnlineConfKeydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response EvaluateOnlineConfKeydefaultJSONResponse) VisitEvaluateOnlineConfKeyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2121,6 +2244,9 @@ type StrictServerInterface interface {
 	// UpdateOnlineConfKey Заменить настройки ключа
 	// (PUT /onlineconf/admin/keys/{id})
 	UpdateOnlineConfKey(ctx context.Context, request UpdateOnlineConfKeyRequestObject) (UpdateOnlineConfKeyResponseObject, error)
+	// EvaluateOnlineConfKey Проверить флаг для пользователя
+	// (POST /onlineconf/admin/keys/{id}/evaluate)
+	EvaluateOnlineConfKey(ctx context.Context, request EvaluateOnlineConfKeyRequestObject) (EvaluateOnlineConfKeyResponseObject, error)
 	// ListOnlineConfHistory История изменений ключа
 	// (GET /onlineconf/admin/keys/{id}/history)
 	ListOnlineConfHistory(ctx context.Context, request ListOnlineConfHistoryRequestObject) (ListOnlineConfHistoryResponseObject, error)
@@ -2346,6 +2472,39 @@ func (sh *strictHandler) UpdateOnlineConfKey(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateOnlineConfKeyResponseObject); ok {
 		if err := validResponse.VisitUpdateOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EvaluateOnlineConfKey operation middleware
+func (sh *strictHandler) EvaluateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request EvaluateOnlineConfKeyRequestObject
+
+	request.Id = id
+
+	var body EvaluateOnlineConfKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EvaluateOnlineConfKey(ctx, request.(EvaluateOnlineConfKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EvaluateOnlineConfKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EvaluateOnlineConfKeyResponseObject); ok {
+		if err := validResponse.VisitEvaluateOnlineConfKeyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

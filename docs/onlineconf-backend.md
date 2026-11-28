@@ -6,7 +6,7 @@
 
 | Компонент | Что делает |
 |---|---|
-| **Сервис `onlineconf`** (новый, gRPC `:9004`, метрики `:9104`) | хранит ключи, ведёт историю, держит снимок всех ключей в памяти |
+| **Сервис `onlineconf`** (новый, gRPC `:9004`) | хранит ключи, ведёт историю, держит снимок всех ключей в памяти |
 | **main** | HTTP API админки и runtime, проверка прав, кеш снимка и списка админов |
 | **auth** | поле `users.is_admin`, поиск пользователей, список админов |
 | **Пакет `internal/pkg/onlineconf`** | клиент с кешем в памяти и функция вычисления флага; используется в main и в сервисе `onlineconf` |
@@ -185,7 +185,7 @@ INSERT INTO onlineconf_revision DEFAULT VALUES;
 
 ## 9. Деплой
 
-- `docker-compose`: сервис `onlineconf` (`ONLINECONF_GRPC_ADDR=onlineconf:9004` для main), цель `onlineconf:9104` в Prometheus.
+- `docker-compose`: сервис `onlineconf` (`ONLINECONF_GRPC_ADDR=onlineconf:9004` для main).
 - nginx: `location /onlineconf/` отдаёт статику админки, для неизвестных путей — `try_files $uri /onlineconf/index.html`. `/api/` уже проксируется в main.
 - Миграция `000009_onlineconf` (`000008` занята API-токенами).
 

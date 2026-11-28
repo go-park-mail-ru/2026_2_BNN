@@ -123,7 +123,7 @@ func main() {
 	go snapshotCache.Run(onlineconfCtx)
 
 	onlineconfHandler := onlineconfDelivery.NewHandler(
-		authService, adminCache, onlineconfService,
+		authService, adminCache, onlineconfService, snapshotCache,
 	)
 	runtimeHandler := onlineconfDelivery.NewRuntimeHandler(snapshotCache)
 	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService, snapshotCache)

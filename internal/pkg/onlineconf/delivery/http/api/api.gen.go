@@ -6,21 +6,161 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
+	json "encoding/json"
 
 	"github.com/gorilla/mux"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for OnlineConfKind.
+const (
+	Config OnlineConfKind = "config"
+	Flag   OnlineConfKind = "flag"
+)
+
+// Valid indicates whether the value is a known member of the OnlineConfKind enum.
+func (e OnlineConfKind) Valid() bool {
+	switch e {
+	case Config:
+		return true
+	case Flag:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OnlineConfScope.
+const (
+	Auth     OnlineConfScope = "auth"
+	Backend  OnlineConfScope = "backend"
+	Frontend OnlineConfScope = "frontend"
+	Notes    OnlineConfScope = "notes"
+)
+
+// Valid indicates whether the value is a known member of the OnlineConfScope enum.
+func (e OnlineConfScope) Valid() bool {
+	switch e {
+	case Auth:
+		return true
+	case Backend:
+		return true
+	case Frontend:
+		return true
+	case Notes:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OnlineConfValueType.
+const (
+	Array   OnlineConfValueType = "array"
+	Boolean OnlineConfValueType = "boolean"
+	Number  OnlineConfValueType = "number"
+	Object  OnlineConfValueType = "object"
+	String  OnlineConfValueType = "string"
+)
+
+// Valid indicates whether the value is a known member of the OnlineConfValueType enum.
+func (e OnlineConfValueType) Valid() bool {
+	switch e {
+	case Array:
+		return true
+	case Boolean:
+		return true
+	case Number:
+		return true
+	case Object:
+		return true
+	case String:
+		return true
+	default:
+		return false
+	}
+}
+
+// OnlineConfConfig defines model for OnlineConfConfig.
+type OnlineConfConfig struct {
+	// Value JSON-значение, соответствующее value_type
+	Value     json.RawMessage     `json:"value"`
+	ValueType OnlineConfValueType `json:"value_type"`
+}
+
 // OnlineConfError defines model for OnlineConfError.
 type OnlineConfError struct {
 	// Code Example: FORBIDDEN
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+// OnlineConfFlag defines model for OnlineConfFlag.
+type OnlineConfFlag struct {
+	Enabled        bool              `json:"enabled"`
+	ExcludeUsers   *[]OnlineConfUser `json:"exclude_users,omitempty"`
+	IncludeUsers   *[]OnlineConfUser `json:"include_users,omitempty"`
+	RolloutPercent int32             `json:"rollout_percent"`
+}
+
+// OnlineConfFlagInput defines model for OnlineConfFlagInput.
+type OnlineConfFlagInput struct {
+	Enabled        bool                 `json:"enabled"`
+	ExcludeUserIDs []openapi_types.UUID `json:"exclude_user_ids,omitempty"`
+	IncludeUserIDs []openapi_types.UUID `json:"include_user_ids,omitempty"`
+	RolloutPercent int32                `json:"rollout_percent"`
+}
+
+// OnlineConfKey defines model for OnlineConfKey.
+type OnlineConfKey struct {
+	Config      *OnlineConfConfig  `json:"config,omitempty"`
+	Description string             `json:"description"`
+	Flag        *OnlineConfFlag    `json:"flag,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	IsPublic    bool               `json:"is_public"`
+	Key         string             `json:"key"`
+	Kind        OnlineConfKind     `json:"kind"`
+	Scope       OnlineConfScope    `json:"scope"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+	UpdatedBy   OnlineConfUser     `json:"updated_by"`
+	Version     int32              `json:"version"`
+}
+
+// OnlineConfKeyInput Для kind=config заполняется только config.
+// Для kind=flag заполняется только flag.
+// Проверка выполняется сервисом OnlineConf.
+type OnlineConfKeyInput struct {
+	Config      *OnlineConfConfig    `json:"config,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Flag        *OnlineConfFlagInput `json:"flag,omitempty"`
+	IsPublic    bool                 `json:"is_public"`
+	Key         string               `json:"key"`
+	Kind        OnlineConfKind       `json:"kind"`
+	Scope       OnlineConfScope      `json:"scope"`
+}
+
+// OnlineConfKind defines model for OnlineConfKind.
+type OnlineConfKind string
+
+// OnlineConfScope defines model for OnlineConfScope.
+type OnlineConfScope string
+
+// OnlineConfUpdateKeyInput defines model for OnlineConfUpdateKeyInput.
+type OnlineConfUpdateKeyInput struct {
+	Config      *OnlineConfConfig    `json:"config,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Flag        *OnlineConfFlagInput `json:"flag,omitempty"`
+	IsPublic    bool                 `json:"is_public"`
+	Key         string               `json:"key"`
+	Kind        OnlineConfKind       `json:"kind"`
+	Scope       OnlineConfScope      `json:"scope"`
+	Version     int32                `json:"version"`
 }
 
 // OnlineConfUser defines model for OnlineConfUser.
@@ -30,6 +170,9 @@ type OnlineConfUser struct {
 	// Login Example: seyran
 	Login string `json:"login"`
 }
+
+// OnlineConfValueType defines model for OnlineConfValueType.
+type OnlineConfValueType string
 
 // AttachmentID defines model for AttachmentID.
 type AttachmentID = openapi_types.UUID
@@ -43,14 +186,54 @@ type NoteID = openapi_types.UUID
 // TagID defines model for TagID.
 type TagID = openapi_types.UUID
 
+// OnlineConfFailure defines model for OnlineConfFailure.
+type OnlineConfFailure = OnlineConfError
+
+// ListOnlineConfKeysParams defines parameters for ListOnlineConfKeys.
+type ListOnlineConfKeysParams struct {
+	// Query Часть имени ключа, без учёта регистра
+	Query *string          `form:"query,omitempty" json:"query,omitempty"`
+	Scope *OnlineConfScope `form:"scope,omitempty" json:"scope,omitempty"`
+	Kind  *OnlineConfKind  `form:"kind,omitempty" json:"kind,omitempty"`
+}
+
+// DeleteOnlineConfKeyParams defines parameters for DeleteOnlineConfKey.
+type DeleteOnlineConfKeyParams struct {
+	Version int32 `form:"version" json:"version"`
+}
+
 // SearchOnlineConfUsersParams defines parameters for SearchOnlineConfUsers.
 type SearchOnlineConfUsersParams struct {
 	// Query Часть логина, без учёта регистра
 	Query string `form:"query" json:"query"`
 }
 
+// CreateOnlineConfKeyJSONRequestBody defines body for CreateOnlineConfKey for application/json ContentType.
+type CreateOnlineConfKeyJSONRequestBody = OnlineConfKeyInput
+
+// UpdateOnlineConfKeyJSONRequestBody defines body for UpdateOnlineConfKey for application/json ContentType.
+type UpdateOnlineConfKeyJSONRequestBody = OnlineConfUpdateKeyInput
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListOnlineConfKeys Каталог ключей
+	// (GET /onlineconf/admin/keys)
+	ListOnlineConfKeys(w http.ResponseWriter, r *http.Request, params ListOnlineConfKeysParams)
+	// CreateOnlineConfKey Создать конфиг или флаг
+	// (POST /onlineconf/admin/keys)
+	CreateOnlineConfKey(w http.ResponseWriter, r *http.Request)
+	// DeleteOnlineConfKey Удалить ключ
+	// (DELETE /onlineconf/admin/keys/{id})
+	DeleteOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeleteOnlineConfKeyParams)
+	// GetOnlineConfKey Карточка ключа
+	// (GET /onlineconf/admin/keys/{id})
+	GetOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// UpdateOnlineConfKey Заменить настройки ключа
+	// (PUT /onlineconf/admin/keys/{id})
+	UpdateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ListOnlineConfScopes Области конфигурации
+	// (GET /onlineconf/admin/scopes)
+	ListOnlineConfScopes(w http.ResponseWriter, r *http.Request)
 	// GetOnlineConfSession Проверка доступа к админке
 	// (GET /onlineconf/admin/session)
 	GetOnlineConfSession(w http.ResponseWriter, r *http.Request)
@@ -67,6 +250,187 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListOnlineConfKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfKeys(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListOnlineConfKeysParams
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "scope" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "scope", r.URL.Query(), &params.Scope, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "scope"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scope", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfKeys(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOnlineConfKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOnlineConfKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteOnlineConfKey operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteOnlineConfKeyParams
+
+	// ------------- Required query parameter "version" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "version", r.URL.Query(), &params.Version, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "version"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "version", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOnlineConfKey(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOnlineConfKey operation middleware
+func (siw *ServerInterfaceWrapper) GetOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOnlineConfKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateOnlineConfKey operation middleware
+func (siw *ServerInterfaceWrapper) UpdateOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateOnlineConfKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnlineConfScopes operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfScopes(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfScopes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetOnlineConfSession operation middleware
 func (siw *ServerInterfaceWrapper) GetOnlineConfSession(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +596,298 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/users", wrapper.SearchOnlineConfUsers).Methods(http.MethodGet)
 
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/scopes", wrapper.ListOnlineConfScopes).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys", wrapper.ListOnlineConfKeys).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys", wrapper.CreateOnlineConfKey).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.DeleteOnlineConfKey).Methods(http.MethodDelete)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.GetOnlineConfKey).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.UpdateOnlineConfKey).Methods(http.MethodPut)
+
 	return r
+}
+
+type OnlineConfFailureJSONResponse OnlineConfError
+
+type ListOnlineConfKeysRequestObject struct {
+	Params ListOnlineConfKeysParams
+}
+
+type ListOnlineConfKeysResponseObject interface {
+	VisitListOnlineConfKeysResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfKeys200JSONResponse []OnlineConfKey
+
+func (response ListOnlineConfKeys200JSONResponse) VisitListOnlineConfKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfKeys401Response struct {
+}
+
+func (response ListOnlineConfKeys401Response) VisitListOnlineConfKeysResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfKeysdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfKeysdefaultJSONResponse) VisitListOnlineConfKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfKeyRequestObject struct {
+	Body *CreateOnlineConfKeyJSONRequestBody
+}
+
+type CreateOnlineConfKeyResponseObject interface {
+	VisitCreateOnlineConfKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateOnlineConfKey201JSONResponse OnlineConfKey
+
+func (response CreateOnlineConfKey201JSONResponse) VisitCreateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfKey401Response struct {
+}
+
+func (response CreateOnlineConfKey401Response) VisitCreateOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type CreateOnlineConfKeydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response CreateOnlineConfKeydefaultJSONResponse) VisitCreateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOnlineConfKeyRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params DeleteOnlineConfKeyParams
+}
+
+type DeleteOnlineConfKeyResponseObject interface {
+	VisitDeleteOnlineConfKeyResponse(w http.ResponseWriter) error
+}
+
+type DeleteOnlineConfKey204Response struct {
+}
+
+func (response DeleteOnlineConfKey204Response) VisitDeleteOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteOnlineConfKey401Response struct {
+}
+
+func (response DeleteOnlineConfKey401Response) VisitDeleteOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type DeleteOnlineConfKeydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response DeleteOnlineConfKeydefaultJSONResponse) VisitDeleteOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnlineConfKeyRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetOnlineConfKeyResponseObject interface {
+	VisitGetOnlineConfKeyResponse(w http.ResponseWriter) error
+}
+
+type GetOnlineConfKey200JSONResponse OnlineConfKey
+
+func (response GetOnlineConfKey200JSONResponse) VisitGetOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnlineConfKey401Response struct {
+}
+
+func (response GetOnlineConfKey401Response) VisitGetOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type GetOnlineConfKeydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response GetOnlineConfKeydefaultJSONResponse) VisitGetOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateOnlineConfKeyRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateOnlineConfKeyJSONRequestBody
+}
+
+type UpdateOnlineConfKeyResponseObject interface {
+	VisitUpdateOnlineConfKeyResponse(w http.ResponseWriter) error
+}
+
+type UpdateOnlineConfKey200JSONResponse OnlineConfKey
+
+func (response UpdateOnlineConfKey200JSONResponse) VisitUpdateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateOnlineConfKey401Response struct {
+}
+
+func (response UpdateOnlineConfKey401Response) VisitUpdateOnlineConfKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type UpdateOnlineConfKeydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response UpdateOnlineConfKeydefaultJSONResponse) VisitUpdateOnlineConfKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfScopesRequestObject struct {
+}
+
+type ListOnlineConfScopesResponseObject interface {
+	VisitListOnlineConfScopesResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfScopes200JSONResponse []OnlineConfScope
+
+func (response ListOnlineConfScopes200JSONResponse) VisitListOnlineConfScopesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfScopes401Response struct {
+}
+
+func (response ListOnlineConfScopes401Response) VisitListOnlineConfScopesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfScopesdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfScopesdefaultJSONResponse) VisitListOnlineConfScopesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetOnlineConfSessionRequestObject struct {
@@ -338,6 +993,24 @@ func (response SearchOnlineConfUsers403JSONResponse) VisitSearchOnlineConfUsersR
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListOnlineConfKeys Каталог ключей
+	// (GET /onlineconf/admin/keys)
+	ListOnlineConfKeys(ctx context.Context, request ListOnlineConfKeysRequestObject) (ListOnlineConfKeysResponseObject, error)
+	// CreateOnlineConfKey Создать конфиг или флаг
+	// (POST /onlineconf/admin/keys)
+	CreateOnlineConfKey(ctx context.Context, request CreateOnlineConfKeyRequestObject) (CreateOnlineConfKeyResponseObject, error)
+	// DeleteOnlineConfKey Удалить ключ
+	// (DELETE /onlineconf/admin/keys/{id})
+	DeleteOnlineConfKey(ctx context.Context, request DeleteOnlineConfKeyRequestObject) (DeleteOnlineConfKeyResponseObject, error)
+	// GetOnlineConfKey Карточка ключа
+	// (GET /onlineconf/admin/keys/{id})
+	GetOnlineConfKey(ctx context.Context, request GetOnlineConfKeyRequestObject) (GetOnlineConfKeyResponseObject, error)
+	// UpdateOnlineConfKey Заменить настройки ключа
+	// (PUT /onlineconf/admin/keys/{id})
+	UpdateOnlineConfKey(ctx context.Context, request UpdateOnlineConfKeyRequestObject) (UpdateOnlineConfKeyResponseObject, error)
+	// ListOnlineConfScopes Области конфигурации
+	// (GET /onlineconf/admin/scopes)
+	ListOnlineConfScopes(ctx context.Context, request ListOnlineConfScopesRequestObject) (ListOnlineConfScopesResponseObject, error)
 	// GetOnlineConfSession Проверка доступа к админке
 	// (GET /onlineconf/admin/session)
 	GetOnlineConfSession(ctx context.Context, request GetOnlineConfSessionRequestObject) (GetOnlineConfSessionResponseObject, error)
@@ -383,6 +1056,173 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListOnlineConfKeys operation middleware
+func (sh *strictHandler) ListOnlineConfKeys(w http.ResponseWriter, r *http.Request, params ListOnlineConfKeysParams) {
+	var request ListOnlineConfKeysRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfKeys(ctx, request.(ListOnlineConfKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfKeysResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateOnlineConfKey operation middleware
+func (sh *strictHandler) CreateOnlineConfKey(w http.ResponseWriter, r *http.Request) {
+	var request CreateOnlineConfKeyRequestObject
+
+	var body CreateOnlineConfKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateOnlineConfKey(ctx, request.(CreateOnlineConfKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateOnlineConfKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateOnlineConfKeyResponseObject); ok {
+		if err := validResponse.VisitCreateOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteOnlineConfKey operation middleware
+func (sh *strictHandler) DeleteOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeleteOnlineConfKeyParams) {
+	var request DeleteOnlineConfKeyRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteOnlineConfKey(ctx, request.(DeleteOnlineConfKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteOnlineConfKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteOnlineConfKeyResponseObject); ok {
+		if err := validResponse.VisitDeleteOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOnlineConfKey operation middleware
+func (sh *strictHandler) GetOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetOnlineConfKeyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOnlineConfKey(ctx, request.(GetOnlineConfKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOnlineConfKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOnlineConfKeyResponseObject); ok {
+		if err := validResponse.VisitGetOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateOnlineConfKey operation middleware
+func (sh *strictHandler) UpdateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateOnlineConfKeyRequestObject
+
+	request.Id = id
+
+	var body UpdateOnlineConfKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateOnlineConfKey(ctx, request.(UpdateOnlineConfKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateOnlineConfKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateOnlineConfKeyResponseObject); ok {
+		if err := validResponse.VisitUpdateOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnlineConfScopes operation middleware
+func (sh *strictHandler) ListOnlineConfScopes(w http.ResponseWriter, r *http.Request) {
+	var request ListOnlineConfScopesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfScopes(ctx, request.(ListOnlineConfScopesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfScopes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfScopesResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfScopesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetOnlineConfSession operation middleware

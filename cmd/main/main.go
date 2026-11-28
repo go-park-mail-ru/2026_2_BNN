@@ -35,6 +35,8 @@ import (
 	"bnn/internal/pkg/utils/httpjson"
 	ws "bnn/internal/pkg/websocket"
 
+	onlineconfClient "bnn/internal/pkg/onlineconf/client"
+
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,10 +47,11 @@ const (
 	shutdownTimeout    = 5 * time.Second
 	MaxRequestSize20MB = 20 << 20
 
-	defaultFrontendURL = "http://localhost:3000"
-	defaultAuthAddr    = "localhost:9001"
-	defaultNotesAddr   = "localhost:9002"
-	metricsAddr        = ":9101"
+	defaultFrontendURL    = "http://localhost:3000"
+	defaultAuthAddr       = "localhost:9001"
+	defaultNotesAddr      = "localhost:9002"
+	metricsAddr           = ":9101"
+	defaultOnlineConfAddr = "localhost:9004"
 )
 
 func main() {
@@ -73,6 +76,20 @@ func main() {
 		os.Exit(1)
 	}
 	defer notesConn.Close()
+
+	onlineconfConn, err := grpcutil.NewClient(
+		lo.CoalesceOrEmpty(
+			os.Getenv("ONLINECONF_GRPC_ADDR"),
+			defaultOnlineConfAddr,
+		),
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to create OnlineConf client", "error", err)
+		os.Exit(1)
+	}
+	defer onlineconfConn.Close()
+
+	onlineconfService := onlineconfClient.NewClient(onlineconfConn)
 
 	authService := authClient.NewClient(authConn)
 	notesService := notesClient.NewClient(notesConn)
@@ -103,7 +120,9 @@ func main() {
 	adminCache := onlineconf.NewAdminCache(authService)
 	go adminCache.Run(onlineconfCtx)
 
-	onlineconfHandler := onlineconfDelivery.NewHandler(authService, adminCache)
+	onlineconfHandler := onlineconfDelivery.NewHandler(
+		authService, adminCache, onlineconfService,
+	)
 
 	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
@@ -115,6 +134,7 @@ func main() {
 	router.Use(middleware.AccessLog(baseLogger))
 	router.Use(middleware.Metrics(httpMetrics))
 	router.Use(middleware.Recovery)
+	router.Use(onlineconfDelivery.NoStore)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
@@ -144,10 +164,23 @@ func main() {
 
 	adminRouter := apiRouter.NewRoute().Subrouter()
 	adminRouter.Use(onlineconfDelivery.AdminOnly(adminCache))
-	onlineconfapi.HandlerFromMux(onlineconfapi.NewStrictHandlerWithOptions(onlineconfHandler, nil, onlineconfapi.StrictHTTPServerOptions{
-		RequestErrorHandlerFunc:  httpjson.RequestError,
-		ResponseErrorHandlerFunc: httpjson.ResponseError,
-	}), adminRouter)
+
+	strictOnlineconfHandler := onlineconfapi.NewStrictHandlerWithOptions(
+		onlineconfHandler,
+		nil,
+		onlineconfapi.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  onlineconfDelivery.RequestError,
+			ResponseErrorHandlerFunc: onlineconfDelivery.ResponseError,
+		},
+	)
+
+	onlineconfapi.HandlerWithOptions(
+		strictOnlineconfHandler,
+		onlineconfapi.GorillaServerOptions{
+			BaseRouter:       adminRouter,
+			ErrorHandlerFunc: onlineconfDelivery.RequestError,
+		},
+	)
 
 	router.PathPrefix("/mcp").Handler(bnnmcp.NewHandler(authService, notesService))
 

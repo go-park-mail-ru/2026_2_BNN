@@ -17,10 +17,19 @@ import (
 type Handler struct {
 	auth   auth.Usecase
 	admins *onlineconf.AdminCache
+	keys   onlineconf.CoreUsecase
 }
 
-func NewHandler(authUC auth.Usecase, admins *onlineconf.AdminCache) *Handler {
-	return &Handler{auth: authUC, admins: admins}
+func NewHandler(
+	authUC auth.Usecase,
+	admins *onlineconf.AdminCache,
+	keys onlineconf.CoreUsecase,
+) *Handler {
+	return &Handler{
+		auth:   authUC,
+		admins: admins,
+		keys:   keys,
+	}
 }
 
 func (h *Handler) GetOnlineConfSession(ctx context.Context, req api.GetOnlineConfSessionRequestObject) (api.GetOnlineConfSessionResponseObject, error) {

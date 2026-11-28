@@ -8,7 +8,8 @@ info:
     На POST, PUT и DELETE (кроме signup, signin, refresh, logout и 2fa/verify) нужен заголовок
     X-CSRF-Token со значением куки bnn_csrf. Кука ставится при входе и обновляется при refresh.
     Без заголовка или с другим значением ответ 403.
-    У ошибок нет тела.
+    Ошибки OnlineConf возвращаются как JSON с полями code и message.
+    Ответы 401 и отказы существующей CSRF-проверки могут быть без тела.
 
 servers:
  - url: /api
@@ -318,6 +319,7 @@ paths:
                 type: string
         '400':
           description: Неверный state или отсутствует код
+  
   /onlineconf/admin/session:
     get:
       tags: [onlineconf]
@@ -380,6 +382,157 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnlineConfError'
+
+  /onlineconf/admin/scopes:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfScopes
+      summary: Области конфигурации
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Доступные scopes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfScope'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfKeys
+      summary: Каталог ключей
+      description: До 200 ключей. Персональные настройки флагов не включаются.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: query
+          in: query
+          description: Часть имени ключа, без учёта регистра
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            $ref: '#/components/schemas/OnlineConfScope'
+        - name: kind
+          in: query
+          schema:
+            $ref: '#/components/schemas/OnlineConfKind'
+      responses:
+        '200':
+          description: Найденные ключи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    post:
+      tags: [onlineconf]
+      operationId: CreateOnlineConfKey
+      summary: Создать конфиг или флаг
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfKeyInput'
+      responses:
+        '201':
+          description: Ключ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfKey
+      summary: Карточка ключа
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Ключ с полными настройками
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    put:
+      tags: [onlineconf]
+      operationId: UpdateOnlineConfKey
+      summary: Заменить настройки ключа
+      description: Требуется текущая версия. Тип kind менять нельзя.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfUpdateKeyInput'
+      responses:
+        '200':
+          description: Ключ сохранён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    delete:
+      tags: [onlineconf]
+      operationId: DeleteOnlineConfKey
+      summary: Удалить ключ
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+      responses:
+        '204':
+          description: Ключ удалён
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
 
   /notes/all:
     get:
@@ -803,6 +956,22 @@ components:
       in: cookie
       name: bnn_access
 
+  responses:
+    OnlineConfFailure:
+      description: |
+        400 VALIDATION — неверный запрос.
+        403 FORBIDDEN — недостаточно прав.
+        404 NOT_FOUND — ключ не найден.
+        409 KEY_EXISTS — имя занято в scope.
+        409 VERSION_CONFLICT — устаревшая версия.
+        413 PAYLOAD_TOO_LARGE — слишком большой запрос.
+        500 INTERNAL — внутренняя ошибка.
+        503 SERVICE_UNAVAILABLE — зависимый сервис недоступен.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OnlineConfError'
+
   parameters:
     NoteID:
       name: id
@@ -855,6 +1024,157 @@ components:
         login:
           type: string
           example: seyran
+
+    OnlineConfScope:
+      type: string
+      enum: [frontend, backend, auth, notes]
+
+    OnlineConfKind:
+      type: string
+      enum: [config, flag]
+
+    OnlineConfValueType:
+      type: string
+      enum: [string, number, boolean, object, array]
+
+    OnlineConfConfig:
+      type: object
+      required: [value_type, value]
+      properties:
+        value_type:
+          $ref: '#/components/schemas/OnlineConfValueType'
+        value:
+          description: JSON-значение, соответствующее value_type
+          x-go-type: json.RawMessage
+          x-go-type-import:
+            name: json
+            path: encoding/json
+
+    OnlineConfFlag:
+      type: object
+      required: [enabled, rollout_percent]
+      properties:
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        include_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlineConfUser'
+        exclude_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlineConfUser'
+
+    OnlineConfFlagInput:
+      type: object
+      required: [enabled, rollout_percent]
+      properties:
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        include_user_ids:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          x-go-name: IncludeUserIDs
+          x-go-type-skip-optional-pointer: true
+          items:
+            type: string
+            format: uuid
+        exclude_user_ids:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          x-go-name: ExcludeUserIDs
+          x-go-type-skip-optional-pointer: true
+          items:
+            type: string
+            format: uuid
+
+    OnlineConfKey:
+      type: object
+      required:
+        - id
+        - scope
+        - key
+        - kind
+        - description
+        - is_public
+        - version
+        - updated_by
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          $ref: '#/components/schemas/OnlineConfScope'
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/OnlineConfKind'
+        description:
+          type: string
+        is_public:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+        updated_by:
+          $ref: '#/components/schemas/OnlineConfUser'
+        updated_at:
+          type: string
+          format: date-time
+        config:
+          $ref: '#/components/schemas/OnlineConfConfig'
+        flag:
+          $ref: '#/components/schemas/OnlineConfFlag'
+
+    OnlineConfKeyInput:
+      type: object
+      description: |
+        Для kind=config заполняется только config.
+        Для kind=flag заполняется только flag.
+        Проверка выполняется сервисом OnlineConf.
+      required: [scope, key, kind, is_public]
+      properties:
+        scope:
+          $ref: '#/components/schemas/OnlineConfScope'
+        key:
+          type: string
+          maxLength: 100
+          pattern: '^[a-zA-Z][a-zA-Z0-9_.-]{0,99}$'
+        kind:
+          $ref: '#/components/schemas/OnlineConfKind'
+        description:
+          type: string
+          x-go-type-skip-optional-pointer: true
+        is_public:
+          type: boolean
+        config:
+          $ref: '#/components/schemas/OnlineConfConfig'
+        flag:
+          $ref: '#/components/schemas/OnlineConfFlagInput'
+
+    OnlineConfUpdateKeyInput:
+      allOf:
+        - $ref: '#/components/schemas/OnlineConfKeyInput'
+        - type: object
+          required: [version]
+          properties:
+            version:
+              type: integer
+              format: int32
+              minimum: 1
 
     AddCollaboratorRequest:
       type: object

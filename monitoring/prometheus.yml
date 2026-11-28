@@ -25,3 +25,8 @@ scrape_configs:
     metrics_path: /api/metrics
     static_configs:
       - targets: ["notes:9103"]
+
+  - job_name: onlineconf
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["onlineconf:9104"]

@@ -2,12 +2,14 @@ package onlineconf
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync/atomic"
 
 	"bnn/internal/models"
 
 	"github.com/samber/lo"
+	uuid "github.com/satori/go.uuid"
 )
 
 type SnapshotCache struct {
@@ -36,6 +38,32 @@ func (c *SnapshotCache) Key(scope, key string) (models.OnlineConfKey, bool) {
 	return lo.Find(c.Get().Keys, func(k models.OnlineConfKey) bool {
 		return k.Scope == scope && k.Key == key
 	})
+}
+
+// ConfigInt отдаёт числовой конфиг; если ключа нет или значение не целое число — fallback.
+func (c *SnapshotCache) ConfigInt(scope, key string, fallback int64) int64 {
+	k, ok := c.Key(scope, key)
+	if !ok || k.Config == nil {
+		return fallback
+	}
+
+	var value int64
+	if err := json.Unmarshal(k.Config.Value, &value); err != nil {
+		return fallback
+	}
+
+	return value
+}
+
+// FlagEnabled вычисляет флаг для пользователя; если ключа нет — fallback.
+func (c *SnapshotCache) FlagEnabled(scope, key string, userID uuid.UUID, fallback bool) bool {
+	k, ok := c.Key(scope, key)
+	if !ok || k.Flag == nil {
+		return fallback
+	}
+
+	enabled, _ := EvaluateFlag(k, userID)
+	return enabled
 }
 
 func (c *SnapshotCache) refresh(ctx context.Context) {

@@ -37,7 +37,7 @@ func (h *Handler) GetOnlineConfSession(ctx context.Context, req api.GetOnlineCon
 
 	admin, ok := h.admins.Get(userID)
 	if !ok {
-		return api.GetOnlineConfSession403JSONResponse{Code: codeForbidden, Message: messageForbidden}, nil
+		return api.GetOnlineConfSession403JSONResponse{Code: onlineconf.CodeForbidden, Message: messageForbidden}, nil
 	}
 
 	return api.GetOnlineConfSession200JSONResponse(toAPIUser(admin)), nil
@@ -46,7 +46,7 @@ func (h *Handler) GetOnlineConfSession(ctx context.Context, req api.GetOnlineCon
 func (h *Handler) SearchOnlineConfUsers(ctx context.Context, req api.SearchOnlineConfUsersRequestObject) (api.SearchOnlineConfUsersResponseObject, error) {
 	users, err := h.auth.SearchUsers(ctx, req.Params.Query)
 	if errors.Is(err, models.ErrValidation) {
-		return api.SearchOnlineConfUsers400JSONResponse{Code: codeValidation, Message: err.Error()}, nil
+		return api.SearchOnlineConfUsers400JSONResponse{Code: onlineconf.CodeValidation, Message: err.Error()}, nil
 	}
 	if err != nil {
 		return nil, err

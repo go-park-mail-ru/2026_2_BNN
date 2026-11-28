@@ -2,6 +2,7 @@ package onlineconf_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"bnn/internal/pkg/onlineconf"
 	"bnn/internal/pkg/onlineconf/mocks"
 
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -120,4 +122,27 @@ func TestSnapshotCacheInitialRevisionZero(t *testing.T) {
 		models.Snapshot{}, false, nil,
 	)
 	assert.Equal(t, empty, cache.Get())
+}
+
+func TestSnapshotCacheValues(t *testing.T) {
+	userID := uuid.NewV4()
+	source := mocks.NewMockSnapshotSource(gomock.NewController(t))
+	cache := onlineconf.NewSnapshotCache(source)
+
+	// до первого снимка — значения по умолчанию
+	assert.Equal(t, int64(10), cache.ConfigInt(onlineconf.ScopeBackend, "limit", 10))
+	assert.True(t, cache.FlagEnabled(onlineconf.ScopeBackend, "upload", userID, true))
+
+	snapshot := models.Snapshot{Revision: 1, Keys: []models.OnlineConfKey{
+		{Scope: onlineconf.ScopeBackend, Key: "limit", Config: &models.OnlineConfConfig{ValueType: onlineconf.ValueNumber, Value: json.RawMessage("2048")}},
+		{Scope: onlineconf.ScopeBackend, Key: "broken", Config: &models.OnlineConfConfig{ValueType: onlineconf.ValueNumber, Value: json.RawMessage("1.5")}},
+		{Scope: onlineconf.ScopeBackend, Key: "upload", Flag: &models.OnlineConfFlag{Enabled: false}},
+	}}
+	refreshOnce(t, cache, source, nil, snapshot, true, nil)
+
+	assert.Equal(t, int64(2048), cache.ConfigInt(onlineconf.ScopeBackend, "limit", 10))
+	assert.Equal(t, int64(10), cache.ConfigInt(onlineconf.ScopeBackend, "broken", 10))
+	assert.Equal(t, int64(10), cache.ConfigInt(onlineconf.ScopeBackend, "upload", 10))
+	assert.False(t, cache.FlagEnabled(onlineconf.ScopeBackend, "upload", userID, true))
+	assert.True(t, cache.FlagEnabled(onlineconf.ScopeBackend, "limit", userID, true))
 }

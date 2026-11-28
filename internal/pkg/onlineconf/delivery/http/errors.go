@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"bnn/internal/models"
+	"bnn/internal/pkg/onlineconf"
 	"bnn/internal/pkg/onlineconf/delivery/http/api"
 	"bnn/internal/pkg/utils/httpjson"
 
@@ -37,12 +38,12 @@ func keyHTTPError(ctx context.Context, err error) (int, api.OnlineConfError) {
 	switch {
 	case errors.Is(err, models.ErrValidation):
 		return http.StatusBadRequest, api.OnlineConfError{
-			Code: codeValidation, Message: err.Error(),
+			Code: onlineconf.CodeValidation, Message: err.Error(),
 		}
 
 	case errors.Is(err, models.ErrForbidden):
 		return http.StatusForbidden, api.OnlineConfError{
-			Code: codeForbidden, Message: messageForbidden,
+			Code: onlineconf.CodeForbidden, Message: messageForbidden,
 		}
 
 	case errors.Is(err, models.ErrOnlineConfKeyNotFound):
@@ -90,7 +91,7 @@ func RequestError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 
 	httpjson.WriteError(
-		w, http.StatusBadRequest, codeValidation, err.Error(),
+		w, http.StatusBadRequest, onlineconf.CodeValidation, err.Error(),
 	)
 }
 

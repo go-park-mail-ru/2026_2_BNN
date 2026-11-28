@@ -100,6 +100,28 @@ services:
       S3_ATTACHMENTS_BUCKET: attachments
     restart: unless-stopped
 
+  onlineconf:
+    build:
+      context: .
+      dockerfile: build/main.Dockerfile
+      args:
+        SERVICE: onlineconf
+    container_name: bnn-onlineconf
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      auth:
+        condition: service_started
+    volumes:
+      - ./certs:/certs:ro
+    environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      AUTH_GRPC_ADDR: auth:9001
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -111,6 +133,8 @@ services:
       auth:
         condition: service_started
       notes:
+        condition: service_started
+      onlineconf:
         condition: service_started
     ports:
       - "127.0.0.1:5458:5458"

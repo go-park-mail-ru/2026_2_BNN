@@ -8,18 +8,11 @@ import (
 	"bnn/internal/pkg/utils/httpjson"
 )
 
-const (
-	codeForbidden  = "FORBIDDEN"
-	codeValidation = "VALIDATION"
-
-	messageForbidden = "admin access required"
-)
+const messageForbidden = "admin access required"
 
 func AdminOnly(admins *onlineconf.AdminCache) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "no-store")
-
 			userID, ok := ctxutil.GetUserID(r.Context())
 			if !ok {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -27,7 +20,7 @@ func AdminOnly(admins *onlineconf.AdminCache) func(http.Handler) http.Handler {
 			}
 
 			if _, ok := admins.Get(userID); !ok {
-				httpjson.WriteError(w, http.StatusForbidden, codeForbidden, messageForbidden)
+				httpjson.WriteError(w, http.StatusForbidden, onlineconf.CodeForbidden, messageForbidden)
 				return
 			}
 

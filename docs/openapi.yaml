@@ -26,6 +26,8 @@ tags:
     description: Теги заметок
   - name: onlineconf
     description: Админка OnlineConf, только для админов
+  - name: onlineconf-runtime
+    description: Конфиги и флаги OnlineConf для продукта
 
 paths:
   /auth/signup:
@@ -382,6 +384,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnlineConfError'
+  /onlineconf/runtime:
+    get:
+      tags: [onlineconf-runtime]
+      operationId: GetOnlineConfRuntime
+      summary: Конфиги и флаги для текущего пользователя
+      description: |
+        Ключи скоупа frontend и ключи с is_public. Флаги уже вычислены для пользователя из куки.
+        Списки include/exclude и непубличные ключи не отдаются.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Текущие значения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRuntime'
+        '401':
+          description: Нет куки или она истекла
 
   /onlineconf/admin/scopes:
     get:
@@ -782,7 +803,9 @@ paths:
       tags: [attachments]
       operationId: UploadAttachment
       summary: Прикрепить файл к блоку
-      description: Файл до 10 МБ, форматы jpeg, png, webp, gif, pdf.
+      description: |
+        Форматы jpeg, png, webp, gif, pdf. Лимит размера — конфиг OnlineConf backend/attachments.max_file_size_bytes
+        (по умолчанию 10 МиБ), загрузку можно выключить флагом backend/attachments.upload_enabled.
       security:
         - cookieAuth: []
       requestBody:
@@ -808,11 +831,19 @@ paths:
         '401':
           description: Нет куки или она истекла
         '403':
-          description: Forbidden
+          description: Нет доступа к заметке (FORBIDDEN) или загрузка выключена флагом (FEATURE_DISABLED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
         '404':
           description: Блока нет или он в чужой заметке
         '413':
-          description: Файл больше 10 МБ
+          description: Файл больше лимита
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileTooLargeError'
         '415':
           description: Неподдерживаемый формат
 
@@ -1004,6 +1035,33 @@ components:
 
   schemas:
 
+    OnlineConfRuntime:
+      type: object
+      required: [revision, user_id, configs, flags]
+      properties:
+        revision:
+          type: integer
+          format: int64
+          example: 42
+        user_id:
+          type: string
+          format: uuid
+        configs:
+          type: object
+          description: scope → ключ → значение
+          additionalProperties:
+            type: object
+            additionalProperties: {}
+          example: {"backend": {"attachments.max_file_size_bytes": 10485760}}
+        flags:
+          type: object
+          description: scope → ключ → включён ли флаг
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: boolean
+          example: {"backend": {"attachments.upload_enabled": true}}
+
     OnlineConfError:
       type: object
       required: [code, message]
@@ -1013,6 +1071,20 @@ components:
           example: FORBIDDEN
         message:
           type: string
+
+    FileTooLargeError:
+      type: object
+      required: [code, message, limit_bytes]
+      properties:
+        code:
+          type: string
+          example: FILE_TOO_LARGE
+        message:
+          type: string
+        limit_bytes:
+          type: integer
+          format: int64
+          example: 10485760
 
     OnlineConfUser:
       type: object
@@ -1046,9 +1118,6 @@ components:
         value:
           description: JSON-значение, соответствующее value_type
           x-go-type: json.RawMessage
-          x-go-type-import:
-            name: json
-            path: encoding/json
 
     OnlineConfFlag:
       type: object

@@ -9,6 +9,7 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments"
 	"bnn/internal/pkg/attachments/delivery/http/api"
+	"bnn/internal/pkg/onlineconf"
 	"bnn/internal/pkg/utils/ctxutil"
 	"bnn/internal/pkg/utils/upload"
 
@@ -17,16 +18,24 @@ import (
 )
 
 const (
-	fileField       = "file"
-	maxFileSize10MB = 10 << 20
+	fileField = "file"
+
+	// значения, пока OnlineConf не отдал свои
+	defaultMaxFileSize   = 10 << 20
+	defaultUploadEnabled = true
+
+	messageUploadDisabled = "attachment uploads are disabled"
+	messageFileTooLarge   = "file is too large"
+	messageNoteForbidden  = "no access to note"
 )
 
 type Handler struct {
-	uc attachments.Usecase
+	uc   attachments.Usecase
+	conf attachments.OnlineConf
 }
 
-func NewHandler(uc attachments.Usecase) *Handler {
-	return &Handler{uc: uc}
+func NewHandler(uc attachments.Usecase, conf attachments.OnlineConf) *Handler {
+	return &Handler{uc: uc, conf: conf}
 }
 
 func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachmentRequestObject) (api.UploadAttachmentResponseObject, error) {
@@ -35,9 +44,15 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 		return api.UploadAttachment401Response{}, nil
 	}
 
-	data, err := upload.ReadFile(req.Body, fileField, maxFileSize10MB)
+	if !h.conf.FlagEnabled(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsUploadEnabled, userID, defaultUploadEnabled) {
+		return api.UploadAttachment403JSONResponse{Code: onlineconf.CodeFeatureDisabled, Message: messageUploadDisabled}, nil
+	}
+
+	maxSize := h.conf.ConfigInt(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsMaxFileSize, defaultMaxFileSize)
+
+	data, err := upload.ReadFile(req.Body, fileField, maxSize)
 	if errors.Is(err, upload.ErrFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
-		return api.UploadAttachment413Response{}, nil
+		return api.UploadAttachment413JSONResponse{Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: maxSize}, nil
 	}
 	if err != nil {
 		return api.UploadAttachment400Response{}, nil
@@ -47,7 +62,7 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 
 	attachment, err := h.uc.UploadAttachment(ctx, userID, uuid.UUID(req.Id), data, contentType)
 	if errors.Is(err, models.ErrForbidden) {
-		return api.UploadAttachment403Response{}, nil
+		return api.UploadAttachment403JSONResponse{Code: onlineconf.CodeForbidden, Message: messageNoteForbidden}, nil
 	}
 	if errors.Is(err, models.ErrBlockNotFound) {
 		return api.UploadAttachment404Response{}, nil

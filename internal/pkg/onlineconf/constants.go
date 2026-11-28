@@ -19,3 +19,15 @@ const (
 	ValueObject  = "object"
 	ValueArray   = "array"
 )
+
+const (
+	KeyAttachmentsMaxFileSize   = "attachments.max_file_size_bytes"
+	KeyAttachmentsUploadEnabled = "attachments.upload_enabled"
+)
+
+const (
+	CodeForbidden       = "FORBIDDEN"
+	CodeValidation      = "VALIDATION"
+	CodeFeatureDisabled = "FEATURE_DISABLED"
+	CodeFileTooLarge    = "FILE_TOO_LARGE"
+)

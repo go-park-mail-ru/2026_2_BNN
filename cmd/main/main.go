@@ -24,8 +24,10 @@ import (
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
 	"bnn/internal/pkg/onlineconf"
+	onlineconfClient "bnn/internal/pkg/onlineconf/client"
 	onlineconfDelivery "bnn/internal/pkg/onlineconf/delivery/http"
 	onlineconfapi "bnn/internal/pkg/onlineconf/delivery/http/api"
+	"bnn/internal/pkg/onlineconf/delivery/http/runtimeapi"
 	"bnn/internal/pkg/swagger"
 	tagsClient "bnn/internal/pkg/tags/client"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
@@ -34,8 +36,6 @@ import (
 	"bnn/internal/pkg/utils/grpcutil"
 	"bnn/internal/pkg/utils/httpjson"
 	ws "bnn/internal/pkg/websocket"
-
-	onlineconfClient "bnn/internal/pkg/onlineconf/client"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -101,7 +101,6 @@ func main() {
 	authHandler := authDelivery.NewHandler(authService, frontendURL)
 	notesHandler := notesDelivery.NewHandler(notesService)
 	tagsHandler := tagsDelivery.NewHandler(tagsService)
-	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
@@ -120,9 +119,14 @@ func main() {
 	adminCache := onlineconf.NewAdminCache(authService)
 	go adminCache.Run(onlineconfCtx)
 
+	snapshotCache := onlineconf.NewSnapshotCache(onlineconfService)
+	go snapshotCache.Run(onlineconfCtx)
+
 	onlineconfHandler := onlineconfDelivery.NewHandler(
 		authService, adminCache, onlineconfService,
 	)
+	runtimeHandler := onlineconfDelivery.NewRuntimeHandler(snapshotCache)
+	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService, snapshotCache)
 
 	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
@@ -161,6 +165,12 @@ func main() {
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
+
+	runtimeRouter := apiRouter.NewRoute().Subrouter()
+	runtimeapi.HandlerFromMux(runtimeapi.NewStrictHandlerWithOptions(runtimeHandler, nil, runtimeapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), runtimeRouter)
 
 	adminRouter := apiRouter.NewRoute().Subrouter()
 	adminRouter.Use(onlineconfDelivery.AdminOnly(adminCache))

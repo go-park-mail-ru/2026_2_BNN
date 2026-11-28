@@ -28,6 +28,23 @@ type Attachment struct {
 	Url string `json:"url"`
 }
 
+// FileTooLargeError defines model for FileTooLargeError.
+type FileTooLargeError struct {
+	// Code Example: FILE_TOO_LARGE
+	Code string `json:"code"`
+
+	// LimitBytes Example: 10485760
+	LimitBytes int64  `json:"limit_bytes"`
+	Message    string `json:"message"`
+}
+
+// OnlineConfError defines model for OnlineConfError.
+type OnlineConfError struct {
+	// Code Example: FORBIDDEN
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 // AttachmentID defines model for AttachmentID.
 type AttachmentID = openapi_types.UUID
 
@@ -418,12 +435,18 @@ func (response UploadAttachment401Response) VisitUploadAttachmentResponse(w http
 	return nil
 }
 
-type UploadAttachment403Response struct {
-}
+type UploadAttachment403JSONResponse OnlineConfError
 
-func (response UploadAttachment403Response) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
+func (response UploadAttachment403JSONResponse) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UploadAttachment404Response struct {
@@ -434,12 +457,18 @@ func (response UploadAttachment404Response) VisitUploadAttachmentResponse(w http
 	return nil
 }
 
-type UploadAttachment413Response struct {
-}
+type UploadAttachment413JSONResponse FileTooLargeError
 
-func (response UploadAttachment413Response) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
+func (response UploadAttachment413JSONResponse) VisitUploadAttachmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(413)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UploadAttachment415Response struct {

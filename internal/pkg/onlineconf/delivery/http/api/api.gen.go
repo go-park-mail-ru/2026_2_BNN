@@ -6,12 +6,11 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
-
-	json "encoding/json"
 
 	"github.com/gorilla/mux"
 	"github.com/oapi-codegen/runtime"

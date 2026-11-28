@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/utils/ctxutil"
 )
 
 type ContextHandler struct {

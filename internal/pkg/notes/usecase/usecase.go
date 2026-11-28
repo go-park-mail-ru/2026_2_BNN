@@ -2,35 +2,65 @@ package usecase
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/notes"
 
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 )
 
-const maxTitleLength = 255
+const (
+	maxTitleLength  = 255
+	maxHeaderLength = 500
+	maxIconLength   = 16
+
+	zeroWidthJoiner   = '\u200d'
+	variationSelector = '\ufe0f'
+	keycapMark        = '\u20e3'
+	tagFirst          = '\U000e0020'
+	tagLast           = '\U000e007f'
+)
+
+const (
+	RoleOwner  = "owner"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+const (
+	blockTypeKey       = "type"
+	blockCheckedKey    = "checked"
+	blockTypeChecklist = "checklist"
+)
 
 type Usecase struct {
-	repo notes.Repo
+	repo       notes.Repo
+	authClient AuthClient
 }
 
-func NewUsecase(repo notes.Repo) *Usecase {
-	return &Usecase{repo: repo}
+func NewUsecase(repo notes.Repo, authClient AuthClient) *Usecase {
+	return &Usecase{
+		repo:       repo,
+		authClient: authClient,
+	}
 }
 
 func (u *Usecase) GetNote(ctx context.Context, userID, noteID uuid.UUID) (models.Note, error) {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
+		return models.Note{}, err
+	}
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
 	}
-	if note.CreatedBy != userID {
-		return models.Note{}, models.ErrNoteNotFound
-	}
+
 	blocks, err := u.repo.ReadBlocks(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
@@ -49,19 +79,16 @@ func (u *Usecase) GetNotes(ctx context.Context, userID uuid.UUID, limit, offset 
 }
 
 func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.CreateNoteRequest) (models.Note, error) {
-	if err := validateTitle(req.Title); err != nil {
+	if err := validateTitle(req.Title, req.Header, req.Icon); err != nil {
 		return models.Note{}, err
 	}
 	if req.ParentNoteID != nil {
-		parentNote, err := u.repo.ReadNote(ctx, *req.ParentNoteID)
+		role, err := u.CheckAccess(ctx, userID, *req.ParentNoteID)
 		if err != nil {
-			if errors.Is(err, models.ErrNoteNotFound) {
-				return models.Note{}, models.ErrNoteNotFound
-			}
 			return models.Note{}, err
 		}
-		if parentNote.CreatedBy != userID {
-			return models.Note{}, models.ErrNoteNotFound
+		if role != RoleOwner && role != RoleEditor {
+			return models.Note{}, models.ErrForbidden
 		}
 	}
 
@@ -88,16 +115,20 @@ func (u *Usecase) CreateNote(ctx context.Context, userID uuid.UUID, req notes.Cr
 }
 
 func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req notes.UpdateNoteRequest) (models.Note, error) {
-	if err := validateTitle(req.Title); err != nil {
+	if err := validateTitle(req.Title, req.Header, req.Icon); err != nil {
 		return models.Note{}, err
+	}
+	role, err := u.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return models.Note{}, err
+	}
+	if role != RoleOwner && role != RoleEditor {
+		return models.Note{}, models.ErrForbidden
 	}
 
 	note, err := u.repo.ReadNote(ctx, noteID)
 	if err != nil {
 		return models.Note{}, err
-	}
-	if note.CreatedBy != userID {
-		return models.Note{}, models.ErrNoteNotFound
 	}
 
 	note.Title = req.Title
@@ -119,8 +150,8 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		oldIDs[b.ID] = true
 	}
 
-	var blocksToSave []models.Block
-	var finalBlockIDs []uuid.UUID
+	blocksToSave := make([]models.Block, 0, len(req.Blocks))
+	finalBlockIDs := make([]uuid.UUID, 0, len(req.Blocks))
 
 	for _, b := range req.Blocks {
 		id := uuid.NewV4()
@@ -154,7 +185,7 @@ func (u *Usecase) UpdateNote(ctx context.Context, userID, noteID uuid.UUID, req 
 		}
 	}
 
-	tags, err := u.noteTags(ctx, userID, noteID, req.TagIDs)
+	tags, err := u.noteTags(ctx, note.CreatedBy, noteID, req.TagIDs)
 	if err != nil {
 		return models.Note{}, err
 	}
@@ -185,28 +216,28 @@ func (u *Usecase) noteTags(ctx context.Context, userID, noteID uuid.UUID, tagIDs
 }
 
 func (u *Usecase) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
-	note, err := u.repo.ReadNote(ctx, noteID)
+	role, err := u.CheckAccess(ctx, userID, noteID)
 	if err != nil {
 		return err
 	}
-	if note.CreatedBy != userID {
-		return models.ErrNoteNotFound
+	if role != RoleOwner {
+		return models.ErrForbidden
 	}
+
 	return u.repo.DeleteNote(ctx, noteID)
 }
 
 func (u *Usecase) AddFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
-	note, err := u.repo.ReadNote(ctx, noteID)
-	if err != nil {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
 		return err
-	}
-	if note.CreatedBy != userID {
-		return models.ErrNoteNotFound
 	}
 	return u.repo.AddFavorite(ctx, userID, noteID)
 }
 
 func (u *Usecase) RemoveFavorite(ctx context.Context, userID, noteID uuid.UUID) error {
+	if _, err := u.CheckAccess(ctx, userID, noteID); err != nil {
+		return err
+	}
 	return u.repo.RemoveFavorite(ctx, userID, noteID)
 }
 
@@ -214,9 +245,165 @@ func (u *Usecase) GetFavorites(ctx context.Context, userID uuid.UUID) ([]models.
 	return u.repo.ReadFavorites(ctx, userID)
 }
 
-func validateTitle(title string) error {
+func validateTitle(title string, header, icon *string) error {
 	if utf8.RuneCountInString(title) > maxTitleLength {
 		return fmt.Errorf("%w: title too long", models.ErrValidation)
 	}
+	if header != nil {
+		if err := validateHeader(*header); err != nil {
+			return err
+		}
+	}
+	if icon != nil {
+		if err := validateIcon(*icon); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func validateHeader(header string) error {
+	if utf8.RuneCountInString(header) > maxHeaderLength {
+		return fmt.Errorf("%w: header too long", models.ErrValidation)
+	}
+	if strings.ContainsFunc(header, unicode.IsControl) {
+		return fmt.Errorf("%w: header has control characters", models.ErrValidation)
+	}
+	return nil
+}
+
+func validateIcon(icon string) error {
+	if utf8.RuneCountInString(icon) > maxIconLength {
+		return fmt.Errorf("%w: icon too long", models.ErrValidation)
+	}
+	for _, r := range icon {
+		if !isEmojiRune(r) {
+			return fmt.Errorf("%w: icon must be emoji", models.ErrValidation)
+		}
+	}
+	return nil
+}
+
+func isEmojiRune(r rune) bool {
+	if r > unicode.MaxASCII && (unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r)) {
+		return true
+	}
+	return r == zeroWidthJoiner || r == variationSelector || r == keycapMark || (r >= tagFirst && r <= tagLast)
+}
+
+func (u *Usecase) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	return u.repo.GetNoteUpdatedAt(ctx, noteID)
+}
+
+func (u *Usecase) CheckAccess(ctx context.Context, userID, noteID uuid.UUID) (string, error) {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return "", err
+	}
+
+	if note.CreatedBy == userID {
+		return RoleOwner, nil
+	}
+
+	return u.repo.ReadCollaboratorRole(ctx, noteID, userID)
+}
+
+func (u *Usecase) AddCollaborator(ctx context.Context, userID, noteID uuid.UUID, login string, role string) error {
+	if role != RoleEditor && role != RoleViewer {
+		return models.ErrValidation
+	}
+	if login == "" {
+		return models.ErrValidation
+	}
+
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrForbidden
+	}
+
+	targetUserID, err := u.authClient.GetUserByLogin(ctx, login)
+	if err != nil {
+		return err
+	}
+
+	if userID == targetUserID {
+		return models.ErrValidation
+	}
+
+	return u.repo.AddCollaborator(ctx, noteID, targetUserID, role)
+}
+
+func (u *Usecase) RemoveCollaborator(ctx context.Context, userID, noteID, targetUserID uuid.UUID) error {
+	note, err := u.repo.ReadNote(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.CreatedBy != userID {
+		return models.ErrForbidden
+	}
+
+	return u.repo.RemoveCollaborator(ctx, noteID, targetUserID)
+}
+
+type AuthClient interface {
+	CheckUserExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error)
+}
+
+func (u *Usecase) GetNoteUpdates(ctx context.Context, noteID uuid.UUID, since *time.Time) (time.Time, []models.Block, error) {
+	updatedAt, err := u.repo.GetNoteUpdatedAt(ctx, noteID)
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	if since != nil && !updatedAt.After(*since) {
+		return updatedAt, nil, nil
+	}
+
+	blocks, err := u.repo.ReadBlocks(ctx, noteID)
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	return updatedAt, blocks, nil
+}
+
+func (u *Usecase) SetChecklistItem(ctx context.Context, userID, noteID, blockID uuid.UUID, checked bool) error {
+	role, err := u.CheckAccess(ctx, userID, noteID)
+	if err != nil {
+		return err
+	}
+	if role != RoleOwner && role != RoleEditor {
+		return models.ErrForbidden
+	}
+
+	blocks, err := u.repo.ReadBlocks(ctx, noteID)
+	if err != nil {
+		return err
+	}
+
+	block, ok := lo.Find(blocks, func(b models.Block) bool { return b.ID == blockID })
+	if !ok {
+		return models.ErrBlockNotFound
+	}
+
+	var content map[string]any
+	if err := json.Unmarshal(block.Content, &content); err != nil {
+		return fmt.Errorf("decode block content: %w", err)
+	}
+	if content[blockTypeKey] != blockTypeChecklist {
+		return fmt.Errorf("%w: block is not a checklist item", models.ErrValidation)
+	}
+
+	content[blockCheckedKey] = checked
+	block.Content, err = json.Marshal(content)
+	if err != nil {
+		return fmt.Errorf("encode block content: %w", err)
+	}
+	block.UpdatedAt = time.Now().UTC()
+
+	return u.repo.UpdateBlock(ctx, noteID, block)
 }

@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package tags;
+
+option go_package = "bnn/internal/pkg/tags/delivery/grpc/gen;gen";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service Tags {
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
+
+  rpc CreateTag(CreateTagRequest) returns (Tag);
+
+  rpc UpdateTag(UpdateTagRequest) returns (Tag);
+
+  rpc DeleteTag(DeleteTagRequest) returns (google.protobuf.Empty);
+}
+
+message Tag {
+  string id = 1;
+  string created_by = 2;
+  string name = 3;
+  string color = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListTagsRequest {
+  string user_id = 1;
+}
+
+message ListTagsResponse {
+  repeated Tag tags = 1;
+}
+
+message CreateTagRequest {
+  string user_id = 1;
+  string name = 2;
+  string color = 3;
+}
+
+message UpdateTagRequest {
+  string user_id = 1;
+  string tag_id = 2;
+  string name = 3;
+  string color = 4;
+}
+
+message DeleteTagRequest {
+  string user_id = 1;
+  string tag_id = 2;
+}

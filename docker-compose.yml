@@ -45,31 +45,134 @@ services:
       - "127.0.0.1:9003:9001"
     restart: unless-stopped
 
-  backend:
+  auth:
     build:
       context: .
       dockerfile: build/main.Dockerfile
-    container_name: bnn-backend
+      args:
+        SERVICE: auth
+    container_name: bnn-auth
     depends_on:
       migrate:
         condition: service_completed_successfully
       s3:
         condition: service_started
-    ports:
-      - "127.0.0.1:5458:5458"
+    volumes:
+      - ./certs:/certs:ro
     environment:
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is not set}
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
       S3_ENDPOINT: s3:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      S3_ATTACHMENTS_BUCKET: attachments
       S3_AVATARS_BUCKET: avatars
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       APP_BASE_URL: ${APP_BASE_URL}
+    restart: unless-stopped
+
+  notes:
+    build:
+      context: .
+      dockerfile: build/main.Dockerfile
+      args:
+        SERVICE: notes
+    container_name: bnn-notes
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      s3:
+        condition: service_started
+    volumes:
+      - ./certs:/certs:ro
+    environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      AUTH_GRPC_ADDR: auth:9001
+      S3_ENDPOINT: s3:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ATTACHMENTS_BUCKET: attachments
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: build/main.Dockerfile
+      args:
+        SERVICE: main
+    container_name: bnn-backend
+    depends_on:
+      auth:
+        condition: service_started
+      notes:
+        condition: service_started
+    ports:
+      - "127.0.0.1:5458:5458"
+    volumes:
+      - ./certs:/certs:ro
+    environment:
+      GRPC_TLS_CA: /certs/ca.crt
+      GRPC_TLS_CERT: /certs/service.crt
+      GRPC_TLS_KEY: /certs/service.key
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is not set}
       FRONTEND_URL: ${FRONTEND_URL}
+      AUTH_GRPC_ADDR: auth:9001
+      NOTES_GRPC_ADDR: notes:9002
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: bnn-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.9.1
+    container_name: bnn-node-exporter
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-enterprise:12.1.0
+    container_name: bnn-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is not set}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/grafana/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3001:3000"
     restart: unless-stopped
 
   nginx:
@@ -77,6 +180,7 @@ services:
     container_name: nginx
     depends_on:
       - backend
+      - grafana
     ports:
       - "80:80"
       - "443:443"
@@ -89,3 +193,6 @@ services:
 volumes:
   postgres-data:
   s3-data:
+  prometheus-data:
+  grafana-data:
+  

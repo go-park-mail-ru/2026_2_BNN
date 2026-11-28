@@ -67,27 +67,20 @@ func (r *Repo) ReadProfile(ctx context.Context, code string) (models.OAuthProfil
 		return models.OAuthProfile{}, fmt.Errorf("get github user: %w", err)
 	}
 
-	email := user.GetEmail()
-	if email == "" {
-		emails, _, err := client.Users.ListEmails(ctx, nil)
-		if err != nil {
-			return models.OAuthProfile{}, fmt.Errorf("get github emails: %w", err)
-		}
-
-		primary, ok := lo.Find(emails, func(e *githubapi.UserEmail) bool {
-			return e.GetPrimary() && e.GetVerified()
-		})
-		if ok {
-			email = primary.GetEmail()
-		}
+	emails, _, err := client.Users.ListEmails(ctx, nil)
+	if err != nil {
+		return models.OAuthProfile{}, fmt.Errorf("get github emails: %w", err)
 	}
 
-	if email == "" {
+	primary, ok := lo.Find(emails, func(e *githubapi.UserEmail) bool {
+		return e.GetPrimary() && e.GetVerified()
+	})
+	if !ok {
 		return models.OAuthProfile{}, errNoEmail
 	}
 
 	return models.OAuthProfile{
-		Email:     email,
+		Email:     primary.GetEmail(),
 		AvatarURL: httpsURL(user.GetAvatarURL()),
 	}, nil
 }

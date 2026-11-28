@@ -10,9 +10,9 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth"
 	"bnn/internal/pkg/auth/delivery/http/api"
-	"bnn/internal/pkg/cookies"
-	"bnn/internal/pkg/ctxutil"
-	"bnn/internal/pkg/upload"
+	"bnn/internal/pkg/utils/cookies"
+	"bnn/internal/pkg/utils/ctxutil"
+	"bnn/internal/pkg/utils/upload"
 
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
@@ -284,7 +284,10 @@ func (h *Handler) GitHubLogin(ctx context.Context, req api.GitHubLoginRequestObj
 	state := uuid.NewV4().String()
 	setOAuthStateCookie(ctx, state)
 
-	location := h.uc.GetOAuthURL(githubProvider, state)
+	location, err := h.uc.GetOAuthURL(ctx, githubProvider, state)
+	if err != nil {
+		return nil, err
+	}
 	return api.GitHubLogin307Response{Headers: api.GitHubLogin307ResponseHeaders{Location: location}}, nil
 }
 

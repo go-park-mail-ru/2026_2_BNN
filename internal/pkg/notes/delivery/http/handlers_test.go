@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"bnn/internal/models"
-	"bnn/internal/pkg/ctxutil"
 	"bnn/internal/pkg/notes"
 	"bnn/internal/pkg/notes/delivery/http/api"
 	"bnn/internal/pkg/notes/mocks"
+	"bnn/internal/pkg/utils/ctxutil"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"

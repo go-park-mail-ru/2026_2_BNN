@@ -113,9 +113,11 @@ func (u *Usecase) SignIn(ctx context.Context, login, password string) (models.Us
 }
 
 func (u *Usecase) Refresh(ctx context.Context, refreshToken string) (models.AuthTokens, error) {
-	token, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
+	hash := hashRefreshToken(refreshToken)
+
+	token, err := u.repo.RevokeRefreshToken(ctx, hash)
 	if errors.Is(err, models.ErrRefreshTokenNotFound) {
-		return models.AuthTokens{}, models.ErrInvalidToken
+		return models.AuthTokens{}, u.handleRefreshReuse(ctx, hash)
 	}
 	if err != nil {
 		return models.AuthTokens{}, err
@@ -128,6 +130,22 @@ func (u *Usecase) Refresh(ctx context.Context, refreshToken string) (models.Auth
 	return u.createTokens(ctx, token.UserID)
 }
 
+func (u *Usecase) handleRefreshReuse(ctx context.Context, hash []byte) error {
+	token, err := u.repo.ReadRefreshToken(ctx, hash)
+	if errors.Is(err, models.ErrRefreshTokenNotFound) {
+		return models.ErrInvalidToken
+	}
+	if err != nil {
+		return err
+	}
+
+	if err := u.repo.DeleteUserRefreshTokens(ctx, token.UserID); err != nil {
+		return err
+	}
+
+	return models.ErrInvalidToken
+}
+
 func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
 	_, err := u.repo.DeleteRefreshToken(ctx, hashRefreshToken(refreshToken))
 	if errors.Is(err, models.ErrRefreshTokenNotFound) {
@@ -137,9 +155,17 @@ func (u *Usecase) Logout(ctx context.Context, refreshToken string) error {
 	return err
 }
 
-func (u *Usecase) Authenticate(_ context.Context, accessToken string) (uuid.UUID, error) {
-	userID, err := u.parseToken(accessToken, accessAudience)
+func (u *Usecase) Authenticate(ctx context.Context, accessToken string) (uuid.UUID, error) {
+	userID, sessionID, err := u.parseToken(accessToken, accessAudience)
 	if err != nil {
+		return uuid.Nil, models.ErrInvalidToken
+	}
+
+	active, err := u.repo.IsSessionActive(ctx, sessionID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !active {
 		return uuid.Nil, models.ErrInvalidToken
 	}
 
@@ -189,7 +215,9 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	accessExpiresAt := now.Add(accessTokenTTL)
 	refreshExpiresAt := now.Add(refreshTokenTTL)
 
-	accessToken, err := u.newToken(userID, accessAudience, accessExpiresAt)
+	sessionID := uuid.NewV4()
+
+	accessToken, err := u.newToken(userID, sessionID, accessAudience, accessExpiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create access token: %w", err)
 	}
@@ -197,6 +225,7 @@ func (u *Usecase) createTokens(ctx context.Context, userID uuid.UUID) (models.Au
 	refreshToken := rand.Text()
 
 	err = u.repo.CreateRefreshToken(ctx, models.RefreshToken{
+		ID:        sessionID,
 		TokenHash: hashRefreshToken(refreshToken),
 		UserID:    userID,
 		ExpiresAt: refreshExpiresAt,
@@ -338,7 +367,7 @@ func (u *Usecase) Disable2FA(ctx context.Context, userID uuid.UUID, code string)
 }
 
 func (u *Usecase) VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error) {
-	userID, err := u.parseToken(twoFactorToken, twoFactorAudience)
+	userID, _, err := u.parseToken(twoFactorToken, twoFactorAudience)
 	if err != nil {
 		return models.User{}, models.AuthTokens{}, models.ErrInvalidToken
 	}
@@ -366,7 +395,7 @@ func (u *Usecase) startSession(ctx context.Context, user models.User) (models.Au
 	}
 
 	expiresAt := time.Now().UTC().Add(twoFactorTokenTTL)
-	token, err := u.newToken(user.ID, twoFactorAudience, expiresAt)
+	token, err := u.newToken(user.ID, uuid.Nil, twoFactorAudience, expiresAt)
 	if err != nil {
 		return models.AuthTokens{}, fmt.Errorf("create 2fa token: %w", err)
 	}
@@ -380,11 +409,11 @@ func checkCode(secret, code string) bool {
 	return err == nil && ok
 }
 
-func (u *Usecase) GetOAuthURL(provider string, state string) string {
+func (u *Usecase) GetOAuthURL(_ context.Context, provider, state string) (string, error) {
 	if provider != githubProvider {
-		return ""
+		return "", models.ErrValidation
 	}
-	return u.oauth.AuthURL(state)
+	return u.oauth.AuthURL(state), nil
 }
 
 func (u *Usecase) HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error) {
@@ -430,4 +459,13 @@ func (u *Usecase) createOAuthUser(ctx context.Context, profile models.OAuthProfi
 	}
 
 	return user, nil
+}
+
+func (u *Usecase) GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error) {
+	user, err := u.repo.ReadUserByLogin(ctx, login)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return user.ID, nil
 }

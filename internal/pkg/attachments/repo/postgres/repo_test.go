@@ -21,17 +21,17 @@ func TestAttachmentRepo(t *testing.T) {
 	repo := postgres.NewRepo(mockDB)
 	attID := uuid.NewV4()
 	blockID := uuid.NewV4()
-	userID := uuid.NewV4()
+	noteID := uuid.NewV4()
 
-	t.Run("ReadBlockOwner", func(t *testing.T) {
-		rows := pgxmock.NewRows([]string{"created_by"}).AddRow(userID)
-		mockDB.ExpectQuery(`SELECT n.created_by FROM blocks b JOIN notes n`).
+	t.Run("ReadBlockNoteID", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"note_id"}).AddRow(noteID)
+		mockDB.ExpectQuery(`SELECT note_id FROM blocks`).
 			WithArgs(blockID).
 			WillReturnRows(rows)
 
-		owner, err := repo.ReadBlockOwner(context.Background(), blockID)
+		gotNoteID, err := repo.ReadBlockNoteID(context.Background(), blockID)
 		require.NoError(t, err)
-		assert.Equal(t, userID, owner)
+		assert.Equal(t, noteID, gotNoteID)
 		assert.NoError(t, mockDB.ExpectationsWereMet())
 	})
 

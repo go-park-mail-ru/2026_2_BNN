@@ -13,9 +13,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-//go:embed queries/read_block_owner.sql
-var readBlockOwnerQuery string
-
 //go:embed queries/create_attachment.sql
 var createAttachmentQuery string
 
@@ -25,26 +22,15 @@ var readAttachmentQuery string
 //go:embed queries/delete_attachment.sql
 var deleteAttachmentQuery string
 
+//go:embed queries/read_block_note_id.sql
+var readBlockNoteIDQuery string
+
 type Repo struct {
 	db database.DB
 }
 
 func NewRepo(db database.DB) *Repo {
 	return &Repo{db: db}
-}
-
-func (r *Repo) ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
-	var ownerID uuid.UUID
-
-	err := r.db.QueryRow(ctx, readBlockOwnerQuery, blockID).Scan(&ownerID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, models.ErrBlockNotFound
-	}
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("read block owner: %w", err)
-	}
-
-	return ownerID, nil
 }
 
 func (r *Repo) CreateAttachment(ctx context.Context, attachment models.Attachment) error {
@@ -85,4 +71,18 @@ func (r *Repo) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (r *Repo) ReadBlockNoteID(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
+	var noteID uuid.UUID
+
+	err := r.db.QueryRow(ctx, readBlockNoteIDQuery, blockID).Scan(&noteID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, models.ErrBlockNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("read block note id: %w", err)
+	}
+
+	return noteID, nil
 }

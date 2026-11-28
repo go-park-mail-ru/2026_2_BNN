@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"time"
 
 	"bnn/internal/models"
 	"bnn/internal/pkg/database"
@@ -58,6 +59,21 @@ var removeFavoriteQuery string
 //go:embed queries/read_favorites.sql
 var readFavoritesQuery string
 
+//go:embed queries/get_note_updated_at.sql
+var getNoteUpdatedAtQuery string
+
+//go:embed queries/add_collaborator.sql
+var addCollaboratorQuery string
+
+//go:embed queries/remove_collaborator.sql
+var removeCollaboratorQuery string
+
+//go:embed queries/read_collaborator_role.sql
+var readCollaboratorRoleQuery string
+
+//go:embed queries/update_block.sql
+var updateBlockQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -81,19 +97,29 @@ func (r *Repo) ReadNote(ctx context.Context, id uuid.UUID) (models.Note, error) 
 func (r *Repo) ReadNotes(ctx context.Context, userID uuid.UUID, limit, offset int64) ([]models.Note, error) {
 	rows, err := r.db.Query(ctx, readNotesQuery, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read notes: %w", err)
 	}
 	defer rows.Close()
 
 	notes := make([]models.Note, 0)
 	for rows.Next() {
-		var note models.Note
-		err := rows.Scan(&note.ID, &note.ParentNoteID, &note.CreatedBy, &note.Title, &note.Header, &note.Icon, &note.CreatedAt, &note.UpdatedAt)
+		var n models.Note
+		err := rows.Scan(
+			&n.ID,
+			&n.ParentNoteID,
+			&n.CreatedBy,
+			&n.Title,
+			&n.Header,
+			&n.Icon,
+			&n.CreatedAt,
+			&n.UpdatedAt,
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan note: %w", err)
 		}
-		notes = append(notes, note)
+		notes = append(notes, n)
 	}
+
 	return notes, rows.Err()
 }
 
@@ -241,4 +267,55 @@ func (r *Repo) ReadFavorites(ctx context.Context, userID uuid.UUID) ([]models.No
 		notes = append(notes, note)
 	}
 	return notes, rows.Err()
+}
+
+func (r *Repo) GetNoteUpdatedAt(ctx context.Context, noteID uuid.UUID) (time.Time, error) {
+	var updatedAt time.Time
+	err := r.db.QueryRow(ctx, getNoteUpdatedAtQuery, noteID).Scan(&updatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, models.ErrNoteNotFound
+		}
+		return time.Time{}, fmt.Errorf("get note updated_at: %w", err)
+	}
+	return updatedAt, nil
+}
+
+func (r *Repo) AddCollaborator(ctx context.Context, noteID, userID uuid.UUID, role string) error {
+	_, err := r.db.Exec(ctx, addCollaboratorQuery, noteID, userID, role)
+	return err
+}
+
+func (r *Repo) RemoveCollaborator(ctx context.Context, noteID, userID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, removeCollaboratorQuery, noteID, userID)
+	if err != nil {
+		return fmt.Errorf("remove collaborator: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrNoteNotFound
+	}
+	return nil
+}
+
+func (r *Repo) ReadCollaboratorRole(ctx context.Context, noteID, userID uuid.UUID) (string, error) {
+	var role string
+	err := r.db.QueryRow(ctx, readCollaboratorRoleQuery, noteID, userID).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", models.ErrNoteNotFound
+		}
+		return "", err
+	}
+	return role, nil
+}
+
+func (r *Repo) UpdateBlock(ctx context.Context, noteID uuid.UUID, block models.Block) error {
+	tag, err := r.db.Exec(ctx, updateBlockQuery, block.ID, noteID, block.Content, block.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("update block: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrBlockNotFound
+	}
+	return nil
 }

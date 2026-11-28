@@ -153,19 +153,19 @@ func (mr *MockRepoMockRecorder) ReadAttachment(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAttachment", reflect.TypeOf((*MockRepo)(nil).ReadAttachment), ctx, id)
 }
 
-// ReadBlockOwner mocks base method.
-func (m *MockRepo) ReadBlockOwner(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
+// ReadBlockNoteID mocks base method.
+func (m *MockRepo) ReadBlockNoteID(ctx context.Context, blockID uuid.UUID) (uuid.UUID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadBlockOwner", ctx, blockID)
+	ret := m.ctrl.Call(m, "ReadBlockNoteID", ctx, blockID)
 	ret0, _ := ret[0].(uuid.UUID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReadBlockOwner indicates an expected call of ReadBlockOwner.
-func (mr *MockRepoMockRecorder) ReadBlockOwner(ctx, blockID any) *gomock.Call {
+// ReadBlockNoteID indicates an expected call of ReadBlockNoteID.
+func (mr *MockRepoMockRecorder) ReadBlockNoteID(ctx, blockID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlockOwner", reflect.TypeOf((*MockRepo)(nil).ReadBlockOwner), ctx, blockID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlockNoteID", reflect.TypeOf((*MockRepo)(nil).ReadBlockNoteID), ctx, blockID)
 }
 
 // MockFileRepo is a mock of FileRepo interface.

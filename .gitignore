@@ -36,3 +36,8 @@ go.work.sum
 
 cover.html
 cookies.txt
+cookies_editor.txt
+cookies_owner.txt
+postman/
+
+certs/

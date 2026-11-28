@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package attachments;
+
+option go_package = "bnn/internal/pkg/attachments/delivery/grpc/gen;gen";
+
+import "google/protobuf/empty.proto";
+
+service Attachments {
+  rpc UploadAttachment(UploadAttachmentRequest) returns (Attachment);
+
+  rpc GetAttachment(AttachmentRequest) returns (File);
+
+  rpc DeleteAttachment(AttachmentRequest) returns (google.protobuf.Empty);
+}
+
+message Attachment {
+  string id = 1;
+  string block_id = 2;
+  string path = 3;
+}
+
+message File {
+  bytes data = 1;
+  string content_type = 2;
+  int64 size = 3;
+}
+
+message UploadAttachmentRequest {
+  string user_id = 1;
+  string block_id = 2;
+  bytes data = 3;
+  string content_type = 4;
+}
+
+message AttachmentRequest {
+  string user_id = 1;
+  string attachment_id = 2;
+}

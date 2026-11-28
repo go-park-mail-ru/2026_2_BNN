@@ -21,10 +21,11 @@ type Usecase interface {
 	UpdateAvatar(ctx context.Context, userID uuid.UUID, data []byte, contentType string) (models.User, error)
 	Generate2FA(ctx context.Context, userID uuid.UUID) ([]byte, error)
 	Enable2FA(ctx context.Context, userID uuid.UUID, code string) error
-	GetOAuthURL(provider string, state string) string
+	GetOAuthURL(ctx context.Context, provider, state string) (string, error)
 	HandleOAuthCallback(ctx context.Context, provider, code string) (models.User, models.AuthTokens, error)
 	Disable2FA(ctx context.Context, userID uuid.UUID, code string) error
 	VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error)
+	GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error)
 }
 
 type Repo interface {
@@ -35,8 +36,11 @@ type Repo interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, hash []byte) error
 
 	CreateRefreshToken(ctx context.Context, token models.RefreshToken) error
+	RevokeRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
+	ReadRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash []byte) (models.RefreshToken, error)
 	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error)
 
 	Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled bool) error
 	UpdateTOTPSecret(ctx context.Context, userID uuid.UUID, secret string) error

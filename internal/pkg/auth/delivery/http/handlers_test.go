@@ -14,8 +14,8 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/auth/delivery/http/api"
 	"bnn/internal/pkg/auth/mocks"
-	"bnn/internal/pkg/cookies"
-	"bnn/internal/pkg/ctxutil"
+	"bnn/internal/pkg/utils/cookies"
+	"bnn/internal/pkg/utils/ctxutil"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	uuid "github.com/satori/go.uuid"
@@ -719,9 +719,9 @@ func TestGitHubLogin(t *testing.T) {
 	uc := mocks.NewMockUsecase(ctrl)
 
 	var state string
-	uc.EXPECT().GetOAuthURL("github", gomock.Any()).DoAndReturn(func(provider, s string) string {
+	uc.EXPECT().GetOAuthURL(gomock.Any(), "github", gomock.Any()).DoAndReturn(func(_ context.Context, provider, s string) (string, error) {
 		state = s
-		return "https://github.com/login/oauth/authorize?state=" + s
+		return "https://github.com/login/oauth/authorize?state=" + s, nil
 	})
 
 	var resp api.GitHubLoginResponseObject

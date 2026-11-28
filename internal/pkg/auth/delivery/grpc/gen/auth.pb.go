@@ -991,6 +991,146 @@ func (x *GetUserByLoginRequest) GetLogin() string {
 	return ""
 }
 
+type UsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UsersResponse) Reset() {
+	*x = UsersResponse{}
+	mi := &file_proto_auth_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UsersResponse) ProtoMessage() {}
+
+func (x *UsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_auth_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UsersResponse.ProtoReflect.Descriptor instead.
+func (*UsersResponse) Descriptor() ([]byte, []int) {
+	return file_proto_auth_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type SearchUsersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchUsersRequest) Reset() {
+	*x = SearchUsersRequest{}
+	mi := &file_proto_auth_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchUsersRequest) ProtoMessage() {}
+
+func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_auth_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchUsersRequest.ProtoReflect.Descriptor instead.
+func (*SearchUsersRequest) Descriptor() ([]byte, []int) {
+	return file_proto_auth_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SearchUsersRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+type SetAdminRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	IsAdmin       bool                   `protobuf:"varint,2,opt,name=is_admin,json=isAdmin,proto3" json:"is_admin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetAdminRequest) Reset() {
+	*x = SetAdminRequest{}
+	mi := &file_proto_auth_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAdminRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAdminRequest) ProtoMessage() {}
+
+func (x *SetAdminRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_auth_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAdminRequest.ProtoReflect.Descriptor instead.
+func (*SetAdminRequest) Descriptor() ([]byte, []int) {
+	return file_proto_auth_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SetAdminRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SetAdminRequest) GetIsAdmin() bool {
+	if x != nil {
+		return x.IsAdmin
+	}
+	return false
+}
+
 var File_proto_auth_proto protoreflect.FileDescriptor
 
 const file_proto_auth_proto_rawDesc = "" +
@@ -1057,7 +1197,15 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\x17CheckUserExistsResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\"-\n" +
 	"\x15GetUserByLoginRequest\x12\x14\n" +
-	"\x05login\x18\x01 \x01(\tR\x05login2\xaa\a\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\"1\n" +
+	"\rUsersResponse\x12 \n" +
+	"\x05users\x18\x01 \x03(\v2\n" +
+	".auth.UserR\x05users\"*\n" +
+	"\x12SearchUsersRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"E\n" +
+	"\x0fSetAdminRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x19\n" +
+	"\bis_admin\x18\x02 \x01(\bR\aisAdmin2\xde\b\n" +
 	"\x04Auth\x12*\n" +
 	"\x06SignUp\x12\x11.auth.Credentials\x1a\r.auth.Session\x12*\n" +
 	"\x06SignIn\x12\x11.auth.Credentials\x1a\r.auth.Session\x12>\n" +
@@ -1078,7 +1226,11 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\x13HandleOAuthCallback\x12\x1a.auth.OAuthCallbackRequest\x1a\r.auth.Session\x12C\n" +
 	"\x0fCheckUserExists\x12\x11.auth.UserRequest\x1a\x1d.auth.CheckUserExistsResponse\x129\n" +
 	"\x0eGetUserByLogin\x12\x1b.auth.GetUserByLoginRequest\x1a\n" +
-	".auth.UserB-Z+bnn/internal/pkg/auth/delivery/grpc/gen;genb\x06proto3"
+	".auth.User\x129\n" +
+	"\n" +
+	"ListAdmins\x12\x16.google.protobuf.Empty\x1a\x13.auth.UsersResponse\x12<\n" +
+	"\vSearchUsers\x12\x18.auth.SearchUsersRequest\x1a\x13.auth.UsersResponse\x129\n" +
+	"\bSetAdmin\x12\x15.auth.SetAdminRequest\x1a\x16.google.protobuf.EmptyB-Z+bnn/internal/pkg/auth/delivery/grpc/gen;genb\x06proto3"
 
 var (
 	file_proto_auth_proto_rawDescOnce sync.Once
@@ -1092,7 +1244,7 @@ func file_proto_auth_proto_rawDescGZIP() []byte {
 	return file_proto_auth_proto_rawDescData
 }
 
-var file_proto_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_proto_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_proto_auth_proto_goTypes = []any{
 	(*User)(nil),                    // 0: auth.User
 	(*Tokens)(nil),                  // 1: auth.Tokens
@@ -1112,54 +1264,64 @@ var file_proto_auth_proto_goTypes = []any{
 	(*OAuthCallbackRequest)(nil),    // 15: auth.OAuthCallbackRequest
 	(*CheckUserExistsResponse)(nil), // 16: auth.CheckUserExistsResponse
 	(*GetUserByLoginRequest)(nil),   // 17: auth.GetUserByLoginRequest
-	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),           // 19: google.protobuf.Empty
+	(*UsersResponse)(nil),           // 18: auth.UsersResponse
+	(*SearchUsersRequest)(nil),      // 19: auth.SearchUsersRequest
+	(*SetAdminRequest)(nil),         // 20: auth.SetAdminRequest
+	(*timestamppb.Timestamp)(nil),   // 21: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),           // 22: google.protobuf.Empty
 }
 var file_proto_auth_proto_depIdxs = []int32{
-	18, // 0: auth.User.created_at:type_name -> google.protobuf.Timestamp
-	18, // 1: auth.User.updated_at:type_name -> google.protobuf.Timestamp
-	18, // 2: auth.Tokens.access_expires_at:type_name -> google.protobuf.Timestamp
-	18, // 3: auth.Tokens.refresh_expires_at:type_name -> google.protobuf.Timestamp
-	18, // 4: auth.Tokens.two_factor_expires_at:type_name -> google.protobuf.Timestamp
+	21, // 0: auth.User.created_at:type_name -> google.protobuf.Timestamp
+	21, // 1: auth.User.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 2: auth.Tokens.access_expires_at:type_name -> google.protobuf.Timestamp
+	21, // 3: auth.Tokens.refresh_expires_at:type_name -> google.protobuf.Timestamp
+	21, // 4: auth.Tokens.two_factor_expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: auth.Session.user:type_name -> auth.User
 	1,  // 6: auth.Session.tokens:type_name -> auth.Tokens
-	3,  // 7: auth.Auth.SignUp:input_type -> auth.Credentials
-	3,  // 8: auth.Auth.SignIn:input_type -> auth.Credentials
-	4,  // 9: auth.Auth.VerifyTwoFactor:input_type -> auth.VerifyTwoFactorRequest
-	5,  // 10: auth.Auth.Refresh:input_type -> auth.RefreshRequest
-	5,  // 11: auth.Auth.Logout:input_type -> auth.RefreshRequest
-	6,  // 12: auth.Auth.Authenticate:input_type -> auth.AuthenticateRequest
-	8,  // 13: auth.Auth.GetUser:input_type -> auth.UserRequest
-	9,  // 14: auth.Auth.ChangePassword:input_type -> auth.ChangePasswordRequest
-	10, // 15: auth.Auth.UpdateAvatar:input_type -> auth.UpdateAvatarRequest
-	8,  // 16: auth.Auth.Generate2FA:input_type -> auth.UserRequest
-	12, // 17: auth.Auth.Enable2FA:input_type -> auth.TwoFactorCodeRequest
-	12, // 18: auth.Auth.Disable2FA:input_type -> auth.TwoFactorCodeRequest
-	13, // 19: auth.Auth.GetOAuthURL:input_type -> auth.OAuthURLRequest
-	15, // 20: auth.Auth.HandleOAuthCallback:input_type -> auth.OAuthCallbackRequest
-	8,  // 21: auth.Auth.CheckUserExists:input_type -> auth.UserRequest
-	17, // 22: auth.Auth.GetUserByLogin:input_type -> auth.GetUserByLoginRequest
-	2,  // 23: auth.Auth.SignUp:output_type -> auth.Session
-	2,  // 24: auth.Auth.SignIn:output_type -> auth.Session
-	2,  // 25: auth.Auth.VerifyTwoFactor:output_type -> auth.Session
-	1,  // 26: auth.Auth.Refresh:output_type -> auth.Tokens
-	19, // 27: auth.Auth.Logout:output_type -> google.protobuf.Empty
-	7,  // 28: auth.Auth.Authenticate:output_type -> auth.AuthenticateResponse
-	0,  // 29: auth.Auth.GetUser:output_type -> auth.User
-	1,  // 30: auth.Auth.ChangePassword:output_type -> auth.Tokens
-	0,  // 31: auth.Auth.UpdateAvatar:output_type -> auth.User
-	11, // 32: auth.Auth.Generate2FA:output_type -> auth.Generate2FAResponse
-	19, // 33: auth.Auth.Enable2FA:output_type -> google.protobuf.Empty
-	19, // 34: auth.Auth.Disable2FA:output_type -> google.protobuf.Empty
-	14, // 35: auth.Auth.GetOAuthURL:output_type -> auth.OAuthURLResponse
-	2,  // 36: auth.Auth.HandleOAuthCallback:output_type -> auth.Session
-	16, // 37: auth.Auth.CheckUserExists:output_type -> auth.CheckUserExistsResponse
-	0,  // 38: auth.Auth.GetUserByLogin:output_type -> auth.User
-	23, // [23:39] is the sub-list for method output_type
-	7,  // [7:23] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 7: auth.UsersResponse.users:type_name -> auth.User
+	3,  // 8: auth.Auth.SignUp:input_type -> auth.Credentials
+	3,  // 9: auth.Auth.SignIn:input_type -> auth.Credentials
+	4,  // 10: auth.Auth.VerifyTwoFactor:input_type -> auth.VerifyTwoFactorRequest
+	5,  // 11: auth.Auth.Refresh:input_type -> auth.RefreshRequest
+	5,  // 12: auth.Auth.Logout:input_type -> auth.RefreshRequest
+	6,  // 13: auth.Auth.Authenticate:input_type -> auth.AuthenticateRequest
+	8,  // 14: auth.Auth.GetUser:input_type -> auth.UserRequest
+	9,  // 15: auth.Auth.ChangePassword:input_type -> auth.ChangePasswordRequest
+	10, // 16: auth.Auth.UpdateAvatar:input_type -> auth.UpdateAvatarRequest
+	8,  // 17: auth.Auth.Generate2FA:input_type -> auth.UserRequest
+	12, // 18: auth.Auth.Enable2FA:input_type -> auth.TwoFactorCodeRequest
+	12, // 19: auth.Auth.Disable2FA:input_type -> auth.TwoFactorCodeRequest
+	13, // 20: auth.Auth.GetOAuthURL:input_type -> auth.OAuthURLRequest
+	15, // 21: auth.Auth.HandleOAuthCallback:input_type -> auth.OAuthCallbackRequest
+	8,  // 22: auth.Auth.CheckUserExists:input_type -> auth.UserRequest
+	17, // 23: auth.Auth.GetUserByLogin:input_type -> auth.GetUserByLoginRequest
+	22, // 24: auth.Auth.ListAdmins:input_type -> google.protobuf.Empty
+	19, // 25: auth.Auth.SearchUsers:input_type -> auth.SearchUsersRequest
+	20, // 26: auth.Auth.SetAdmin:input_type -> auth.SetAdminRequest
+	2,  // 27: auth.Auth.SignUp:output_type -> auth.Session
+	2,  // 28: auth.Auth.SignIn:output_type -> auth.Session
+	2,  // 29: auth.Auth.VerifyTwoFactor:output_type -> auth.Session
+	1,  // 30: auth.Auth.Refresh:output_type -> auth.Tokens
+	22, // 31: auth.Auth.Logout:output_type -> google.protobuf.Empty
+	7,  // 32: auth.Auth.Authenticate:output_type -> auth.AuthenticateResponse
+	0,  // 33: auth.Auth.GetUser:output_type -> auth.User
+	1,  // 34: auth.Auth.ChangePassword:output_type -> auth.Tokens
+	0,  // 35: auth.Auth.UpdateAvatar:output_type -> auth.User
+	11, // 36: auth.Auth.Generate2FA:output_type -> auth.Generate2FAResponse
+	22, // 37: auth.Auth.Enable2FA:output_type -> google.protobuf.Empty
+	22, // 38: auth.Auth.Disable2FA:output_type -> google.protobuf.Empty
+	14, // 39: auth.Auth.GetOAuthURL:output_type -> auth.OAuthURLResponse
+	2,  // 40: auth.Auth.HandleOAuthCallback:output_type -> auth.Session
+	16, // 41: auth.Auth.CheckUserExists:output_type -> auth.CheckUserExistsResponse
+	0,  // 42: auth.Auth.GetUserByLogin:output_type -> auth.User
+	18, // 43: auth.Auth.ListAdmins:output_type -> auth.UsersResponse
+	18, // 44: auth.Auth.SearchUsers:output_type -> auth.UsersResponse
+	22, // 45: auth.Auth.SetAdmin:output_type -> google.protobuf.Empty
+	27, // [27:46] is the sub-list for method output_type
+	8,  // [8:27] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_auth_proto_init() }
@@ -1173,7 +1335,7 @@ func file_proto_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_auth_proto_rawDesc), len(file_proto_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

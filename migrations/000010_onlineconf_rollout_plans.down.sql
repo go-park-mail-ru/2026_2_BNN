@@ -1,0 +1,1 @@
+DROP TABLE onlineconf_rollout_plans;

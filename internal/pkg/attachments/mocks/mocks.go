@@ -234,3 +234,55 @@ func (mr *MockFileRepoMockRecorder) PutFile(ctx, key, data, contentType any) *go
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutFile", reflect.TypeOf((*MockFileRepo)(nil).PutFile), ctx, key, data, contentType)
 }
+
+// MockOnlineConf is a mock of OnlineConf interface.
+type MockOnlineConf struct {
+	ctrl     *gomock.Controller
+	recorder *MockOnlineConfMockRecorder
+	isgomock struct{}
+}
+
+// MockOnlineConfMockRecorder is the mock recorder for MockOnlineConf.
+type MockOnlineConfMockRecorder struct {
+	mock *MockOnlineConf
+}
+
+// NewMockOnlineConf creates a new mock instance.
+func NewMockOnlineConf(ctrl *gomock.Controller) *MockOnlineConf {
+	mock := &MockOnlineConf{ctrl: ctrl}
+	mock.recorder = &MockOnlineConfMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockOnlineConf) EXPECT() *MockOnlineConfMockRecorder {
+	return m.recorder
+}
+
+// ConfigInt mocks base method.
+func (m *MockOnlineConf) ConfigInt(scope, key string, fallback int64) int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConfigInt", scope, key, fallback)
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// ConfigInt indicates an expected call of ConfigInt.
+func (mr *MockOnlineConfMockRecorder) ConfigInt(scope, key, fallback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfigInt", reflect.TypeOf((*MockOnlineConf)(nil).ConfigInt), scope, key, fallback)
+}
+
+// FlagEnabled mocks base method.
+func (m *MockOnlineConf) FlagEnabled(scope, key string, userID uuid.UUID, fallback bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FlagEnabled", scope, key, userID, fallback)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// FlagEnabled indicates an expected call of FlagEnabled.
+func (mr *MockOnlineConfMockRecorder) FlagEnabled(scope, key, userID, fallback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlagEnabled", reflect.TypeOf((*MockOnlineConf)(nil).FlagEnabled), scope, key, userID, fallback)
+}

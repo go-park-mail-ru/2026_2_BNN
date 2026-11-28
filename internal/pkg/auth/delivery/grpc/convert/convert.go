@@ -74,3 +74,16 @@ func SessionFromProto(s *gen.Session) (models.User, models.AuthTokens, error) {
 
 	return user, TokensFromProto(s.GetTokens()), nil
 }
+
+func UsersFromProto(list []*gen.User) ([]models.User, error) {
+	result := make([]models.User, 0, len(list))
+	for _, u := range list {
+		user, err := UserFromProto(u)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, user)
+	}
+
+	return result, nil
+}

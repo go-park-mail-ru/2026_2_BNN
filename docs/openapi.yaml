@@ -8,11 +8,12 @@ info:
     На POST, PUT и DELETE (кроме signup, signin, refresh, logout и 2fa/verify) нужен заголовок
     X-CSRF-Token со значением куки bnn_csrf. Кука ставится при входе и обновляется при refresh.
     Без заголовка или с другим значением ответ 403.
-    У ошибок нет тела.
+    Ошибки OnlineConf возвращаются как JSON с полями code и message.
+    Ответы 401 и отказы существующей CSRF-проверки могут быть без тела.
 
 servers:
  - url: /api
-  
+
 
 tags:
   - name: auth
@@ -23,6 +24,10 @@ tags:
     description: Файлы в блоках заметок
   - name: tags
     description: Теги заметок
+  - name: onlineconf
+    description: Админка OnlineConf, только для админов
+  - name: onlineconf-runtime
+    description: Конфиги и флаги OnlineConf для продукта
 
 paths:
   /auth/signup:
@@ -317,6 +322,655 @@ paths:
         '400':
           description: Неверный state или отсутствует код
 
+  /onlineconf/admin/session:
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfSession
+      summary: Проверка доступа к админке
+      description: Админ получает 200, остальные 403. Признак админа в ответе не передаётся.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Пользователь — админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfSession'
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Не админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
+
+  /onlineconf/admin/users:
+    get:
+      tags: [onlineconf]
+      operationId: SearchOnlineConfUsers
+      summary: Поиск пользователей по логину
+      description: Для списков принудительного включения и исключения. Не больше 10 пользователей.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Часть логина, без учёта регистра
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Найденные пользователи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfUser'
+        '400':
+          description: Пустой или слишком длинный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
+        '401':
+          description: Нет куки или она истекла
+        '403':
+          description: Не админ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
+  /onlineconf/runtime:
+    get:
+      tags: [onlineconf-runtime]
+      operationId: GetOnlineConfRuntime
+      summary: Конфиги и флаги для текущего пользователя
+      description: |
+        Ключи скоупа frontend и ключи с is_public. Флаги уже вычислены для пользователя из куки.
+        Списки include/exclude и непубличные ключи не отдаются.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Текущие значения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRuntime'
+        '401':
+          description: Нет куки или она истекла
+
+  /onlineconf/admin/scopes:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfScopes
+      summary: Области конфигурации
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Доступные scopes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfScope'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfKeys
+      summary: Каталог ключей
+      description: До 200 ключей. Персональные настройки флагов не включаются.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: query
+          in: query
+          description: Часть имени ключа, без учёта регистра
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            $ref: '#/components/schemas/OnlineConfScope'
+        - name: kind
+          in: query
+          schema:
+            $ref: '#/components/schemas/OnlineConfKind'
+      responses:
+        '200':
+          description: Найденные ключи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    post:
+      tags: [onlineconf]
+      operationId: CreateOnlineConfKey
+      summary: Создать конфиг или флаг
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfKeyInput'
+      responses:
+        '201':
+          description: Ключ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfKey
+      summary: Карточка ключа
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Ключ с полными настройками
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    put:
+      tags: [onlineconf]
+      operationId: UpdateOnlineConfKey
+      summary: Заменить настройки ключа
+      description: Требуется текущая версия. Тип kind менять нельзя.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfUpdateKeyInput'
+      responses:
+        '200':
+          description: Ключ сохранён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    delete:
+      tags: [onlineconf]
+      operationId: DeleteOnlineConfKey
+      summary: Удалить ключ
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+      responses:
+        '204':
+          description: Ключ удалён
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/history:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfHistory
+      summary: История изменений ключа
+      description: |
+        Сначала последние изменения.
+        История сохраняется после удаления ключа.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: История изменений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfHistoryEntry'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/rollout-plans:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfRolloutPlans
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfRolloutPlan'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    post:
+      tags: [onlineconf]
+      operationId: CreateOnlineConfRolloutPlan
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfRolloutPlanInput'
+      responses:
+        '201':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRolloutPlan'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/rollout-plans/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfRolloutPlan
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRolloutPlan'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    put:
+      tags: [onlineconf]
+      operationId: UpdateOnlineConfRolloutPlan
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfRolloutPlanInput'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRolloutPlan'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    delete:
+      tags: [onlineconf]
+      operationId: DeleteOnlineConfRolloutPlan
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Успешно
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/rollout-plan:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [onlineconf]
+      operationId: SetOnlineConfRolloutPlan
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfSetRolloutPlanInput'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/rollout:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: GetOnlineConfRollout
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfRollout'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/rollout/approve:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [onlineconf]
+      operationId: ApproveOnlineConfRollout
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfRolloutVersionInput'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/rollout/rollback:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [onlineconf]
+      operationId: RollbackOnlineConfRollout
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfRolloutVersionInput'
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfKey'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/schedules:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfSchedules
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfSchedule'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    post:
+      tags: [onlineconf]
+      operationId: CreateOnlineConfSchedule
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfScheduleInput'
+      responses:
+        '201':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfSchedule'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/schedules/{schedule_id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [onlineconf]
+      operationId: DeleteOnlineConfSchedule
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Успешно
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/keys/{id}/evaluate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [onlineconf]
+      operationId: EvaluateOnlineConfKey
+      summary: Проверить флаг для пользователя
+      description: Считается по снимку в памяти main, той же функцией, что и для продукта.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineConfEvaluateInput'
+      responses:
+        '200':
+          description: Результат для пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfEvaluation'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/admins:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfAdmins
+      summary: Список админов
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Админы по алфавиту логинов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfUser'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/admins/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [onlineconf]
+      operationId: GrantOnlineConfAdmin
+      summary: Выдать права админа
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Права выданы
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    delete:
+      tags: [onlineconf]
+      operationId: RevokeOnlineConfAdmin
+      summary: Забрать права админа
+      description: Забрать права у самого себя нельзя — 400.
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Права сняты
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
   /notes/all:
     get:
       tags: [notes]
@@ -503,7 +1157,7 @@ paths:
           description: Не авторизован
         '404':
           description: Заметка не найдена
-  
+
   /notes/{id}/collaborators:
     parameters:
       - $ref: '#/components/parameters/NoteID'
@@ -565,7 +1219,9 @@ paths:
       tags: [attachments]
       operationId: UploadAttachment
       summary: Прикрепить файл к блоку
-      description: Файл до 10 МБ, форматы jpeg, png, webp, gif, pdf.
+      description: |
+        Форматы jpeg, png, webp, gif, pdf. Лимит размера — конфиг OnlineConf backend/attachments.max_file_size_bytes
+        (по умолчанию 10 МиБ), загрузку можно выключить флагом backend/attachments.upload_enabled.
       security:
         - cookieAuth: []
       requestBody:
@@ -591,11 +1247,19 @@ paths:
         '401':
           description: Нет куки или она истекла
         '403':
-          description: Forbidden
+          description: Нет доступа к заметке (FORBIDDEN) или загрузка выключена флагом (FEATURE_DISABLED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineConfError'
         '404':
           description: Блока нет или он в чужой заметке
         '413':
-          description: Файл больше 10 МБ
+          description: Файл больше лимита
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileTooLargeError'
         '415':
           description: Неподдерживаемый формат
 
@@ -739,6 +1403,27 @@ components:
       in: cookie
       name: bnn_access
 
+  responses:
+    OnlineConfFailure:
+      description: |
+        400 VALIDATION — неверный запрос.
+        400 ROLLOUT_STEP_NOT_ALLOWED — процент привязанного флага меняется через approve или rollback.
+        403 FORBIDDEN — недостаточно прав.
+        404 NOT_FOUND — ключ не найден.
+        409 KEY_EXISTS — имя занято в scope.
+        409 VERSION_CONFLICT — устаревшая версия.
+        409 ROLLOUT_PLAN_EXISTS — имя регламента занято.
+        409 ROLLOUT_PLAN_IN_USE — регламент привязан к флагу.
+        409 ROLLOUT_NOT_READY — следующий этап ещё не доступен для подтверждения.
+        409 SCHEDULE_FINISHED — задание уже выполнено или завершилось ошибкой.
+        413 PAYLOAD_TOO_LARGE — слишком большой запрос.
+        500 INTERNAL — внутренняя ошибка.
+        503 SERVICE_UNAVAILABLE — зависимый сервис недоступен.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OnlineConfError'
+
   parameters:
     NoteID:
       name: id
@@ -770,6 +1455,437 @@ components:
         format: uuid
 
   schemas:
+
+    OnlineConfEvaluateInput:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+
+    OnlineConfEvaluation:
+      type: object
+      required: [result, reason, revision]
+      properties:
+        result:
+          type: boolean
+        reason:
+          type: string
+          enum: [disabled, excluded, included, rollout]
+        revision:
+          type: integer
+          format: int64
+          example: 42
+
+    OnlineConfRuntime:
+      type: object
+      required: [revision, user_id, configs, flags]
+      properties:
+        revision:
+          type: integer
+          format: int64
+          example: 42
+        user_id:
+          type: string
+          format: uuid
+        configs:
+          type: object
+          description: scope → ключ → значение
+          additionalProperties:
+            type: object
+            additionalProperties: {}
+          example: {"backend": {"attachments.max_file_size_bytes": 10485760}}
+        flags:
+          type: object
+          description: scope → ключ → включён ли флаг
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: boolean
+          example: {"backend": {"attachments.upload_enabled": true}}
+
+    OnlineConfError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: FORBIDDEN
+        message:
+          type: string
+
+    FileTooLargeError:
+      type: object
+      required: [code, message, limit_bytes]
+      properties:
+        code:
+          type: string
+          example: FILE_TOO_LARGE
+        message:
+          type: string
+        limit_bytes:
+          type: integer
+          format: int64
+          example: 10485760
+
+    OnlineConfSession:
+      type: object
+      required: [login]
+      properties:
+        login:
+          type: string
+
+    OnlineConfUser:
+      type: object
+      required: [id, login]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+          example: seyran
+
+    OnlineConfScope:
+      type: string
+      enum: [frontend, backend, auth, notes]
+
+    OnlineConfKind:
+      type: string
+      enum: [config, flag]
+
+    OnlineConfValueType:
+      type: string
+      enum: [string, number, boolean, object, array]
+
+    OnlineConfConfig:
+      type: object
+      required: [value_type, value]
+      properties:
+        value_type:
+          $ref: '#/components/schemas/OnlineConfValueType'
+        value:
+          description: JSON-значение, соответствующее value_type
+          x-go-type: json.RawMessage
+
+    OnlineConfFlag:
+      type: object
+      required: [enabled, rollout_percent]
+      properties:
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        include_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlineConfUser'
+        exclude_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlineConfUser'
+
+    OnlineConfFlagInput:
+      type: object
+      required: [enabled, rollout_percent]
+      properties:
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        include_user_ids:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          x-go-name: IncludeUserIDs
+          x-go-type-skip-optional-pointer: true
+          items:
+            type: string
+            format: uuid
+        exclude_user_ids:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          x-go-name: ExcludeUserIDs
+          x-go-type-skip-optional-pointer: true
+          items:
+            type: string
+            format: uuid
+
+    OnlineConfKey:
+      type: object
+      required:
+        - id
+        - scope
+        - key
+        - kind
+        - description
+        - is_public
+        - version
+        - updated_by
+        - updated_at
+      properties:
+        rollout_plan_id:
+          type: string
+          format: uuid
+        rollout_step:
+          type: integer
+          format: int32
+        step_ready_at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        scope:
+          $ref: '#/components/schemas/OnlineConfScope'
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/OnlineConfKind'
+        description:
+          type: string
+        is_public:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+        updated_by:
+          $ref: '#/components/schemas/OnlineConfUser'
+        updated_at:
+          type: string
+          format: date-time
+        config:
+          $ref: '#/components/schemas/OnlineConfConfig'
+        flag:
+          $ref: '#/components/schemas/OnlineConfFlag'
+
+    OnlineConfHistoryEntry:
+      type: object
+      required:
+        - id
+        - action
+        - old_value
+        - new_value
+        - user
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, update, delete]
+        old_value:
+          type: object
+          nullable: true
+          x-go-type: OnlineConfKey
+          allOf:
+            - $ref: '#/components/schemas/OnlineConfKey'
+        new_value:
+          type: object
+          nullable: true
+          x-go-type: OnlineConfKey
+          allOf:
+            - $ref: '#/components/schemas/OnlineConfKey'
+        user:
+          $ref: '#/components/schemas/OnlineConfUser'
+        created_at:
+          type: string
+          format: date-time
+
+
+    OnlineConfRolloutPlan:
+      type: object
+      required: [id, name, steps, interval_min]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        steps:
+          type: array
+          items:
+            type: integer
+            format: int32
+        interval_min:
+          type: integer
+          format: int32
+
+    OnlineConfRolloutPlanInput:
+      type: object
+      required: [name, steps, interval_min]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        steps:
+          type: array
+          minItems: 2
+          maxItems: 101
+          items:
+            type: integer
+            format: int32
+            minimum: 0
+            maximum: 100
+        interval_min:
+          type: integer
+          format: int32
+          minimum: 1
+
+    OnlineConfSetRolloutPlanInput:
+      type: object
+      required: [plan_id, version]
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: null отвязывает регламент. Поле обязательно.
+          x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+
+    OnlineConfRolloutVersionInput:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+
+    OnlineConfRollout:
+      type: object
+      required: [key_id, plan, step, current_percent, next_percent, step_ready_at, status, version]
+      properties:
+        key_id:
+          type: string
+          format: uuid
+        plan:
+          type: object
+          nullable: true
+          x-go-type: OnlineConfRolloutPlan
+          allOf:
+            - $ref: '#/components/schemas/OnlineConfRolloutPlan'
+        step:
+          type: integer
+          format: int32
+          nullable: true
+        current_percent:
+          type: integer
+          format: int32
+        next_percent:
+          type: integer
+          format: int32
+          nullable: true
+        step_ready_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          description: unassigned, waiting, pending_approval или done. Индекс step начинается с нуля.
+        version:
+          type: integer
+          format: int32
+
+    OnlineConfScheduleInput:
+      type: object
+      required: [run_at]
+      description: Нужен хотя бы один из параметров enabled и rollout_percent. Процент привязанного флага меняется через approve.
+      properties:
+        run_at:
+          type: string
+          format: date-time
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+
+    OnlineConfSchedule:
+      type: object
+      required: [id, key_id, run_at, done, failed, error, created_by, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key_id:
+          type: string
+          format: uuid
+        run_at:
+          type: string
+          format: date-time
+        enabled:
+          type: boolean
+        rollout_percent:
+          type: integer
+          format: int32
+        done:
+          type: boolean
+        failed:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    OnlineConfKeyInput:
+      type: object
+      description: |
+        Для kind=config заполняется только config.
+        Для kind=flag заполняется только flag.
+        Проверка выполняется сервисом OnlineConf.
+      required: [scope, key, kind, is_public]
+      properties:
+        scope:
+          $ref: '#/components/schemas/OnlineConfScope'
+        key:
+          type: string
+          maxLength: 100
+          pattern: '^[a-zA-Z][a-zA-Z0-9_.-]{0,99}$'
+        kind:
+          $ref: '#/components/schemas/OnlineConfKind'
+        description:
+          type: string
+          x-go-type-skip-optional-pointer: true
+        is_public:
+          type: boolean
+        config:
+          $ref: '#/components/schemas/OnlineConfConfig'
+        flag:
+          $ref: '#/components/schemas/OnlineConfFlagInput'
+
+    OnlineConfUpdateKeyInput:
+      allOf:
+        - $ref: '#/components/schemas/OnlineConfKeyInput'
+        - type: object
+          required: [version]
+          properties:
+            version:
+              type: integer
+              format: int32
+              minimum: 1
 
     AddCollaboratorRequest:
       type: object
@@ -1016,7 +2132,7 @@ components:
           type: string
           pattern: '^#[0-9a-fA-F]{8}$'
           example: '#FF880080'
-    
+
     TwoFactorCodeRequest:
       type: object
       required: [code]
@@ -1025,4 +2141,4 @@ components:
           type: string
           description: 6 цифр из приложения-аутентификатора
           example: '123456'
-          
+

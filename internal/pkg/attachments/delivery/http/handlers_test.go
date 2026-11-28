@@ -13,6 +13,7 @@ import (
 	"bnn/internal/models"
 	"bnn/internal/pkg/attachments/delivery/http/api"
 	"bnn/internal/pkg/attachments/mocks"
+	"bnn/internal/pkg/onlineconf"
 	"bnn/internal/pkg/utils/ctxutil"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -23,6 +24,13 @@ import (
 )
 
 var pngData = []byte("\x89PNG\r\n\x1a\nfile")
+
+// defaults — OnlineConf без снимка: лимит 10 МиБ, загрузка разрешена.
+var defaults = onlineconf.NewSnapshotCache(nil)
+
+var tooLarge = api.UploadAttachment413JSONResponse{
+	Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: onlineconf.MaxAttachmentSizeBytes,
+}
 
 func newForm(t *testing.T, field string, data []byte) *multipart.Reader {
 	var buf bytes.Buffer
@@ -71,11 +79,13 @@ func TestUploadAttachment(t *testing.T) {
 			expected: api.UploadAttachment401Response{},
 		},
 		{
-			name:     "file too large",
-			ctx:      ctxutil.WithUserID(context.Background(), userID),
-			form:     func(t *testing.T) *multipart.Reader { return newForm(t, fileField, make([]byte, maxFileSize10MB+1)) },
+			name: "file too large",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			form: func(t *testing.T) *multipart.Reader {
+				return newForm(t, fileField, make([]byte, onlineconf.MaxAttachmentSizeBytes+1))
+			},
 			prepare:  func(uc *mocks.MockUsecase) {},
-			expected: api.UploadAttachment413Response{},
+			expected: tooLarge,
 		},
 		{
 			name: "request body too large",
@@ -93,7 +103,7 @@ func TestUploadAttachment(t *testing.T) {
 				return multipart.NewReader(body, w.Boundary())
 			},
 			prepare:  func(uc *mocks.MockUsecase) {},
-			expected: api.UploadAttachment413Response{},
+			expected: tooLarge,
 		},
 		{
 			name:     "no file field",
@@ -131,7 +141,60 @@ func TestUploadAttachment(t *testing.T) {
 			tt.prepare(uc)
 
 			req := api.UploadAttachmentRequestObject{Id: openapi_types.UUID(blockID), Body: tt.form(t)}
-			resp, err := NewHandler(uc).UploadAttachment(tt.ctx, req)
+			resp, err := NewHandler(uc, defaults).UploadAttachment(tt.ctx, req)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, resp)
+		})
+	}
+}
+
+func TestUploadAttachmentOnlineConf(t *testing.T) {
+	userID := uuid.NewV4()
+	blockID := uuid.NewV4()
+	ctx := ctxutil.WithUserID(context.Background(), userID)
+
+	tests := []struct {
+		name     string
+		prepare  func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf)
+		expected api.UploadAttachmentResponseObject
+	}{
+		{
+			name: "uploads disabled by flag",
+			prepare: func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf) {
+				conf.EXPECT().FlagEnabled(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsUploadEnabled, userID, true).Return(false)
+			},
+			expected: api.UploadAttachment403JSONResponse{Code: onlineconf.CodeFeatureDisabled, Message: messageUploadDisabled},
+		},
+		{
+			name: "limit from onlineconf",
+			prepare: func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf) {
+				conf.EXPECT().FlagEnabled(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true)
+				conf.EXPECT().ConfigInt(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsMaxFileSize, int64(onlineconf.MaxAttachmentSizeBytes)).Return(int64(4))
+			},
+			expected: api.UploadAttachment413JSONResponse{Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: 4},
+		},
+		{
+			name: "no access to note",
+			prepare: func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf) {
+				conf.EXPECT().FlagEnabled(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true)
+				conf.EXPECT().ConfigInt(gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(onlineconf.MaxAttachmentSizeBytes))
+				uc.EXPECT().UploadAttachment(gomock.Any(), userID, blockID, pngData, "image/png").
+					Return(models.Attachment{}, models.ErrForbidden)
+			},
+			expected: api.UploadAttachment403JSONResponse{Code: onlineconf.CodeForbidden, Message: messageNoteForbidden},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			uc := mocks.NewMockUsecase(ctrl)
+			conf := mocks.NewMockOnlineConf(ctrl)
+			tt.prepare(uc, conf)
+
+			req := api.UploadAttachmentRequestObject{Id: openapi_types.UUID(blockID), Body: newForm(t, fileField, pngData)}
+			resp, err := NewHandler(uc, conf).UploadAttachment(ctx, req)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -182,7 +245,7 @@ func TestGetAttachment(t *testing.T) {
 			tt.prepare(uc)
 
 			req := api.GetAttachmentRequestObject{Id: openapi_types.UUID(attachmentID)}
-			resp, err := NewHandler(uc).GetAttachment(tt.ctx, req)
+			resp, err := NewHandler(uc, defaults).GetAttachment(tt.ctx, req)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -231,7 +294,7 @@ func TestDeleteAttachment(t *testing.T) {
 			tt.prepare(uc)
 
 			req := api.DeleteAttachmentRequestObject{Id: openapi_types.UUID(attachmentID)}
-			resp, err := NewHandler(uc).DeleteAttachment(tt.ctx, req)
+			resp, err := NewHandler(uc, defaults).DeleteAttachment(tt.ctx, req)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, resp)
@@ -249,7 +312,7 @@ func TestHandlersInternalError(t *testing.T) {
 	uc.EXPECT().GetAttachment(gomock.Any(), gomock.Any(), gomock.Any()).Return(models.File{}, dbErr)
 	uc.EXPECT().DeleteAttachment(gomock.Any(), gomock.Any(), gomock.Any()).Return(dbErr)
 
-	h := NewHandler(uc)
+	h := NewHandler(uc, defaults)
 
 	_, err := h.UploadAttachment(ctx, api.UploadAttachmentRequestObject{Body: newForm(t, fileField, pngData)})
 	assert.ErrorIs(t, err, dbErr)

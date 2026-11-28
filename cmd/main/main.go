@@ -23,6 +23,11 @@ import (
 	notesClient "bnn/internal/pkg/notes/client"
 	notesDelivery "bnn/internal/pkg/notes/delivery/http"
 	notesapi "bnn/internal/pkg/notes/delivery/http/api"
+	"bnn/internal/pkg/onlineconf"
+	onlineconfClient "bnn/internal/pkg/onlineconf/client"
+	onlineconfDelivery "bnn/internal/pkg/onlineconf/delivery/http"
+	onlineconfapi "bnn/internal/pkg/onlineconf/delivery/http/api"
+	"bnn/internal/pkg/onlineconf/delivery/http/runtimeapi"
 	"bnn/internal/pkg/swagger"
 	tagsClient "bnn/internal/pkg/tags/client"
 	tagsDelivery "bnn/internal/pkg/tags/delivery/http"
@@ -42,10 +47,11 @@ const (
 	shutdownTimeout    = 5 * time.Second
 	MaxRequestSize20MB = 20 << 20
 
-	defaultFrontendURL = "http://localhost:3000"
-	defaultAuthAddr    = "localhost:9001"
-	defaultNotesAddr   = "localhost:9002"
-	metricsAddr        = ":9101"
+	defaultFrontendURL    = "http://localhost:3000"
+	defaultAuthAddr       = "localhost:9001"
+	defaultNotesAddr      = "localhost:9002"
+	metricsAddr           = ":9101"
+	defaultOnlineConfAddr = "localhost:9004"
 )
 
 func main() {
@@ -71,6 +77,20 @@ func main() {
 	}
 	defer notesConn.Close()
 
+	onlineconfConn, err := grpcutil.NewClient(
+		lo.CoalesceOrEmpty(
+			os.Getenv("ONLINECONF_GRPC_ADDR"),
+			defaultOnlineConfAddr,
+		),
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to create OnlineConf client", "error", err)
+		os.Exit(1)
+	}
+	defer onlineconfConn.Close()
+
+	onlineconfService := onlineconfClient.NewClient(onlineconfConn)
+
 	authService := authClient.NewClient(authConn)
 	notesService := notesClient.NewClient(notesConn)
 	tagsService := tagsClient.NewClient(notesConn)
@@ -81,7 +101,6 @@ func main() {
 	authHandler := authDelivery.NewHandler(authService, frontendURL)
 	notesHandler := notesDelivery.NewHandler(notesService)
 	tagsHandler := tagsDelivery.NewHandler(tagsService)
-	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService)
 
 	corsMiddleware, err := middleware.NewCORS(os.Getenv("FRONTEND_ORIGIN"))
 	if err != nil {
@@ -94,6 +113,21 @@ func main() {
 	defer wsCancel()
 	go wsHub.Run(wsCtx)
 
+	onlineconfCtx, onlineconfCancel := context.WithCancel(context.Background())
+	defer onlineconfCancel()
+
+	adminCache := onlineconf.NewAdminCache(authService)
+	go adminCache.Run(onlineconfCtx)
+
+	snapshotCache := onlineconf.NewSnapshotCache(onlineconfService)
+	go snapshotCache.Run(onlineconfCtx)
+
+	onlineconfHandler := onlineconfDelivery.NewHandler(
+		authService, adminCache, onlineconfService, snapshotCache,
+	)
+	runtimeHandler := onlineconfDelivery.NewRuntimeHandler(snapshotCache)
+	attachmentsHandler := attachmentsDelivery.NewHandler(attachmentsService, snapshotCache)
+
 	wsHandler := ws.NewHandler(wsHub, os.Getenv("FRONTEND_ORIGIN"), notesService)
 
 	httpMetrics := metrics.NewHTTP(prometheus.DefaultRegisterer)
@@ -104,6 +138,7 @@ func main() {
 	router.Use(middleware.AccessLog(baseLogger))
 	router.Use(middleware.Metrics(httpMetrics))
 	router.Use(middleware.Recovery)
+	router.Use(onlineconfDelivery.NoStore)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(authHandler.Middleware)
@@ -130,6 +165,32 @@ func main() {
 		RequestErrorHandlerFunc:  httpjson.RequestError,
 		ResponseErrorHandlerFunc: httpjson.ResponseError,
 	}), apiRouter)
+
+	runtimeRouter := apiRouter.NewRoute().Subrouter()
+	runtimeapi.HandlerFromMux(runtimeapi.NewStrictHandlerWithOptions(runtimeHandler, nil, runtimeapi.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  httpjson.RequestError,
+		ResponseErrorHandlerFunc: httpjson.ResponseError,
+	}), runtimeRouter)
+
+	adminRouter := apiRouter.NewRoute().Subrouter()
+	adminRouter.Use(onlineconfDelivery.AdminOnly(adminCache))
+
+	strictOnlineconfHandler := onlineconfapi.NewStrictHandlerWithOptions(
+		onlineconfHandler,
+		nil,
+		onlineconfapi.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  onlineconfDelivery.RequestError,
+			ResponseErrorHandlerFunc: onlineconfDelivery.ResponseError,
+		},
+	)
+
+	onlineconfapi.HandlerWithOptions(
+		strictOnlineconfHandler,
+		onlineconfapi.GorillaServerOptions{
+			BaseRouter:       adminRouter,
+			ErrorHandlerFunc: onlineconfDelivery.RequestError,
+		},
+	)
 
 	router.PathPrefix("/mcp").Handler(bnnmcp.NewHandler(authService, notesService))
 
@@ -165,6 +226,8 @@ func main() {
 	slog.InfoContext(ctx, "Received signal, shutting down", "signal", sig)
 
 	wsCancel()
+
+	onlineconfCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()

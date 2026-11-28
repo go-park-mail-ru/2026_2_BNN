@@ -38,8 +38,13 @@ service Auth {
 
   rpc CheckUserExists(UserRequest) returns (CheckUserExistsResponse);
 
+  rpc GetUserByLogin(GetUserByLoginRequest) returns (User);
 
-rpc GetUserByLogin(GetUserByLoginRequest) returns (User);
+  rpc ListAdmins(google.protobuf.Empty) returns (UsersResponse);
+
+  rpc SearchUsers(SearchUsersRequest) returns (UsersResponse);
+
+  rpc SetAdmin(SetAdminRequest) returns (google.protobuf.Empty);
 }
 
 message User {
@@ -134,4 +139,17 @@ message CheckUserExistsResponse {
 
 message GetUserByLoginRequest {
   string login = 1;
+}
+
+message UsersResponse {
+  repeated User users = 1;
+}
+
+message SearchUsersRequest {
+  string query = 1;
+}
+
+message SetAdminRequest {
+  string user_id = 1;
+  bool is_admin = 2;
 }

@@ -12,6 +12,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var _ auth.Usecase = (*Client)(nil)
@@ -169,4 +170,30 @@ func (c *Client) GetUserByLogin(ctx context.Context, login string) (uuid.UUID, e
 		return uuid.Nil, err
 	}
 	return userID, nil
+}
+
+func (c *Client) ListAdmins(ctx context.Context) ([]models.User, error) {
+	resp, err := c.client.ListAdmins(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, grpcerr.FromStatus(err)
+	}
+
+	return convert.UsersFromProto(resp.GetUsers())
+}
+
+func (c *Client) SearchUsers(ctx context.Context, query string) ([]models.User, error) {
+	resp, err := c.client.SearchUsers(ctx, &gen.SearchUsersRequest{Query: query})
+	if err != nil {
+		return nil, grpcerr.FromStatus(err)
+	}
+
+	return convert.UsersFromProto(resp.GetUsers())
+}
+
+func (c *Client) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	_, err := c.client.SetAdmin(ctx, &gen.SetAdminRequest{UserId: userID.String(), IsAdmin: isAdmin})
+	if err != nil {
+		return grpcerr.FromStatus(err)
+	}
+	return nil
 }

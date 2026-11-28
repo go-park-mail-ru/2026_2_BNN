@@ -27,3 +27,8 @@ type FileRepo interface {
 	GetFile(ctx context.Context, key string) (models.File, error)
 	DeleteFile(ctx context.Context, key string) error
 }
+
+type OnlineConf interface {
+	ConfigInt(scope, key string, fallback int64) int64
+	FlagEnabled(scope, key string, userID uuid.UUID, fallback bool) bool
+}

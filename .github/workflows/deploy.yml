@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - onlyconf
 
 permissions:
   contents: read

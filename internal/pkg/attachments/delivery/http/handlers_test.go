@@ -29,7 +29,7 @@ var pngData = []byte("\x89PNG\r\n\x1a\nfile")
 var defaults = onlineconf.NewSnapshotCache(nil)
 
 var tooLarge = api.UploadAttachment413JSONResponse{
-	Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: defaultMaxFileSize,
+	Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: onlineconf.MaxAttachmentSizeBytes,
 }
 
 func newForm(t *testing.T, field string, data []byte) *multipart.Reader {
@@ -79,9 +79,11 @@ func TestUploadAttachment(t *testing.T) {
 			expected: api.UploadAttachment401Response{},
 		},
 		{
-			name:     "file too large",
-			ctx:      ctxutil.WithUserID(context.Background(), userID),
-			form:     func(t *testing.T) *multipart.Reader { return newForm(t, fileField, make([]byte, defaultMaxFileSize+1)) },
+			name: "file too large",
+			ctx:  ctxutil.WithUserID(context.Background(), userID),
+			form: func(t *testing.T) *multipart.Reader {
+				return newForm(t, fileField, make([]byte, onlineconf.MaxAttachmentSizeBytes+1))
+			},
 			prepare:  func(uc *mocks.MockUsecase) {},
 			expected: tooLarge,
 		},
@@ -168,7 +170,7 @@ func TestUploadAttachmentOnlineConf(t *testing.T) {
 			name: "limit from onlineconf",
 			prepare: func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf) {
 				conf.EXPECT().FlagEnabled(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true)
-				conf.EXPECT().ConfigInt(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsMaxFileSize, int64(defaultMaxFileSize)).Return(int64(4))
+				conf.EXPECT().ConfigInt(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsMaxFileSize, int64(onlineconf.MaxAttachmentSizeBytes)).Return(int64(4))
 			},
 			expected: api.UploadAttachment413JSONResponse{Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: 4},
 		},
@@ -176,7 +178,7 @@ func TestUploadAttachmentOnlineConf(t *testing.T) {
 			name: "no access to note",
 			prepare: func(uc *mocks.MockUsecase, conf *mocks.MockOnlineConf) {
 				conf.EXPECT().FlagEnabled(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true)
-				conf.EXPECT().ConfigInt(gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(defaultMaxFileSize))
+				conf.EXPECT().ConfigInt(gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(onlineconf.MaxAttachmentSizeBytes))
 				uc.EXPECT().UploadAttachment(gomock.Any(), userID, blockID, pngData, "image/png").
 					Return(models.Attachment{}, models.ErrForbidden)
 			},

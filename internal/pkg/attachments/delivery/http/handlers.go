@@ -20,8 +20,6 @@ import (
 const (
 	fileField = "file"
 
-	// значения, пока OnlineConf не отдал свои
-	defaultMaxFileSize   = 10 << 20
 	defaultUploadEnabled = true
 
 	messageUploadDisabled = "attachment uploads are disabled"
@@ -48,8 +46,11 @@ func (h *Handler) UploadAttachment(ctx context.Context, req api.UploadAttachment
 		return api.UploadAttachment403JSONResponse{Code: onlineconf.CodeFeatureDisabled, Message: messageUploadDisabled}, nil
 	}
 
-	maxSize := h.conf.ConfigInt(onlineconf.ScopeBackend, onlineconf.KeyAttachmentsMaxFileSize, defaultMaxFileSize)
-
+	maxSize := h.conf.ConfigInt(
+		onlineconf.ScopeBackend,
+		onlineconf.KeyAttachmentsMaxFileSize,
+		onlineconf.MaxAttachmentSizeBytes,
+	)
 	data, err := upload.ReadFile(req.Body, fileField, maxSize)
 	if errors.Is(err, upload.ErrFileTooLarge) || errors.As(err, new(*http.MaxBytesError)) {
 		return api.UploadAttachment413JSONResponse{Code: onlineconf.CodeFileTooLarge, Message: messageFileTooLarge, LimitBytes: maxSize}, nil

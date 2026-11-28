@@ -17,13 +17,13 @@ import (
 type Handler struct {
 	auth   auth.Usecase
 	admins *onlineconf.AdminCache
-	keys   onlineconf.CoreUsecase
+	keys   onlineconf.Usecase
 }
 
 func NewHandler(
 	authUC auth.Usecase,
 	admins *onlineconf.AdminCache,
-	keys onlineconf.CoreUsecase,
+	keys onlineconf.Usecase,
 ) *Handler {
 	return &Handler{
 		auth:   authUC,

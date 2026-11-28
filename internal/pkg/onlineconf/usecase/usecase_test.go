@@ -172,7 +172,7 @@ func TestAttachmentSizeValidation(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			repo, _, uc := newUsecase(t)
 			input := configInput("number", value)
-			input.Key = attachmentSizeKey
+			input.Key = onlineconf.KeyAttachmentsMaxFileSize
 			valid := value == "1048576" || value == "1572864" || value == "10485760"
 			if valid {
 				repo.EXPECT().CreateKey(gomock.Any(), gomock.Any()).Return(models.OnlineConfKey{}, nil)
@@ -192,9 +192,9 @@ func TestAttachmentSizeValidation(t *testing.T) {
 
 func TestKnownKeyKindAndType(t *testing.T) {
 	for _, input := range []onlineconf.KeyInput{
-		{Scope: "backend", Key: attachmentSizeKey, Kind: "config", Config: &models.OnlineConfConfig{ValueType: "string", Value: json.RawMessage(`"1048576"`)}},
-		{Scope: "backend", Key: attachmentSizeKey, Kind: "flag", Flag: &onlineconf.FlagInput{}},
-		{Scope: "backend", Key: attachmentUploadKey, Kind: "config", Config: &models.OnlineConfConfig{ValueType: "boolean", Value: json.RawMessage("true")}},
+		{Scope: "backend", Key: onlineconf.KeyAttachmentsMaxFileSize, Kind: "config", Config: &models.OnlineConfConfig{ValueType: "string", Value: json.RawMessage(`"1048576"`)}},
+		{Scope: "backend", Key: onlineconf.KeyAttachmentsMaxFileSize, Kind: "flag", Flag: &onlineconf.FlagInput{}},
+		{Scope: "backend", Key: onlineconf.KeyAttachmentsUploadEnabled, Kind: "config", Config: &models.OnlineConfConfig{ValueType: "boolean", Value: json.RawMessage("true")}},
 	} {
 		t.Run(input.Key+"/"+input.Kind, func(t *testing.T) {
 			_, _, uc := newUsecase(t)
@@ -268,7 +268,7 @@ func TestFlagBoundaries(t *testing.T) {
 		t.Run(fmt.Sprint(percent), func(t *testing.T) {
 			repo, _, uc := newUsecase(t)
 			input := flagInput()
-			input.Key = attachmentUploadKey
+			input.Key = onlineconf.KeyAttachmentsUploadEnabled
 			input.Flag.Enabled = false
 			input.Flag.RolloutPercent = percent
 			repo.EXPECT().CreateKey(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -357,7 +357,7 @@ func TestUpdateKey(t *testing.T) {
 	repo, _, uc := newUsecase(t)
 	actor, id := uuid.NewV4(), uuid.NewV4()
 	input := configInput("number", "2097152")
-	input.Key = attachmentSizeKey
+	input.Key = onlineconf.KeyAttachmentsMaxFileSize
 	repo.EXPECT().ReadKey(gomock.Any(), id).Return(models.OnlineConfKey{ID: id, Kind: "config", Version: 3}, nil)
 	repo.EXPECT().UpdateKey(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, key models.OnlineConfKey) (models.OnlineConfKey, error) {

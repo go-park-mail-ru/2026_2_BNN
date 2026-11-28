@@ -555,6 +555,38 @@ paths:
         default:
           $ref: '#/components/responses/OnlineConfFailure'
 
+
+  /onlineconf/admin/keys/{id}/history:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfHistory
+      summary: История изменений ключа
+      description: |
+        Сначала последние изменения.
+        История сохраняется после удаления ключа.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: История изменений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfHistoryEntry'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
   /notes/all:
     get:
       tags: [notes]
@@ -1215,6 +1247,40 @@ components:
         flag:
           $ref: '#/components/schemas/OnlineConfFlag'
 
+    OnlineConfHistoryEntry:
+      type: object
+      required:
+        - id
+        - action
+        - old_value
+        - new_value
+        - user
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, update, delete]
+        old_value:
+          type: object
+          nullable: true
+          x-go-type: OnlineConfKey
+          allOf:
+            - $ref: '#/components/schemas/OnlineConfKey'
+        new_value:
+          type: object
+          nullable: true
+          x-go-type: OnlineConfKey
+          allOf:
+            - $ref: '#/components/schemas/OnlineConfKey'
+        user:
+          $ref: '#/components/schemas/OnlineConfUser'
+        created_at:
+          type: string
+          format: date-time
+    
     OnlineConfKeyInput:
       type: object
       description: |

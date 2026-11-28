@@ -15,13 +15,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const (
-	maxOverrideUsers    = 100
-	minAttachmentSize   = 1 << 20
-	maxAttachmentSize   = 10 << 20
-	attachmentSizeKey   = "attachments.max_file_size_bytes"
-	attachmentUploadKey = "attachments.upload_enabled"
-)
+const maxOverrideUsers = 100
 
 var keyPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,99}$`)
 
@@ -285,19 +279,38 @@ func validateKnownKey(input onlineconf.KeyInput) error {
 	if input.Scope != onlineconf.ScopeBackend {
 		return nil
 	}
+
 	switch input.Key {
-	case attachmentSizeKey:
-		if input.Kind != onlineconf.KindConfig || input.Config.ValueType != onlineconf.ValueNumber {
-			return fmt.Errorf("%w: attachment size must be a number config", models.ErrValidation)
+	case onlineconf.KeyAttachmentsMaxFileSize:
+		if input.Kind != onlineconf.KindConfig ||
+			input.Config == nil ||
+			input.Config.ValueType != onlineconf.ValueNumber {
+			return fmt.Errorf(
+				"%w: attachment size must be a number config",
+				models.ErrValidation,
+			)
 		}
+
 		var size int64
-		if json.Unmarshal(input.Config.Value, &size) != nil || size < minAttachmentSize || size > maxAttachmentSize {
-			return fmt.Errorf("%w: attachment size must be an integer between 1 and 10 MiB", models.ErrValidation)
+		if json.Unmarshal(input.Config.Value, &size) != nil ||
+			size < onlineconf.MinAttachmentSizeBytes ||
+			size > onlineconf.MaxAttachmentSizeBytes {
+			return fmt.Errorf(
+				"%w: attachment size must be an integer between %d and %d bytes",
+				models.ErrValidation,
+				onlineconf.MinAttachmentSizeBytes,
+				onlineconf.MaxAttachmentSizeBytes,
+			)
 		}
-	case attachmentUploadKey:
+
+	case onlineconf.KeyAttachmentsUploadEnabled:
 		if input.Kind != onlineconf.KindFlag {
-			return fmt.Errorf("%w: attachment upload setting must be a flag", models.ErrValidation)
+			return fmt.Errorf(
+				"%w: attachment upload setting must be a flag",
+				models.ErrValidation,
+			)
 		}
 	}
+
 	return nil
 }

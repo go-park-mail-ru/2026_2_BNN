@@ -15,10 +15,10 @@ import (
 
 type Handler struct {
 	gen.UnimplementedOnlineConfServer
-	uc onlineconf.CoreUsecase
+	uc onlineconf.Usecase
 }
 
-func NewHandler(uc onlineconf.CoreUsecase) *Handler {
+func NewHandler(uc onlineconf.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -159,4 +159,30 @@ func (h *Handler) DeleteKey(
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (h *Handler) ListHistory(
+	ctx context.Context,
+	in *gen.ListHistoryRequest,
+) (*gen.ListHistoryResponse, error) {
+	if in == nil {
+		return nil, grpcerr.ToStatus(models.ErrValidation)
+	}
+
+	keyID, err := grpcconv.ParseUUID(in.GetKeyId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	history, err := h.uc.ListHistory(ctx, keyID)
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	entries := make([]*gen.HistoryEntry, 0, len(history))
+	for _, entry := range history {
+		entries = append(entries, convert.HistoryToProto(entry))
+	}
+
+	return &gen.ListHistoryResponse{Entries: entries}, nil
 }

@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var _ onlineconf.CoreUsecase = (*Client)(nil)
+var _ onlineconf.Usecase = (*Client)(nil)
 
 type Client struct {
 	client gen.OnlineConfClient
@@ -142,4 +142,30 @@ func (c *Client) DeleteKey(
 	})
 
 	return grpcerr.FromStatus(err)
+}
+
+func (c *Client) ListHistory(
+	ctx context.Context,
+	keyID uuid.UUID,
+) ([]models.OnlineConfHistory, error) {
+	response, err := c.client.ListHistory(ctx, &gen.ListHistoryRequest{
+		KeyId: keyID.String(),
+	})
+	if err != nil {
+		return nil, grpcerr.FromStatus(err)
+	}
+
+	history := make(
+		[]models.OnlineConfHistory, 0, len(response.GetEntries()),
+	)
+
+	for _, entry := range response.GetEntries() {
+		item, err := convert.HistoryFromProto(entry)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, item)
+	}
+
+	return history, nil
 }

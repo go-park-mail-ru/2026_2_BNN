@@ -17,6 +17,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for OnlineConfHistoryEntryAction.
+const (
+	Create OnlineConfHistoryEntryAction = "create"
+	Delete OnlineConfHistoryEntryAction = "delete"
+	Update OnlineConfHistoryEntryAction = "update"
+)
+
+// Valid indicates whether the value is a known member of the OnlineConfHistoryEntryAction enum.
+func (e OnlineConfHistoryEntryAction) Valid() bool {
+	switch e {
+	case Create:
+		return true
+	case Delete:
+		return true
+	case Update:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OnlineConfKind.
 const (
 	Config OnlineConfKind = "config"
@@ -115,6 +136,19 @@ type OnlineConfFlagInput struct {
 	IncludeUserIDs []openapi_types.UUID `json:"include_user_ids,omitempty"`
 	RolloutPercent int32                `json:"rollout_percent"`
 }
+
+// OnlineConfHistoryEntry defines model for OnlineConfHistoryEntry.
+type OnlineConfHistoryEntry struct {
+	Action    OnlineConfHistoryEntryAction `json:"action"`
+	CreatedAt time.Time                    `json:"created_at"`
+	Id        openapi_types.UUID           `json:"id"`
+	NewValue  *OnlineConfKey               `json:"new_value"`
+	OldValue  *OnlineConfKey               `json:"old_value"`
+	User      OnlineConfUser               `json:"user"`
+}
+
+// OnlineConfHistoryEntryAction defines model for OnlineConfHistoryEntry.Action.
+type OnlineConfHistoryEntryAction string
 
 // OnlineConfKey defines model for OnlineConfKey.
 type OnlineConfKey struct {
@@ -235,6 +269,9 @@ type ServerInterface interface {
 	// UpdateOnlineConfKey Заменить настройки ключа
 	// (PUT /onlineconf/admin/keys/{id})
 	UpdateOnlineConfKey(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// ListOnlineConfHistory История изменений ключа
+	// (GET /onlineconf/admin/keys/{id}/history)
+	ListOnlineConfHistory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// ListOnlineConfScopes Области конфигурации
 	// (GET /onlineconf/admin/scopes)
 	ListOnlineConfScopes(w http.ResponseWriter, r *http.Request)
@@ -413,6 +450,32 @@ func (siw *ServerInterfaceWrapper) UpdateOnlineConfKey(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateOnlineConfKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnlineConfHistory operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfHistory(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -611,6 +674,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.GetOnlineConfKey).Methods(http.MethodGet)
 
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.UpdateOnlineConfKey).Methods(http.MethodPut)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/history", wrapper.ListOnlineConfHistory).Methods(http.MethodGet)
 
 	return r
 }
@@ -848,6 +913,53 @@ func (response UpdateOnlineConfKeydefaultJSONResponse) VisitUpdateOnlineConfKeyR
 	return err
 }
 
+type ListOnlineConfHistoryRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListOnlineConfHistoryResponseObject interface {
+	VisitListOnlineConfHistoryResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfHistory200JSONResponse []OnlineConfHistoryEntry
+
+func (response ListOnlineConfHistory200JSONResponse) VisitListOnlineConfHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfHistory401Response struct {
+}
+
+func (response ListOnlineConfHistory401Response) VisitListOnlineConfHistoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfHistorydefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfHistorydefaultJSONResponse) VisitListOnlineConfHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListOnlineConfScopesRequestObject struct {
 }
 
@@ -1012,6 +1124,9 @@ type StrictServerInterface interface {
 	// UpdateOnlineConfKey Заменить настройки ключа
 	// (PUT /onlineconf/admin/keys/{id})
 	UpdateOnlineConfKey(ctx context.Context, request UpdateOnlineConfKeyRequestObject) (UpdateOnlineConfKeyResponseObject, error)
+	// ListOnlineConfHistory История изменений ключа
+	// (GET /onlineconf/admin/keys/{id}/history)
+	ListOnlineConfHistory(ctx context.Context, request ListOnlineConfHistoryRequestObject) (ListOnlineConfHistoryResponseObject, error)
 	// ListOnlineConfScopes Области конфигурации
 	// (GET /onlineconf/admin/scopes)
 	ListOnlineConfScopes(ctx context.Context, request ListOnlineConfScopesRequestObject) (ListOnlineConfScopesResponseObject, error)
@@ -1198,6 +1313,32 @@ func (sh *strictHandler) UpdateOnlineConfKey(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateOnlineConfKeyResponseObject); ok {
 		if err := validResponse.VisitUpdateOnlineConfKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnlineConfHistory operation middleware
+func (sh *strictHandler) ListOnlineConfHistory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListOnlineConfHistoryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfHistory(ctx, request.(ListOnlineConfHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfHistoryResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

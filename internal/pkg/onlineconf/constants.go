@@ -26,6 +26,11 @@ const (
 )
 
 const (
+	MinAttachmentSizeBytes = 1 << 20
+	MaxAttachmentSizeBytes = 10 << 20
+)
+
+const (
 	CodeForbidden       = "FORBIDDEN"
 	CodeValidation      = "VALIDATION"
 	CodeFeatureDisabled = "FEATURE_DISABLED"

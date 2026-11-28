@@ -25,6 +25,7 @@ var (
 		"id", "scope", "key", "kind", "description", "is_public",
 		"value_type", "value", "enabled", "rollout_percent", "version",
 		"updated_by", "login", "updated_at", "included", "excluded",
+		"rollout_plan_id", "rollout_step", "step_ready_at",
 	}
 	historyColumns = []string{"id", "key_id", "action", "old_value", "new_value", "user_id", "login", "created_at"}
 )
@@ -81,6 +82,7 @@ func keyRow(key models.OnlineConfKey) []any {
 		key.ID.String(), key.Scope, key.Key, key.Kind, key.Description, key.IsPublic,
 		valueType, value, enabled, percent, key.Version,
 		key.UpdatedBy.ID.String(), key.UpdatedBy.Login, key.UpdatedAt, included, excluded,
+		key.RolloutPlanID, key.RolloutStep, key.StepReadyAt,
 	}
 }
 

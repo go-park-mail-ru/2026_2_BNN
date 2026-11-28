@@ -20,6 +20,13 @@ type knownError struct {
 const internalMessage = "internal error"
 
 var knownErrors = []knownError{
+	{models.ErrOnlineConfRolloutPlanNotFound, codes.NotFound},
+	{models.ErrOnlineConfRolloutPlanExists, codes.AlreadyExists},
+	{models.ErrOnlineConfRolloutPlanInUse, codes.FailedPrecondition},
+	{models.ErrOnlineConfRolloutStepNotAllowed, codes.InvalidArgument},
+	{models.ErrOnlineConfRolloutNotReady, codes.FailedPrecondition},
+	{models.ErrOnlineConfScheduleNotFound, codes.NotFound},
+	{models.ErrOnlineConfScheduleFinished, codes.FailedPrecondition},
 	{models.ErrValidation, codes.InvalidArgument},
 	{models.ErrUserExists, codes.AlreadyExists},
 	{models.ErrUserNotFound, codes.NotFound},

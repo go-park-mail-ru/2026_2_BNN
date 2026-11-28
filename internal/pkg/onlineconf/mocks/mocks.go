@@ -171,6 +171,21 @@ func (m *MockUsecase) EXPECT() *MockUsecaseMockRecorder {
 	return m.recorder
 }
 
+// AdvanceRollout mocks base method.
+func (m *MockUsecase) AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdvanceRollout", ctx, actor, keyID, version, rollback)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdvanceRollout indicates an expected call of AdvanceRollout.
+func (mr *MockUsecaseMockRecorder) AdvanceRollout(ctx, actor, keyID, version, rollback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceRollout", reflect.TypeOf((*MockUsecase)(nil).AdvanceRollout), ctx, actor, keyID, version, rollback)
+}
+
 // CreateKey mocks base method.
 func (m *MockUsecase) CreateKey(ctx context.Context, userID uuid.UUID, input onlineconf.KeyInput) (models.OnlineConfKey, error) {
 	m.ctrl.T.Helper()
@@ -184,6 +199,36 @@ func (m *MockUsecase) CreateKey(ctx context.Context, userID uuid.UUID, input onl
 func (mr *MockUsecaseMockRecorder) CreateKey(ctx, userID, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateKey", reflect.TypeOf((*MockUsecase)(nil).CreateKey), ctx, userID, input)
+}
+
+// CreateRolloutPlan mocks base method.
+func (m *MockUsecase) CreateRolloutPlan(ctx context.Context, input onlineconf.RolloutPlanInput) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRolloutPlan", ctx, input)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRolloutPlan indicates an expected call of CreateRolloutPlan.
+func (mr *MockUsecaseMockRecorder) CreateRolloutPlan(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRolloutPlan", reflect.TypeOf((*MockUsecase)(nil).CreateRolloutPlan), ctx, input)
+}
+
+// CreateSchedule mocks base method.
+func (m *MockUsecase) CreateSchedule(ctx context.Context, actor, keyID uuid.UUID, input onlineconf.ScheduleInput) (models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSchedule", ctx, actor, keyID, input)
+	ret0, _ := ret[0].(models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSchedule indicates an expected call of CreateSchedule.
+func (mr *MockUsecaseMockRecorder) CreateSchedule(ctx, actor, keyID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSchedule", reflect.TypeOf((*MockUsecase)(nil).CreateSchedule), ctx, actor, keyID, input)
 }
 
 // DeleteKey mocks base method.
@@ -200,6 +245,34 @@ func (mr *MockUsecaseMockRecorder) DeleteKey(ctx, userID, id, version any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKey", reflect.TypeOf((*MockUsecase)(nil).DeleteKey), ctx, userID, id, version)
 }
 
+// DeleteRolloutPlan mocks base method.
+func (m *MockUsecase) DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRolloutPlan indicates an expected call of DeleteRolloutPlan.
+func (mr *MockUsecaseMockRecorder) DeleteRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolloutPlan", reflect.TypeOf((*MockUsecase)(nil).DeleteRolloutPlan), ctx, id)
+}
+
+// DeleteSchedule mocks base method.
+func (m *MockUsecase) DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSchedule", ctx, keyID, scheduleID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSchedule indicates an expected call of DeleteSchedule.
+func (mr *MockUsecaseMockRecorder) DeleteSchedule(ctx, keyID, scheduleID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSchedule", reflect.TypeOf((*MockUsecase)(nil).DeleteSchedule), ctx, keyID, scheduleID)
+}
+
 // GetKey mocks base method.
 func (m *MockUsecase) GetKey(ctx context.Context, id uuid.UUID) (models.OnlineConfKey, error) {
 	m.ctrl.T.Helper()
@@ -213,6 +286,36 @@ func (m *MockUsecase) GetKey(ctx context.Context, id uuid.UUID) (models.OnlineCo
 func (mr *MockUsecaseMockRecorder) GetKey(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKey", reflect.TypeOf((*MockUsecase)(nil).GetKey), ctx, id)
+}
+
+// GetRollout mocks base method.
+func (m *MockUsecase) GetRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRollout", ctx, keyID)
+	ret0, _ := ret[0].(models.OnlineConfRollout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRollout indicates an expected call of GetRollout.
+func (mr *MockUsecaseMockRecorder) GetRollout(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRollout", reflect.TypeOf((*MockUsecase)(nil).GetRollout), ctx, keyID)
+}
+
+// GetRolloutPlan mocks base method.
+func (m *MockUsecase) GetRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRolloutPlan indicates an expected call of GetRolloutPlan.
+func (mr *MockUsecaseMockRecorder) GetRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRolloutPlan", reflect.TypeOf((*MockUsecase)(nil).GetRolloutPlan), ctx, id)
 }
 
 // GetSnapshot mocks base method.
@@ -261,6 +364,36 @@ func (mr *MockUsecaseMockRecorder) ListKeys(ctx, query, scope, kind any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListKeys", reflect.TypeOf((*MockUsecase)(nil).ListKeys), ctx, query, scope, kind)
 }
 
+// ListRolloutPlans mocks base method.
+func (m *MockUsecase) ListRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRolloutPlans", ctx)
+	ret0, _ := ret[0].([]models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRolloutPlans indicates an expected call of ListRolloutPlans.
+func (mr *MockUsecaseMockRecorder) ListRolloutPlans(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolloutPlans", reflect.TypeOf((*MockUsecase)(nil).ListRolloutPlans), ctx)
+}
+
+// ListSchedules mocks base method.
+func (m *MockUsecase) ListSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSchedules", ctx, keyID)
+	ret0, _ := ret[0].([]models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSchedules indicates an expected call of ListSchedules.
+func (mr *MockUsecaseMockRecorder) ListSchedules(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSchedules", reflect.TypeOf((*MockUsecase)(nil).ListSchedules), ctx, keyID)
+}
+
 // ListScopes mocks base method.
 func (m *MockUsecase) ListScopes() []string {
 	m.ctrl.T.Helper()
@@ -273,6 +406,21 @@ func (m *MockUsecase) ListScopes() []string {
 func (mr *MockUsecaseMockRecorder) ListScopes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListScopes", reflect.TypeOf((*MockUsecase)(nil).ListScopes))
+}
+
+// SetRolloutPlan mocks base method.
+func (m *MockUsecase) SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetRolloutPlan", ctx, actor, keyID, planID, version)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetRolloutPlan indicates an expected call of SetRolloutPlan.
+func (mr *MockUsecaseMockRecorder) SetRolloutPlan(ctx, actor, keyID, planID, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRolloutPlan", reflect.TypeOf((*MockUsecase)(nil).SetRolloutPlan), ctx, actor, keyID, planID, version)
 }
 
 // UpdateKey mocks base method.
@@ -288,6 +436,457 @@ func (m *MockUsecase) UpdateKey(ctx context.Context, userID, id uuid.UUID, versi
 func (mr *MockUsecaseMockRecorder) UpdateKey(ctx, userID, id, version, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockUsecase)(nil).UpdateKey), ctx, userID, id, version, input)
+}
+
+// UpdateRolloutPlan mocks base method.
+func (m *MockUsecase) UpdateRolloutPlan(ctx context.Context, id uuid.UUID, input onlineconf.RolloutPlanInput) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRolloutPlan", ctx, id, input)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRolloutPlan indicates an expected call of UpdateRolloutPlan.
+func (mr *MockUsecaseMockRecorder) UpdateRolloutPlan(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRolloutPlan", reflect.TypeOf((*MockUsecase)(nil).UpdateRolloutPlan), ctx, id, input)
+}
+
+// MockRolloutUsecase is a mock of RolloutUsecase interface.
+type MockRolloutUsecase struct {
+	ctrl     *gomock.Controller
+	recorder *MockRolloutUsecaseMockRecorder
+	isgomock struct{}
+}
+
+// MockRolloutUsecaseMockRecorder is the mock recorder for MockRolloutUsecase.
+type MockRolloutUsecaseMockRecorder struct {
+	mock *MockRolloutUsecase
+}
+
+// NewMockRolloutUsecase creates a new mock instance.
+func NewMockRolloutUsecase(ctrl *gomock.Controller) *MockRolloutUsecase {
+	mock := &MockRolloutUsecase{ctrl: ctrl}
+	mock.recorder = &MockRolloutUsecaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRolloutUsecase) EXPECT() *MockRolloutUsecaseMockRecorder {
+	return m.recorder
+}
+
+// AdvanceRollout mocks base method.
+func (m *MockRolloutUsecase) AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdvanceRollout", ctx, actor, keyID, version, rollback)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdvanceRollout indicates an expected call of AdvanceRollout.
+func (mr *MockRolloutUsecaseMockRecorder) AdvanceRollout(ctx, actor, keyID, version, rollback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceRollout", reflect.TypeOf((*MockRolloutUsecase)(nil).AdvanceRollout), ctx, actor, keyID, version, rollback)
+}
+
+// CreateSchedule mocks base method.
+func (m *MockRolloutUsecase) CreateSchedule(ctx context.Context, actor, keyID uuid.UUID, input onlineconf.ScheduleInput) (models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSchedule", ctx, actor, keyID, input)
+	ret0, _ := ret[0].(models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSchedule indicates an expected call of CreateSchedule.
+func (mr *MockRolloutUsecaseMockRecorder) CreateSchedule(ctx, actor, keyID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSchedule", reflect.TypeOf((*MockRolloutUsecase)(nil).CreateSchedule), ctx, actor, keyID, input)
+}
+
+// DeleteSchedule mocks base method.
+func (m *MockRolloutUsecase) DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSchedule", ctx, keyID, scheduleID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSchedule indicates an expected call of DeleteSchedule.
+func (mr *MockRolloutUsecaseMockRecorder) DeleteSchedule(ctx, keyID, scheduleID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSchedule", reflect.TypeOf((*MockRolloutUsecase)(nil).DeleteSchedule), ctx, keyID, scheduleID)
+}
+
+// GetRollout mocks base method.
+func (m *MockRolloutUsecase) GetRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRollout", ctx, keyID)
+	ret0, _ := ret[0].(models.OnlineConfRollout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRollout indicates an expected call of GetRollout.
+func (mr *MockRolloutUsecaseMockRecorder) GetRollout(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRollout", reflect.TypeOf((*MockRolloutUsecase)(nil).GetRollout), ctx, keyID)
+}
+
+// ListSchedules mocks base method.
+func (m *MockRolloutUsecase) ListSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSchedules", ctx, keyID)
+	ret0, _ := ret[0].([]models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSchedules indicates an expected call of ListSchedules.
+func (mr *MockRolloutUsecaseMockRecorder) ListSchedules(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSchedules", reflect.TypeOf((*MockRolloutUsecase)(nil).ListSchedules), ctx, keyID)
+}
+
+// SetRolloutPlan mocks base method.
+func (m *MockRolloutUsecase) SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetRolloutPlan", ctx, actor, keyID, planID, version)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetRolloutPlan indicates an expected call of SetRolloutPlan.
+func (mr *MockRolloutUsecaseMockRecorder) SetRolloutPlan(ctx, actor, keyID, planID, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRolloutPlan", reflect.TypeOf((*MockRolloutUsecase)(nil).SetRolloutPlan), ctx, actor, keyID, planID, version)
+}
+
+// MockRolloutRepo is a mock of RolloutRepo interface.
+type MockRolloutRepo struct {
+	ctrl     *gomock.Controller
+	recorder *MockRolloutRepoMockRecorder
+	isgomock struct{}
+}
+
+// MockRolloutRepoMockRecorder is the mock recorder for MockRolloutRepo.
+type MockRolloutRepoMockRecorder struct {
+	mock *MockRolloutRepo
+}
+
+// NewMockRolloutRepo creates a new mock instance.
+func NewMockRolloutRepo(ctrl *gomock.Controller) *MockRolloutRepo {
+	mock := &MockRolloutRepo{ctrl: ctrl}
+	mock.recorder = &MockRolloutRepoMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRolloutRepo) EXPECT() *MockRolloutRepoMockRecorder {
+	return m.recorder
+}
+
+// AdvanceRollout mocks base method.
+func (m *MockRolloutRepo) AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdvanceRollout", ctx, actor, keyID, version, rollback)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdvanceRollout indicates an expected call of AdvanceRollout.
+func (mr *MockRolloutRepoMockRecorder) AdvanceRollout(ctx, actor, keyID, version, rollback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceRollout", reflect.TypeOf((*MockRolloutRepo)(nil).AdvanceRollout), ctx, actor, keyID, version, rollback)
+}
+
+// CreateSchedule mocks base method.
+func (m *MockRolloutRepo) CreateSchedule(ctx context.Context, schedule models.OnlineConfSchedule) (models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSchedule", ctx, schedule)
+	ret0, _ := ret[0].(models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSchedule indicates an expected call of CreateSchedule.
+func (mr *MockRolloutRepoMockRecorder) CreateSchedule(ctx, schedule any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSchedule", reflect.TypeOf((*MockRolloutRepo)(nil).CreateSchedule), ctx, schedule)
+}
+
+// DeleteSchedule mocks base method.
+func (m *MockRolloutRepo) DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSchedule", ctx, keyID, scheduleID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSchedule indicates an expected call of DeleteSchedule.
+func (mr *MockRolloutRepoMockRecorder) DeleteSchedule(ctx, keyID, scheduleID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSchedule", reflect.TypeOf((*MockRolloutRepo)(nil).DeleteSchedule), ctx, keyID, scheduleID)
+}
+
+// ProcessRollouts mocks base method.
+func (m *MockRolloutRepo) ProcessRollouts(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessRollouts", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessRollouts indicates an expected call of ProcessRollouts.
+func (mr *MockRolloutRepoMockRecorder) ProcessRollouts(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessRollouts", reflect.TypeOf((*MockRolloutRepo)(nil).ProcessRollouts), ctx)
+}
+
+// ReadRollout mocks base method.
+func (m *MockRolloutRepo) ReadRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRollout", ctx, keyID)
+	ret0, _ := ret[0].(models.OnlineConfRollout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRollout indicates an expected call of ReadRollout.
+func (mr *MockRolloutRepoMockRecorder) ReadRollout(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRollout", reflect.TypeOf((*MockRolloutRepo)(nil).ReadRollout), ctx, keyID)
+}
+
+// ReadSchedules mocks base method.
+func (m *MockRolloutRepo) ReadSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadSchedules", ctx, keyID)
+	ret0, _ := ret[0].([]models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadSchedules indicates an expected call of ReadSchedules.
+func (mr *MockRolloutRepoMockRecorder) ReadSchedules(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadSchedules", reflect.TypeOf((*MockRolloutRepo)(nil).ReadSchedules), ctx, keyID)
+}
+
+// SetRolloutPlan mocks base method.
+func (m *MockRolloutRepo) SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetRolloutPlan", ctx, actor, keyID, planID, version)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetRolloutPlan indicates an expected call of SetRolloutPlan.
+func (mr *MockRolloutRepoMockRecorder) SetRolloutPlan(ctx, actor, keyID, planID, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRolloutPlan", reflect.TypeOf((*MockRolloutRepo)(nil).SetRolloutPlan), ctx, actor, keyID, planID, version)
+}
+
+// MockRolloutPlanUsecase is a mock of RolloutPlanUsecase interface.
+type MockRolloutPlanUsecase struct {
+	ctrl     *gomock.Controller
+	recorder *MockRolloutPlanUsecaseMockRecorder
+	isgomock struct{}
+}
+
+// MockRolloutPlanUsecaseMockRecorder is the mock recorder for MockRolloutPlanUsecase.
+type MockRolloutPlanUsecaseMockRecorder struct {
+	mock *MockRolloutPlanUsecase
+}
+
+// NewMockRolloutPlanUsecase creates a new mock instance.
+func NewMockRolloutPlanUsecase(ctrl *gomock.Controller) *MockRolloutPlanUsecase {
+	mock := &MockRolloutPlanUsecase{ctrl: ctrl}
+	mock.recorder = &MockRolloutPlanUsecaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRolloutPlanUsecase) EXPECT() *MockRolloutPlanUsecaseMockRecorder {
+	return m.recorder
+}
+
+// CreateRolloutPlan mocks base method.
+func (m *MockRolloutPlanUsecase) CreateRolloutPlan(ctx context.Context, input onlineconf.RolloutPlanInput) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRolloutPlan", ctx, input)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRolloutPlan indicates an expected call of CreateRolloutPlan.
+func (mr *MockRolloutPlanUsecaseMockRecorder) CreateRolloutPlan(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRolloutPlan", reflect.TypeOf((*MockRolloutPlanUsecase)(nil).CreateRolloutPlan), ctx, input)
+}
+
+// DeleteRolloutPlan mocks base method.
+func (m *MockRolloutPlanUsecase) DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRolloutPlan indicates an expected call of DeleteRolloutPlan.
+func (mr *MockRolloutPlanUsecaseMockRecorder) DeleteRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolloutPlan", reflect.TypeOf((*MockRolloutPlanUsecase)(nil).DeleteRolloutPlan), ctx, id)
+}
+
+// GetRolloutPlan mocks base method.
+func (m *MockRolloutPlanUsecase) GetRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRolloutPlan indicates an expected call of GetRolloutPlan.
+func (mr *MockRolloutPlanUsecaseMockRecorder) GetRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRolloutPlan", reflect.TypeOf((*MockRolloutPlanUsecase)(nil).GetRolloutPlan), ctx, id)
+}
+
+// ListRolloutPlans mocks base method.
+func (m *MockRolloutPlanUsecase) ListRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRolloutPlans", ctx)
+	ret0, _ := ret[0].([]models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRolloutPlans indicates an expected call of ListRolloutPlans.
+func (mr *MockRolloutPlanUsecaseMockRecorder) ListRolloutPlans(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolloutPlans", reflect.TypeOf((*MockRolloutPlanUsecase)(nil).ListRolloutPlans), ctx)
+}
+
+// UpdateRolloutPlan mocks base method.
+func (m *MockRolloutPlanUsecase) UpdateRolloutPlan(ctx context.Context, id uuid.UUID, input onlineconf.RolloutPlanInput) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRolloutPlan", ctx, id, input)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRolloutPlan indicates an expected call of UpdateRolloutPlan.
+func (mr *MockRolloutPlanUsecaseMockRecorder) UpdateRolloutPlan(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRolloutPlan", reflect.TypeOf((*MockRolloutPlanUsecase)(nil).UpdateRolloutPlan), ctx, id, input)
+}
+
+// MockRolloutPlanRepo is a mock of RolloutPlanRepo interface.
+type MockRolloutPlanRepo struct {
+	ctrl     *gomock.Controller
+	recorder *MockRolloutPlanRepoMockRecorder
+	isgomock struct{}
+}
+
+// MockRolloutPlanRepoMockRecorder is the mock recorder for MockRolloutPlanRepo.
+type MockRolloutPlanRepoMockRecorder struct {
+	mock *MockRolloutPlanRepo
+}
+
+// NewMockRolloutPlanRepo creates a new mock instance.
+func NewMockRolloutPlanRepo(ctrl *gomock.Controller) *MockRolloutPlanRepo {
+	mock := &MockRolloutPlanRepo{ctrl: ctrl}
+	mock.recorder = &MockRolloutPlanRepoMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRolloutPlanRepo) EXPECT() *MockRolloutPlanRepoMockRecorder {
+	return m.recorder
+}
+
+// CreateRolloutPlan mocks base method.
+func (m *MockRolloutPlanRepo) CreateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRolloutPlan", ctx, plan)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRolloutPlan indicates an expected call of CreateRolloutPlan.
+func (mr *MockRolloutPlanRepoMockRecorder) CreateRolloutPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRolloutPlan", reflect.TypeOf((*MockRolloutPlanRepo)(nil).CreateRolloutPlan), ctx, plan)
+}
+
+// DeleteRolloutPlan mocks base method.
+func (m *MockRolloutPlanRepo) DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRolloutPlan indicates an expected call of DeleteRolloutPlan.
+func (mr *MockRolloutPlanRepoMockRecorder) DeleteRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolloutPlan", reflect.TypeOf((*MockRolloutPlanRepo)(nil).DeleteRolloutPlan), ctx, id)
+}
+
+// ReadRolloutPlan mocks base method.
+func (m *MockRolloutPlanRepo) ReadRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRolloutPlan indicates an expected call of ReadRolloutPlan.
+func (mr *MockRolloutPlanRepoMockRecorder) ReadRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRolloutPlan", reflect.TypeOf((*MockRolloutPlanRepo)(nil).ReadRolloutPlan), ctx, id)
+}
+
+// ReadRolloutPlans mocks base method.
+func (m *MockRolloutPlanRepo) ReadRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRolloutPlans", ctx)
+	ret0, _ := ret[0].([]models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRolloutPlans indicates an expected call of ReadRolloutPlans.
+func (mr *MockRolloutPlanRepoMockRecorder) ReadRolloutPlans(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRolloutPlans", reflect.TypeOf((*MockRolloutPlanRepo)(nil).ReadRolloutPlans), ctx)
+}
+
+// UpdateRolloutPlan mocks base method.
+func (m *MockRolloutPlanRepo) UpdateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRolloutPlan", ctx, plan)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRolloutPlan indicates an expected call of UpdateRolloutPlan.
+func (mr *MockRolloutPlanRepoMockRecorder) UpdateRolloutPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRolloutPlan", reflect.TypeOf((*MockRolloutPlanRepo)(nil).UpdateRolloutPlan), ctx, plan)
 }
 
 // MockRepo is a mock of Repo interface.
@@ -314,6 +913,21 @@ func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
+// AdvanceRollout mocks base method.
+func (m *MockRepo) AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdvanceRollout", ctx, actor, keyID, version, rollback)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdvanceRollout indicates an expected call of AdvanceRollout.
+func (mr *MockRepoMockRecorder) AdvanceRollout(ctx, actor, keyID, version, rollback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceRollout", reflect.TypeOf((*MockRepo)(nil).AdvanceRollout), ctx, actor, keyID, version, rollback)
+}
+
 // CreateKey mocks base method.
 func (m *MockRepo) CreateKey(ctx context.Context, key models.OnlineConfKey) (models.OnlineConfKey, error) {
 	m.ctrl.T.Helper()
@@ -329,6 +943,36 @@ func (mr *MockRepoMockRecorder) CreateKey(ctx, key any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateKey", reflect.TypeOf((*MockRepo)(nil).CreateKey), ctx, key)
 }
 
+// CreateRolloutPlan mocks base method.
+func (m *MockRepo) CreateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRolloutPlan", ctx, plan)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRolloutPlan indicates an expected call of CreateRolloutPlan.
+func (mr *MockRepoMockRecorder) CreateRolloutPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRolloutPlan", reflect.TypeOf((*MockRepo)(nil).CreateRolloutPlan), ctx, plan)
+}
+
+// CreateSchedule mocks base method.
+func (m *MockRepo) CreateSchedule(ctx context.Context, schedule models.OnlineConfSchedule) (models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSchedule", ctx, schedule)
+	ret0, _ := ret[0].(models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSchedule indicates an expected call of CreateSchedule.
+func (mr *MockRepoMockRecorder) CreateSchedule(ctx, schedule any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSchedule", reflect.TypeOf((*MockRepo)(nil).CreateSchedule), ctx, schedule)
+}
+
 // DeleteKey mocks base method.
 func (m *MockRepo) DeleteKey(ctx context.Context, id uuid.UUID, version int32, userID uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -341,6 +985,48 @@ func (m *MockRepo) DeleteKey(ctx context.Context, id uuid.UUID, version int32, u
 func (mr *MockRepoMockRecorder) DeleteKey(ctx, id, version, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKey", reflect.TypeOf((*MockRepo)(nil).DeleteKey), ctx, id, version, userID)
+}
+
+// DeleteRolloutPlan mocks base method.
+func (m *MockRepo) DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRolloutPlan indicates an expected call of DeleteRolloutPlan.
+func (mr *MockRepoMockRecorder) DeleteRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolloutPlan", reflect.TypeOf((*MockRepo)(nil).DeleteRolloutPlan), ctx, id)
+}
+
+// DeleteSchedule mocks base method.
+func (m *MockRepo) DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSchedule", ctx, keyID, scheduleID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSchedule indicates an expected call of DeleteSchedule.
+func (mr *MockRepoMockRecorder) DeleteSchedule(ctx, keyID, scheduleID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSchedule", reflect.TypeOf((*MockRepo)(nil).DeleteSchedule), ctx, keyID, scheduleID)
+}
+
+// ProcessRollouts mocks base method.
+func (m *MockRepo) ProcessRollouts(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessRollouts", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessRollouts indicates an expected call of ProcessRollouts.
+func (mr *MockRepoMockRecorder) ProcessRollouts(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessRollouts", reflect.TypeOf((*MockRepo)(nil).ProcessRollouts), ctx)
 }
 
 // ReadHistory mocks base method.
@@ -388,6 +1074,66 @@ func (mr *MockRepoMockRecorder) ReadKeys(ctx, query, scope, kind any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadKeys", reflect.TypeOf((*MockRepo)(nil).ReadKeys), ctx, query, scope, kind)
 }
 
+// ReadRollout mocks base method.
+func (m *MockRepo) ReadRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRollout", ctx, keyID)
+	ret0, _ := ret[0].(models.OnlineConfRollout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRollout indicates an expected call of ReadRollout.
+func (mr *MockRepoMockRecorder) ReadRollout(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRollout", reflect.TypeOf((*MockRepo)(nil).ReadRollout), ctx, keyID)
+}
+
+// ReadRolloutPlan mocks base method.
+func (m *MockRepo) ReadRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRolloutPlan", ctx, id)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRolloutPlan indicates an expected call of ReadRolloutPlan.
+func (mr *MockRepoMockRecorder) ReadRolloutPlan(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRolloutPlan", reflect.TypeOf((*MockRepo)(nil).ReadRolloutPlan), ctx, id)
+}
+
+// ReadRolloutPlans mocks base method.
+func (m *MockRepo) ReadRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadRolloutPlans", ctx)
+	ret0, _ := ret[0].([]models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRolloutPlans indicates an expected call of ReadRolloutPlans.
+func (mr *MockRepoMockRecorder) ReadRolloutPlans(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRolloutPlans", reflect.TypeOf((*MockRepo)(nil).ReadRolloutPlans), ctx)
+}
+
+// ReadSchedules mocks base method.
+func (m *MockRepo) ReadSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadSchedules", ctx, keyID)
+	ret0, _ := ret[0].([]models.OnlineConfSchedule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadSchedules indicates an expected call of ReadSchedules.
+func (mr *MockRepoMockRecorder) ReadSchedules(ctx, keyID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadSchedules", reflect.TypeOf((*MockRepo)(nil).ReadSchedules), ctx, keyID)
+}
+
 // ReadSnapshot mocks base method.
 func (m *MockRepo) ReadSnapshot(ctx context.Context) (models.Snapshot, error) {
 	m.ctrl.T.Helper()
@@ -403,6 +1149,21 @@ func (mr *MockRepoMockRecorder) ReadSnapshot(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadSnapshot", reflect.TypeOf((*MockRepo)(nil).ReadSnapshot), ctx)
 }
 
+// SetRolloutPlan mocks base method.
+func (m *MockRepo) SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetRolloutPlan", ctx, actor, keyID, planID, version)
+	ret0, _ := ret[0].(models.OnlineConfKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetRolloutPlan indicates an expected call of SetRolloutPlan.
+func (mr *MockRepoMockRecorder) SetRolloutPlan(ctx, actor, keyID, planID, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRolloutPlan", reflect.TypeOf((*MockRepo)(nil).SetRolloutPlan), ctx, actor, keyID, planID, version)
+}
+
 // UpdateKey mocks base method.
 func (m *MockRepo) UpdateKey(ctx context.Context, key models.OnlineConfKey) (models.OnlineConfKey, error) {
 	m.ctrl.T.Helper()
@@ -416,6 +1177,21 @@ func (m *MockRepo) UpdateKey(ctx context.Context, key models.OnlineConfKey) (mod
 func (mr *MockRepoMockRecorder) UpdateKey(ctx, key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockRepo)(nil).UpdateKey), ctx, key)
+}
+
+// UpdateRolloutPlan mocks base method.
+func (m *MockRepo) UpdateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRolloutPlan", ctx, plan)
+	ret0, _ := ret[0].(models.OnlineConfRolloutPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRolloutPlan indicates an expected call of UpdateRolloutPlan.
+func (mr *MockRepoMockRecorder) UpdateRolloutPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRolloutPlan", reflect.TypeOf((*MockRepo)(nil).UpdateRolloutPlan), ctx, plan)
 }
 
 // MockAuthClient is a mock of AuthClient interface.

@@ -10,7 +10,8 @@ SELECT k.id, k.scope, k.key, k.kind, k.description, k.is_public,
            SELECT jsonb_agg(jsonb_build_object('id', o.user_id, 'login', o.login) ORDER BY o.user_id)
            FROM onlineconf_overrides o
            WHERE o.key_id = k.id AND NOT o.enabled
-       ), '[]'::jsonb)
+       ), '[]'::jsonb),
+       k.rollout_plan_id, k.rollout_step, k.step_ready_at
 FROM onlineconf_keys k
 LEFT JOIN users u ON u.id = k.updated_by
 WHERE k.id = $1;

@@ -79,7 +79,13 @@ func toAPIKey(key models.OnlineConfKey, withOverrides bool) api.OnlineConfKey {
 		UpdatedBy: toAPIUser(models.User{
 			ID: key.UpdatedBy.ID, Login: key.UpdatedBy.Login,
 		}),
-		UpdatedAt: key.UpdatedAt,
+		UpdatedAt:   key.UpdatedAt,
+		RolloutStep: key.RolloutStep,
+		StepReadyAt: key.StepReadyAt,
+	}
+	if key.RolloutPlanID != nil {
+		id := openapi_types.UUID(*key.RolloutPlanID)
+		result.RolloutPlanId = &id
 	}
 
 	if key.Config != nil {

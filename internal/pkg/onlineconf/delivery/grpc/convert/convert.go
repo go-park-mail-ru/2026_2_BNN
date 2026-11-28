@@ -26,7 +26,10 @@ func KeyToProto(key models.OnlineConfKey) *gen.Key {
 			Id:    key.UpdatedBy.ID.String(),
 			Login: key.UpdatedBy.Login,
 		},
-		UpdatedAt: grpcconv.TimeToProto(key.UpdatedAt),
+		UpdatedAt:     grpcconv.TimeToProto(key.UpdatedAt),
+		RolloutPlanId: grpcconv.OptionalUUIDToString(key.RolloutPlanID),
+		RolloutStep:   key.RolloutStep,
+		StepReadyAt:   timePointerToProto(key.StepReadyAt),
 	}
 
 	if key.Config != nil {
@@ -82,6 +85,15 @@ func KeyFromProto(key *gen.Key) (models.OnlineConfKey, error) {
 		Version:     key.GetVersion(),
 		UpdatedBy:   updatedBy,
 		UpdatedAt:   grpcconv.TimeFromProto(key.GetUpdatedAt()),
+		RolloutStep: key.RolloutStep,
+	}
+	result.RolloutPlanID, err = grpcconv.ParseOptionalUUID(key.RolloutPlanId)
+	if err != nil {
+		return models.OnlineConfKey{}, err
+	}
+	result.StepReadyAt, err = timePointerFromProto(key.StepReadyAt)
+	if err != nil {
+		return models.OnlineConfKey{}, err
 	}
 
 	switch result.Kind {

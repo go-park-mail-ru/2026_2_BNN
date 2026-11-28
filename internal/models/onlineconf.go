@@ -25,17 +25,20 @@ type OnlineConfFlag struct {
 }
 
 type OnlineConfKey struct {
-	ID          uuid.UUID         `json:"id"`
-	Scope       string            `json:"scope"`
-	Key         string            `json:"key"`
-	Kind        string            `json:"kind"`
-	Description string            `json:"description"`
-	IsPublic    bool              `json:"is_public"`
-	Config      *OnlineConfConfig `json:"config,omitempty"`
-	Flag        *OnlineConfFlag   `json:"flag,omitempty"`
-	Version     int32             `json:"version"`
-	UpdatedBy   OnlineConfUser    `json:"updated_by"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID            uuid.UUID         `json:"id"`
+	Scope         string            `json:"scope"`
+	Key           string            `json:"key"`
+	Kind          string            `json:"kind"`
+	Description   string            `json:"description"`
+	IsPublic      bool              `json:"is_public"`
+	Config        *OnlineConfConfig `json:"config,omitempty"`
+	Flag          *OnlineConfFlag   `json:"flag,omitempty"`
+	Version       int32             `json:"version"`
+	UpdatedBy     OnlineConfUser    `json:"updated_by"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	RolloutPlanID *uuid.UUID        `json:"rollout_plan_id,omitempty"`
+	RolloutStep   *int32            `json:"rollout_step,omitempty"`
+	StepReadyAt   *time.Time        `json:"step_ready_at,omitempty"`
 }
 
 type OnlineConfOverride struct {

@@ -254,7 +254,8 @@ func validateConfig(config models.OnlineConfConfig) error {
 }
 
 func validateFlag(flag onlineconf.FlagInput) error {
-	if flag.RolloutPercent < 0 || flag.RolloutPercent > 100 {
+	if flag.RolloutPercent < onlineconf.RolloutPercentMin ||
+		flag.RolloutPercent > onlineconf.RolloutPercentMax {
 		return fmt.Errorf("%w: rollout percent must be between 0 and 100", models.ErrValidation)
 	}
 	if len(flag.IncludeUserIDs) > maxOverrideUsers || len(flag.ExcludeUserIDs) > maxOverrideUsers {

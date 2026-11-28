@@ -1,6 +1,21 @@
 package onlineconf
 
 const (
+	CodeRolloutPlanExists     = "ROLLOUT_PLAN_EXISTS"
+	CodeRolloutPlanInUse      = "ROLLOUT_PLAN_IN_USE"
+	CodeRolloutNotReady       = "ROLLOUT_NOT_READY"
+	CodeScheduleFinished      = "SCHEDULE_FINISHED"
+	CodeRolloutStepNotAllowed = "ROLLOUT_STEP_NOT_ALLOWED"
+)
+
+const (
+	RolloutWaiting         = "waiting"
+	RolloutPendingApproval = "pending_approval"
+	RolloutDone            = "done"
+	RolloutUnassigned      = "unassigned"
+)
+
+const (
 	ScopeFrontend = "frontend"
 	ScopeBackend  = "backend"
 	ScopeAuth     = "auth"
@@ -35,4 +50,12 @@ const (
 	CodeValidation      = "VALIDATION"
 	CodeFeatureDisabled = "FEATURE_DISABLED"
 	CodeFileTooLarge    = "FILE_TOO_LARGE"
+)
+
+const (
+	RolloutPercentMin = 0
+	RolloutPercentMax = 100
+
+	RolloutPlanMinSteps      = 2
+	RolloutPlanNameMaxLength = 100
 )

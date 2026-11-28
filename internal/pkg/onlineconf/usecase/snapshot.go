@@ -98,6 +98,9 @@ func cloneSnapshot(snapshot models.Snapshot) models.Snapshot {
 	}
 	for i, key := range snapshot.Keys {
 		cloned.Keys[i] = key
+		cloned.Keys[i].RolloutPlanID = clonePointer(key.RolloutPlanID)
+		cloned.Keys[i].RolloutStep = clonePointer(key.RolloutStep)
+		cloned.Keys[i].StepReadyAt = clonePointer(key.StepReadyAt)
 		if key.Config != nil {
 			config := *key.Config
 			config.Value = bytes.Clone(config.Value)
@@ -111,4 +114,12 @@ func cloneSnapshot(snapshot models.Snapshot) models.Snapshot {
 		}
 	}
 	return cloned
+}
+
+func clonePointer[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }

@@ -22,10 +22,49 @@ type CoreUsecase interface {
 
 type Usecase interface {
 	CoreUsecase
+	RolloutPlanUsecase
+	RolloutUsecase
 	ListHistory(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfHistory, error)
 }
 
+type RolloutUsecase interface {
+	SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error)
+	GetRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error)
+	AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error)
+	ListSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error)
+	CreateSchedule(ctx context.Context, actor, keyID uuid.UUID, input ScheduleInput) (models.OnlineConfSchedule, error)
+	DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error
+}
+
+type RolloutRepo interface {
+	SetRolloutPlan(ctx context.Context, actor, keyID uuid.UUID, planID *uuid.UUID, version int32) (models.OnlineConfKey, error)
+	ReadRollout(ctx context.Context, keyID uuid.UUID) (models.OnlineConfRollout, error)
+	AdvanceRollout(ctx context.Context, actor, keyID uuid.UUID, version int32, rollback bool) (models.OnlineConfKey, error)
+	ReadSchedules(ctx context.Context, keyID uuid.UUID) ([]models.OnlineConfSchedule, error)
+	CreateSchedule(ctx context.Context, schedule models.OnlineConfSchedule) (models.OnlineConfSchedule, error)
+	DeleteSchedule(ctx context.Context, keyID, scheduleID uuid.UUID) error
+	ProcessRollouts(ctx context.Context) error
+}
+
+type RolloutPlanUsecase interface {
+	ListRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error)
+	GetRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error)
+	CreateRolloutPlan(ctx context.Context, input RolloutPlanInput) (models.OnlineConfRolloutPlan, error)
+	UpdateRolloutPlan(ctx context.Context, id uuid.UUID, input RolloutPlanInput) (models.OnlineConfRolloutPlan, error)
+	DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error
+}
+
+type RolloutPlanRepo interface {
+	ReadRolloutPlans(ctx context.Context) ([]models.OnlineConfRolloutPlan, error)
+	ReadRolloutPlan(ctx context.Context, id uuid.UUID) (models.OnlineConfRolloutPlan, error)
+	CreateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error)
+	UpdateRolloutPlan(ctx context.Context, plan models.OnlineConfRolloutPlan) (models.OnlineConfRolloutPlan, error)
+	DeleteRolloutPlan(ctx context.Context, id uuid.UUID) error
+}
+
 type Repo interface {
+	RolloutPlanRepo
+	RolloutRepo
 	ReadKeys(ctx context.Context, query, scope, kind string) ([]models.OnlineConfKey, error)
 	ReadKey(ctx context.Context, id uuid.UUID) (models.OnlineConfKey, error)
 	CreateKey(ctx context.Context, key models.OnlineConfKey) (models.OnlineConfKey, error)

@@ -23,6 +23,17 @@ service OnlineConf {
   rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
 
   rpc Evaluate(EvaluateRequest) returns (EvaluateResponse);
+  rpc ListRolloutPlans(google.protobuf.Empty) returns (RolloutPlansResponse);
+  rpc GetRolloutPlan(RolloutPlanRequest) returns (RolloutPlan);
+  rpc CreateRolloutPlan(RolloutPlanInput) returns (RolloutPlan);
+  rpc UpdateRolloutPlan(RolloutPlanRequest) returns (RolloutPlan);
+  rpc DeleteRolloutPlan(RolloutPlanRequest) returns (google.protobuf.Empty);
+  rpc SetRolloutPlan(SetRolloutPlanRequest) returns (Key);
+  rpc GetRollout(RolloutKeyRequest) returns (RolloutState);
+  rpc AdvanceRollout(RolloutChangeRequest) returns (Key);
+  rpc ListSchedules(RolloutKeyRequest) returns (SchedulesResponse);
+  rpc CreateSchedule(CreateScheduleRequest) returns (Schedule);
+  rpc DeleteSchedule(DeleteScheduleRequest) returns (google.protobuf.Empty);
 }
 
 message UserRef {
@@ -56,6 +67,9 @@ message Key {
     Config config = 10;
     Flag flag = 11;
   }
+  optional string rollout_plan_id = 12;
+  optional int32 rollout_step = 13;
+  google.protobuf.Timestamp step_ready_at = 14;
 }
 
 message FlagInput {
@@ -153,3 +167,50 @@ message EvaluateResponse {
   string reason = 2;
   int64 revision = 3;
 }
+message RolloutPlan {
+ string id = 1;
+ string name = 2;
+ repeated int32 steps = 3;
+ int32 interval_min = 4;
+}
+message RolloutPlanInput {
+ string name = 1;
+ repeated int32 steps = 2;
+ int32 interval_min = 3;
+}
+message RolloutPlansResponse { repeated RolloutPlan plans = 1; }
+message RolloutPlanRequest { string id = 1; RolloutPlanInput input = 2; }
+message RolloutKeyRequest { string key_id = 1; }
+message SetRolloutPlanRequest {
+ string user_id = 1; string key_id = 2;
+ optional string plan_id = 3; int32 version = 4;
+}
+message RolloutChangeRequest {
+ string user_id = 1; string key_id = 2; int32 version = 3; bool rollback = 4;
+}
+message RolloutState {
+ string key_id = 1;
+ RolloutPlan plan = 2;
+ optional int32 step = 3;
+ int32 current_percent = 4;
+ optional int32 next_percent = 5;
+ google.protobuf.Timestamp step_ready_at = 6;
+ string status = 7;
+ int32 version = 8;
+}
+message ScheduleInput {
+ google.protobuf.Timestamp run_at = 1;
+ optional bool enabled = 2;
+ optional int32 rollout_percent = 3;
+}
+message Schedule {
+ string id = 1; string key_id = 2;
+ google.protobuf.Timestamp run_at = 3;
+ optional bool enabled = 4;
+ optional int32 rollout_percent = 5;
+ bool done = 6; bool failed = 7; optional string error = 8;
+ string created_by = 9; google.protobuf.Timestamp created_at = 10;
+}
+message SchedulesResponse { repeated Schedule schedules = 1; }
+message CreateScheduleRequest { string user_id = 1; string key_id = 2; ScheduleInput input = 3; }
+message DeleteScheduleRequest { string key_id = 1; string schedule_id = 2; }

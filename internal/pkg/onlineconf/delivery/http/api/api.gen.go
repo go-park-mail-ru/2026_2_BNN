@@ -152,17 +152,20 @@ type OnlineConfHistoryEntryAction string
 
 // OnlineConfKey defines model for OnlineConfKey.
 type OnlineConfKey struct {
-	Config      *OnlineConfConfig  `json:"config,omitempty"`
-	Description string             `json:"description"`
-	Flag        *OnlineConfFlag    `json:"flag,omitempty"`
-	Id          openapi_types.UUID `json:"id"`
-	IsPublic    bool               `json:"is_public"`
-	Key         string             `json:"key"`
-	Kind        OnlineConfKind     `json:"kind"`
-	Scope       OnlineConfScope    `json:"scope"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	UpdatedBy   OnlineConfUser     `json:"updated_by"`
-	Version     int32              `json:"version"`
+	Config        *OnlineConfConfig   `json:"config,omitempty"`
+	Description   string              `json:"description"`
+	Flag          *OnlineConfFlag     `json:"flag,omitempty"`
+	Id            openapi_types.UUID  `json:"id"`
+	IsPublic      bool                `json:"is_public"`
+	Key           string              `json:"key"`
+	Kind          OnlineConfKind      `json:"kind"`
+	RolloutPlanId *openapi_types.UUID `json:"rollout_plan_id,omitempty"`
+	RolloutStep   *int32              `json:"rollout_step,omitempty"`
+	Scope         OnlineConfScope     `json:"scope"`
+	StepReadyAt   *time.Time          `json:"step_ready_at,omitempty"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	UpdatedBy     OnlineConfUser      `json:"updated_by"`
+	Version       int32               `json:"version"`
 }
 
 // OnlineConfKeyInput Для kind=config заполняется только config.
@@ -181,12 +184,74 @@ type OnlineConfKeyInput struct {
 // OnlineConfKind defines model for OnlineConfKind.
 type OnlineConfKind string
 
+// OnlineConfRollout defines model for OnlineConfRollout.
+type OnlineConfRollout struct {
+	CurrentPercent int32                  `json:"current_percent"`
+	KeyId          openapi_types.UUID     `json:"key_id"`
+	NextPercent    *int32                 `json:"next_percent"`
+	Plan           *OnlineConfRolloutPlan `json:"plan"`
+
+	// Status unassigned, waiting, pending_approval или done. Индекс step начинается с нуля.
+	Status      string     `json:"status"`
+	Step        *int32     `json:"step"`
+	StepReadyAt *time.Time `json:"step_ready_at"`
+	Version     int32      `json:"version"`
+}
+
+// OnlineConfRolloutPlan defines model for OnlineConfRolloutPlan.
+type OnlineConfRolloutPlan struct {
+	Id          openapi_types.UUID `json:"id"`
+	IntervalMin int32              `json:"interval_min"`
+	Name        string             `json:"name"`
+	Steps       []int32            `json:"steps"`
+}
+
+// OnlineConfRolloutPlanInput defines model for OnlineConfRolloutPlanInput.
+type OnlineConfRolloutPlanInput struct {
+	IntervalMin int32   `json:"interval_min"`
+	Name        string  `json:"name"`
+	Steps       []int32 `json:"steps"`
+}
+
+// OnlineConfRolloutVersionInput defines model for OnlineConfRolloutVersionInput.
+type OnlineConfRolloutVersionInput struct {
+	Version int32 `json:"version"`
+}
+
+// OnlineConfSchedule defines model for OnlineConfSchedule.
+type OnlineConfSchedule struct {
+	CreatedAt      time.Time          `json:"created_at"`
+	CreatedBy      openapi_types.UUID `json:"created_by"`
+	Done           bool               `json:"done"`
+	Enabled        *bool              `json:"enabled,omitempty"`
+	Error          *string            `json:"error"`
+	Failed         bool               `json:"failed"`
+	Id             openapi_types.UUID `json:"id"`
+	KeyId          openapi_types.UUID `json:"key_id"`
+	RolloutPercent *int32             `json:"rollout_percent,omitempty"`
+	RunAt          time.Time          `json:"run_at"`
+}
+
+// OnlineConfScheduleInput Нужен хотя бы один из параметров enabled и rollout_percent. Процент привязанного флага меняется через approve.
+type OnlineConfScheduleInput struct {
+	Enabled        *bool     `json:"enabled,omitempty"`
+	RolloutPercent *int32    `json:"rollout_percent,omitempty"`
+	RunAt          time.Time `json:"run_at"`
+}
+
 // OnlineConfScope defines model for OnlineConfScope.
 type OnlineConfScope string
 
 // OnlineConfSession defines model for OnlineConfSession.
 type OnlineConfSession struct {
 	Login string `json:"login"`
+}
+
+// OnlineConfSetRolloutPlanInput defines model for OnlineConfSetRolloutPlanInput.
+type OnlineConfSetRolloutPlanInput struct {
+	// PlanId null отвязывает регламент. Поле обязательно.
+	PlanId  json.RawMessage `json:"plan_id"`
+	Version int32           `json:"version"`
 }
 
 // OnlineConfUpdateKeyInput defines model for OnlineConfUpdateKeyInput.
@@ -252,6 +317,24 @@ type CreateOnlineConfKeyJSONRequestBody = OnlineConfKeyInput
 // UpdateOnlineConfKeyJSONRequestBody defines body for UpdateOnlineConfKey for application/json ContentType.
 type UpdateOnlineConfKeyJSONRequestBody = OnlineConfUpdateKeyInput
 
+// SetOnlineConfRolloutPlanJSONRequestBody defines body for SetOnlineConfRolloutPlan for application/json ContentType.
+type SetOnlineConfRolloutPlanJSONRequestBody = OnlineConfSetRolloutPlanInput
+
+// ApproveOnlineConfRolloutJSONRequestBody defines body for ApproveOnlineConfRollout for application/json ContentType.
+type ApproveOnlineConfRolloutJSONRequestBody = OnlineConfRolloutVersionInput
+
+// RollbackOnlineConfRolloutJSONRequestBody defines body for RollbackOnlineConfRollout for application/json ContentType.
+type RollbackOnlineConfRolloutJSONRequestBody = OnlineConfRolloutVersionInput
+
+// CreateOnlineConfScheduleJSONRequestBody defines body for CreateOnlineConfSchedule for application/json ContentType.
+type CreateOnlineConfScheduleJSONRequestBody = OnlineConfScheduleInput
+
+// CreateOnlineConfRolloutPlanJSONRequestBody defines body for CreateOnlineConfRolloutPlan for application/json ContentType.
+type CreateOnlineConfRolloutPlanJSONRequestBody = OnlineConfRolloutPlanInput
+
+// UpdateOnlineConfRolloutPlanJSONRequestBody defines body for UpdateOnlineConfRolloutPlan for application/json ContentType.
+type UpdateOnlineConfRolloutPlanJSONRequestBody = OnlineConfRolloutPlanInput
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListOnlineConfKeys Каталог ключей
@@ -272,6 +355,42 @@ type ServerInterface interface {
 	// ListOnlineConfHistory История изменений ключа
 	// (GET /onlineconf/admin/keys/{id}/history)
 	ListOnlineConfHistory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /onlineconf/admin/keys/{id}/rollout)
+	GetOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /onlineconf/admin/keys/{id}/rollout-plan)
+	SetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /onlineconf/admin/keys/{id}/rollout/approve)
+	ApproveOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /onlineconf/admin/keys/{id}/rollout/rollback)
+	RollbackOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /onlineconf/admin/keys/{id}/schedules)
+	ListOnlineConfSchedules(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /onlineconf/admin/keys/{id}/schedules)
+	CreateOnlineConfSchedule(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /onlineconf/admin/keys/{id}/schedules/{schedule_id})
+	DeleteOnlineConfSchedule(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, scheduleId openapi_types.UUID)
+
+	// (GET /onlineconf/admin/rollout-plans)
+	ListOnlineConfRolloutPlans(w http.ResponseWriter, r *http.Request)
+
+	// (POST /onlineconf/admin/rollout-plans)
+	CreateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /onlineconf/admin/rollout-plans/{id})
+	DeleteOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /onlineconf/admin/rollout-plans/{id})
+	GetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /onlineconf/admin/rollout-plans/{id})
+	UpdateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// ListOnlineConfScopes Области конфигурации
 	// (GET /onlineconf/admin/scopes)
 	ListOnlineConfScopes(w http.ResponseWriter, r *http.Request)
@@ -485,6 +604,303 @@ func (siw *ServerInterfaceWrapper) ListOnlineConfHistory(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetOnlineConfRollout operation middleware
+func (siw *ServerInterfaceWrapper) GetOnlineConfRollout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOnlineConfRollout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetOnlineConfRolloutPlan operation middleware
+func (siw *ServerInterfaceWrapper) SetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetOnlineConfRolloutPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveOnlineConfRollout operation middleware
+func (siw *ServerInterfaceWrapper) ApproveOnlineConfRollout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveOnlineConfRollout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RollbackOnlineConfRollout operation middleware
+func (siw *ServerInterfaceWrapper) RollbackOnlineConfRollout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RollbackOnlineConfRollout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnlineConfSchedules operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfSchedules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfSchedules(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOnlineConfSchedule operation middleware
+func (siw *ServerInterfaceWrapper) CreateOnlineConfSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOnlineConfSchedule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteOnlineConfSchedule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOnlineConfSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "schedule_id" -------------
+	var scheduleId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "schedule_id", mux.Vars(r)["schedule_id"], &scheduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schedule_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOnlineConfSchedule(w, r, id, scheduleId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnlineConfRolloutPlans operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfRolloutPlans(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfRolloutPlans(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOnlineConfRolloutPlan operation middleware
+func (siw *ServerInterfaceWrapper) CreateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOnlineConfRolloutPlan(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteOnlineConfRolloutPlan operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOnlineConfRolloutPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOnlineConfRolloutPlan operation middleware
+func (siw *ServerInterfaceWrapper) GetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOnlineConfRolloutPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateOnlineConfRolloutPlan operation middleware
+func (siw *ServerInterfaceWrapper) UpdateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", mux.Vars(r)["id"], &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateOnlineConfRolloutPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListOnlineConfScopes operation middleware
 func (siw *ServerInterfaceWrapper) ListOnlineConfScopes(w http.ResponseWriter, r *http.Request) {
 
@@ -676,6 +1092,30 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}", wrapper.UpdateOnlineConfKey).Methods(http.MethodPut)
 
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/history", wrapper.ListOnlineConfHistory).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/rollout-plans", wrapper.ListOnlineConfRolloutPlans).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/rollout-plans", wrapper.CreateOnlineConfRolloutPlan).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/rollout-plans/{id}", wrapper.DeleteOnlineConfRolloutPlan).Methods(http.MethodDelete)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/rollout-plans/{id}", wrapper.GetOnlineConfRolloutPlan).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/rollout-plans/{id}", wrapper.UpdateOnlineConfRolloutPlan).Methods(http.MethodPut)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/rollout-plan", wrapper.SetOnlineConfRolloutPlan).Methods(http.MethodPut)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/rollout", wrapper.GetOnlineConfRollout).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/rollout/approve", wrapper.ApproveOnlineConfRollout).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/rollout/rollback", wrapper.RollbackOnlineConfRollout).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/schedules", wrapper.ListOnlineConfSchedules).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/schedules", wrapper.CreateOnlineConfSchedule).Methods(http.MethodPost)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/schedules/{schedule_id}", wrapper.DeleteOnlineConfSchedule).Methods(http.MethodDelete)
 
 	return r
 }
@@ -960,6 +1400,563 @@ func (response ListOnlineConfHistorydefaultJSONResponse) VisitListOnlineConfHist
 	return err
 }
 
+type GetOnlineConfRolloutRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetOnlineConfRolloutResponseObject interface {
+	VisitGetOnlineConfRolloutResponse(w http.ResponseWriter) error
+}
+
+type GetOnlineConfRollout200JSONResponse OnlineConfRollout
+
+func (response GetOnlineConfRollout200JSONResponse) VisitGetOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnlineConfRollout401Response struct {
+}
+
+func (response GetOnlineConfRollout401Response) VisitGetOnlineConfRolloutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type GetOnlineConfRolloutdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response GetOnlineConfRolloutdefaultJSONResponse) VisitGetOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetOnlineConfRolloutPlanRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *SetOnlineConfRolloutPlanJSONRequestBody
+}
+
+type SetOnlineConfRolloutPlanResponseObject interface {
+	VisitSetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error
+}
+
+type SetOnlineConfRolloutPlan200JSONResponse OnlineConfKey
+
+func (response SetOnlineConfRolloutPlan200JSONResponse) VisitSetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetOnlineConfRolloutPlan401Response struct {
+}
+
+func (response SetOnlineConfRolloutPlan401Response) VisitSetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type SetOnlineConfRolloutPlandefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response SetOnlineConfRolloutPlandefaultJSONResponse) VisitSetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveOnlineConfRolloutRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *ApproveOnlineConfRolloutJSONRequestBody
+}
+
+type ApproveOnlineConfRolloutResponseObject interface {
+	VisitApproveOnlineConfRolloutResponse(w http.ResponseWriter) error
+}
+
+type ApproveOnlineConfRollout200JSONResponse OnlineConfKey
+
+func (response ApproveOnlineConfRollout200JSONResponse) VisitApproveOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveOnlineConfRollout401Response struct {
+}
+
+func (response ApproveOnlineConfRollout401Response) VisitApproveOnlineConfRolloutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ApproveOnlineConfRolloutdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ApproveOnlineConfRolloutdefaultJSONResponse) VisitApproveOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RollbackOnlineConfRolloutRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *RollbackOnlineConfRolloutJSONRequestBody
+}
+
+type RollbackOnlineConfRolloutResponseObject interface {
+	VisitRollbackOnlineConfRolloutResponse(w http.ResponseWriter) error
+}
+
+type RollbackOnlineConfRollout200JSONResponse OnlineConfKey
+
+func (response RollbackOnlineConfRollout200JSONResponse) VisitRollbackOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RollbackOnlineConfRollout401Response struct {
+}
+
+func (response RollbackOnlineConfRollout401Response) VisitRollbackOnlineConfRolloutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type RollbackOnlineConfRolloutdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response RollbackOnlineConfRolloutdefaultJSONResponse) VisitRollbackOnlineConfRolloutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfSchedulesRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListOnlineConfSchedulesResponseObject interface {
+	VisitListOnlineConfSchedulesResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfSchedules200JSONResponse []OnlineConfSchedule
+
+func (response ListOnlineConfSchedules200JSONResponse) VisitListOnlineConfSchedulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfSchedules401Response struct {
+}
+
+func (response ListOnlineConfSchedules401Response) VisitListOnlineConfSchedulesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfSchedulesdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfSchedulesdefaultJSONResponse) VisitListOnlineConfSchedulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfScheduleRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CreateOnlineConfScheduleJSONRequestBody
+}
+
+type CreateOnlineConfScheduleResponseObject interface {
+	VisitCreateOnlineConfScheduleResponse(w http.ResponseWriter) error
+}
+
+type CreateOnlineConfSchedule201JSONResponse OnlineConfSchedule
+
+func (response CreateOnlineConfSchedule201JSONResponse) VisitCreateOnlineConfScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfSchedule401Response struct {
+}
+
+func (response CreateOnlineConfSchedule401Response) VisitCreateOnlineConfScheduleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type CreateOnlineConfScheduledefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response CreateOnlineConfScheduledefaultJSONResponse) VisitCreateOnlineConfScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOnlineConfScheduleRequestObject struct {
+	Id         openapi_types.UUID `json:"id"`
+	ScheduleId openapi_types.UUID `json:"schedule_id"`
+}
+
+type DeleteOnlineConfScheduleResponseObject interface {
+	VisitDeleteOnlineConfScheduleResponse(w http.ResponseWriter) error
+}
+
+type DeleteOnlineConfSchedule204Response struct {
+}
+
+func (response DeleteOnlineConfSchedule204Response) VisitDeleteOnlineConfScheduleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteOnlineConfSchedule401Response struct {
+}
+
+func (response DeleteOnlineConfSchedule401Response) VisitDeleteOnlineConfScheduleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type DeleteOnlineConfScheduledefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response DeleteOnlineConfScheduledefaultJSONResponse) VisitDeleteOnlineConfScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfRolloutPlansRequestObject struct {
+}
+
+type ListOnlineConfRolloutPlansResponseObject interface {
+	VisitListOnlineConfRolloutPlansResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfRolloutPlans200JSONResponse []OnlineConfRolloutPlan
+
+func (response ListOnlineConfRolloutPlans200JSONResponse) VisitListOnlineConfRolloutPlansResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfRolloutPlans401Response struct {
+}
+
+func (response ListOnlineConfRolloutPlans401Response) VisitListOnlineConfRolloutPlansResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfRolloutPlansdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfRolloutPlansdefaultJSONResponse) VisitListOnlineConfRolloutPlansResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfRolloutPlanRequestObject struct {
+	Body *CreateOnlineConfRolloutPlanJSONRequestBody
+}
+
+type CreateOnlineConfRolloutPlanResponseObject interface {
+	VisitCreateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error
+}
+
+type CreateOnlineConfRolloutPlan201JSONResponse OnlineConfRolloutPlan
+
+func (response CreateOnlineConfRolloutPlan201JSONResponse) VisitCreateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOnlineConfRolloutPlan401Response struct {
+}
+
+func (response CreateOnlineConfRolloutPlan401Response) VisitCreateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type CreateOnlineConfRolloutPlandefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response CreateOnlineConfRolloutPlandefaultJSONResponse) VisitCreateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOnlineConfRolloutPlanRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteOnlineConfRolloutPlanResponseObject interface {
+	VisitDeleteOnlineConfRolloutPlanResponse(w http.ResponseWriter) error
+}
+
+type DeleteOnlineConfRolloutPlan204Response struct {
+}
+
+func (response DeleteOnlineConfRolloutPlan204Response) VisitDeleteOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteOnlineConfRolloutPlan401Response struct {
+}
+
+func (response DeleteOnlineConfRolloutPlan401Response) VisitDeleteOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type DeleteOnlineConfRolloutPlandefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response DeleteOnlineConfRolloutPlandefaultJSONResponse) VisitDeleteOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnlineConfRolloutPlanRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetOnlineConfRolloutPlanResponseObject interface {
+	VisitGetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error
+}
+
+type GetOnlineConfRolloutPlan200JSONResponse OnlineConfRolloutPlan
+
+func (response GetOnlineConfRolloutPlan200JSONResponse) VisitGetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnlineConfRolloutPlan401Response struct {
+}
+
+func (response GetOnlineConfRolloutPlan401Response) VisitGetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type GetOnlineConfRolloutPlandefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response GetOnlineConfRolloutPlandefaultJSONResponse) VisitGetOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateOnlineConfRolloutPlanRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateOnlineConfRolloutPlanJSONRequestBody
+}
+
+type UpdateOnlineConfRolloutPlanResponseObject interface {
+	VisitUpdateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error
+}
+
+type UpdateOnlineConfRolloutPlan200JSONResponse OnlineConfRolloutPlan
+
+func (response UpdateOnlineConfRolloutPlan200JSONResponse) VisitUpdateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateOnlineConfRolloutPlan401Response struct {
+}
+
+func (response UpdateOnlineConfRolloutPlan401Response) VisitUpdateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type UpdateOnlineConfRolloutPlandefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response UpdateOnlineConfRolloutPlandefaultJSONResponse) VisitUpdateOnlineConfRolloutPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListOnlineConfScopesRequestObject struct {
 }
 
@@ -1127,6 +2124,42 @@ type StrictServerInterface interface {
 	// ListOnlineConfHistory История изменений ключа
 	// (GET /onlineconf/admin/keys/{id}/history)
 	ListOnlineConfHistory(ctx context.Context, request ListOnlineConfHistoryRequestObject) (ListOnlineConfHistoryResponseObject, error)
+
+	// (GET /onlineconf/admin/keys/{id}/rollout)
+	GetOnlineConfRollout(ctx context.Context, request GetOnlineConfRolloutRequestObject) (GetOnlineConfRolloutResponseObject, error)
+
+	// (PUT /onlineconf/admin/keys/{id}/rollout-plan)
+	SetOnlineConfRolloutPlan(ctx context.Context, request SetOnlineConfRolloutPlanRequestObject) (SetOnlineConfRolloutPlanResponseObject, error)
+
+	// (POST /onlineconf/admin/keys/{id}/rollout/approve)
+	ApproveOnlineConfRollout(ctx context.Context, request ApproveOnlineConfRolloutRequestObject) (ApproveOnlineConfRolloutResponseObject, error)
+
+	// (POST /onlineconf/admin/keys/{id}/rollout/rollback)
+	RollbackOnlineConfRollout(ctx context.Context, request RollbackOnlineConfRolloutRequestObject) (RollbackOnlineConfRolloutResponseObject, error)
+
+	// (GET /onlineconf/admin/keys/{id}/schedules)
+	ListOnlineConfSchedules(ctx context.Context, request ListOnlineConfSchedulesRequestObject) (ListOnlineConfSchedulesResponseObject, error)
+
+	// (POST /onlineconf/admin/keys/{id}/schedules)
+	CreateOnlineConfSchedule(ctx context.Context, request CreateOnlineConfScheduleRequestObject) (CreateOnlineConfScheduleResponseObject, error)
+
+	// (DELETE /onlineconf/admin/keys/{id}/schedules/{schedule_id})
+	DeleteOnlineConfSchedule(ctx context.Context, request DeleteOnlineConfScheduleRequestObject) (DeleteOnlineConfScheduleResponseObject, error)
+
+	// (GET /onlineconf/admin/rollout-plans)
+	ListOnlineConfRolloutPlans(ctx context.Context, request ListOnlineConfRolloutPlansRequestObject) (ListOnlineConfRolloutPlansResponseObject, error)
+
+	// (POST /onlineconf/admin/rollout-plans)
+	CreateOnlineConfRolloutPlan(ctx context.Context, request CreateOnlineConfRolloutPlanRequestObject) (CreateOnlineConfRolloutPlanResponseObject, error)
+
+	// (DELETE /onlineconf/admin/rollout-plans/{id})
+	DeleteOnlineConfRolloutPlan(ctx context.Context, request DeleteOnlineConfRolloutPlanRequestObject) (DeleteOnlineConfRolloutPlanResponseObject, error)
+
+	// (GET /onlineconf/admin/rollout-plans/{id})
+	GetOnlineConfRolloutPlan(ctx context.Context, request GetOnlineConfRolloutPlanRequestObject) (GetOnlineConfRolloutPlanResponseObject, error)
+
+	// (PUT /onlineconf/admin/rollout-plans/{id})
+	UpdateOnlineConfRolloutPlan(ctx context.Context, request UpdateOnlineConfRolloutPlanRequestObject) (UpdateOnlineConfRolloutPlanResponseObject, error)
 	// ListOnlineConfScopes Области конфигурации
 	// (GET /onlineconf/admin/scopes)
 	ListOnlineConfScopes(ctx context.Context, request ListOnlineConfScopesRequestObject) (ListOnlineConfScopesResponseObject, error)
@@ -1339,6 +2372,357 @@ func (sh *strictHandler) ListOnlineConfHistory(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListOnlineConfHistoryResponseObject); ok {
 		if err := validResponse.VisitListOnlineConfHistoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOnlineConfRollout operation middleware
+func (sh *strictHandler) GetOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetOnlineConfRolloutRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOnlineConfRollout(ctx, request.(GetOnlineConfRolloutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOnlineConfRollout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOnlineConfRolloutResponseObject); ok {
+		if err := validResponse.VisitGetOnlineConfRolloutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetOnlineConfRolloutPlan operation middleware
+func (sh *strictHandler) SetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request SetOnlineConfRolloutPlanRequestObject
+
+	request.Id = id
+
+	var body SetOnlineConfRolloutPlanJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetOnlineConfRolloutPlan(ctx, request.(SetOnlineConfRolloutPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetOnlineConfRolloutPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetOnlineConfRolloutPlanResponseObject); ok {
+		if err := validResponse.VisitSetOnlineConfRolloutPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveOnlineConfRollout operation middleware
+func (sh *strictHandler) ApproveOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ApproveOnlineConfRolloutRequestObject
+
+	request.Id = id
+
+	var body ApproveOnlineConfRolloutJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveOnlineConfRollout(ctx, request.(ApproveOnlineConfRolloutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveOnlineConfRollout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveOnlineConfRolloutResponseObject); ok {
+		if err := validResponse.VisitApproveOnlineConfRolloutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RollbackOnlineConfRollout operation middleware
+func (sh *strictHandler) RollbackOnlineConfRollout(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RollbackOnlineConfRolloutRequestObject
+
+	request.Id = id
+
+	var body RollbackOnlineConfRolloutJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RollbackOnlineConfRollout(ctx, request.(RollbackOnlineConfRolloutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RollbackOnlineConfRollout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RollbackOnlineConfRolloutResponseObject); ok {
+		if err := validResponse.VisitRollbackOnlineConfRolloutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnlineConfSchedules operation middleware
+func (sh *strictHandler) ListOnlineConfSchedules(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListOnlineConfSchedulesRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfSchedules(ctx, request.(ListOnlineConfSchedulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfSchedules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfSchedulesResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfSchedulesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateOnlineConfSchedule operation middleware
+func (sh *strictHandler) CreateOnlineConfSchedule(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateOnlineConfScheduleRequestObject
+
+	request.Id = id
+
+	var body CreateOnlineConfScheduleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateOnlineConfSchedule(ctx, request.(CreateOnlineConfScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateOnlineConfSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateOnlineConfScheduleResponseObject); ok {
+		if err := validResponse.VisitCreateOnlineConfScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteOnlineConfSchedule operation middleware
+func (sh *strictHandler) DeleteOnlineConfSchedule(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, scheduleId openapi_types.UUID) {
+	var request DeleteOnlineConfScheduleRequestObject
+
+	request.Id = id
+	request.ScheduleId = scheduleId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteOnlineConfSchedule(ctx, request.(DeleteOnlineConfScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteOnlineConfSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteOnlineConfScheduleResponseObject); ok {
+		if err := validResponse.VisitDeleteOnlineConfScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnlineConfRolloutPlans operation middleware
+func (sh *strictHandler) ListOnlineConfRolloutPlans(w http.ResponseWriter, r *http.Request) {
+	var request ListOnlineConfRolloutPlansRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfRolloutPlans(ctx, request.(ListOnlineConfRolloutPlansRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfRolloutPlans")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfRolloutPlansResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfRolloutPlansResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateOnlineConfRolloutPlan operation middleware
+func (sh *strictHandler) CreateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request) {
+	var request CreateOnlineConfRolloutPlanRequestObject
+
+	var body CreateOnlineConfRolloutPlanJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateOnlineConfRolloutPlan(ctx, request.(CreateOnlineConfRolloutPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateOnlineConfRolloutPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateOnlineConfRolloutPlanResponseObject); ok {
+		if err := validResponse.VisitCreateOnlineConfRolloutPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteOnlineConfRolloutPlan operation middleware
+func (sh *strictHandler) DeleteOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteOnlineConfRolloutPlanRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteOnlineConfRolloutPlan(ctx, request.(DeleteOnlineConfRolloutPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteOnlineConfRolloutPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteOnlineConfRolloutPlanResponseObject); ok {
+		if err := validResponse.VisitDeleteOnlineConfRolloutPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOnlineConfRolloutPlan operation middleware
+func (sh *strictHandler) GetOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetOnlineConfRolloutPlanRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOnlineConfRolloutPlan(ctx, request.(GetOnlineConfRolloutPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOnlineConfRolloutPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOnlineConfRolloutPlanResponseObject); ok {
+		if err := validResponse.VisitGetOnlineConfRolloutPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateOnlineConfRolloutPlan operation middleware
+func (sh *strictHandler) UpdateOnlineConfRolloutPlan(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateOnlineConfRolloutPlanRequestObject
+
+	request.Id = id
+
+	var body UpdateOnlineConfRolloutPlanJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateOnlineConfRolloutPlan(ctx, request.(UpdateOnlineConfRolloutPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateOnlineConfRolloutPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateOnlineConfRolloutPlanResponseObject); ok {
+		if err := validResponse.VisitUpdateOnlineConfRolloutPlanResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

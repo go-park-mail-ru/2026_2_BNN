@@ -36,6 +36,20 @@ func NoStore(next http.Handler) http.Handler {
 
 func keyHTTPError(ctx context.Context, err error) (int, api.OnlineConfError) {
 	switch {
+	case errors.Is(err, models.ErrOnlineConfRolloutPlanNotFound):
+		return http.StatusNotFound, api.OnlineConfError{Code: codeNotFound, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfScheduleNotFound):
+		return http.StatusNotFound, api.OnlineConfError{Code: codeNotFound, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfRolloutPlanExists):
+		return http.StatusConflict, api.OnlineConfError{Code: onlineconf.CodeRolloutPlanExists, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfRolloutPlanInUse):
+		return http.StatusConflict, api.OnlineConfError{Code: onlineconf.CodeRolloutPlanInUse, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfRolloutNotReady):
+		return http.StatusConflict, api.OnlineConfError{Code: onlineconf.CodeRolloutNotReady, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfScheduleFinished):
+		return http.StatusConflict, api.OnlineConfError{Code: onlineconf.CodeScheduleFinished, Message: err.Error()}
+	case errors.Is(err, models.ErrOnlineConfRolloutStepNotAllowed):
+		return http.StatusBadRequest, api.OnlineConfError{Code: onlineconf.CodeRolloutStepNotAllowed, Message: err.Error()}
 	case errors.Is(err, models.ErrValidation):
 		return http.StatusBadRequest, api.OnlineConfError{
 			Code: onlineconf.CodeValidation, Message: err.Error(),

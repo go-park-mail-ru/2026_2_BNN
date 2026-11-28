@@ -81,6 +81,11 @@ func run() error {
 
 	refreshCtx, cancelRefresh := context.WithCancel(ctx)
 	refreshDone := make(chan struct{})
+	rolloutDone := make(chan struct{})
+	go func() {
+		defer close(rolloutDone)
+		uc.RunRollouts(refreshCtx)
+	}()
 
 	go func() {
 		defer close(refreshDone)
@@ -90,6 +95,7 @@ func run() error {
 	defer func() {
 		cancelRefresh()
 		<-refreshDone
+		<-rolloutDone
 	}()
 
 	server := grpcutil.NewServer()

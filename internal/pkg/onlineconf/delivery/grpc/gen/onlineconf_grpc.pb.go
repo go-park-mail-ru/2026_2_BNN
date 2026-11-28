@@ -20,14 +20,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OnlineConf_GetSnapshot_FullMethodName = "/onlineconf.OnlineConf/GetSnapshot"
-	OnlineConf_ListKeys_FullMethodName    = "/onlineconf.OnlineConf/ListKeys"
-	OnlineConf_GetKey_FullMethodName      = "/onlineconf.OnlineConf/GetKey"
-	OnlineConf_CreateKey_FullMethodName   = "/onlineconf.OnlineConf/CreateKey"
-	OnlineConf_UpdateKey_FullMethodName   = "/onlineconf.OnlineConf/UpdateKey"
-	OnlineConf_DeleteKey_FullMethodName   = "/onlineconf.OnlineConf/DeleteKey"
-	OnlineConf_ListHistory_FullMethodName = "/onlineconf.OnlineConf/ListHistory"
-	OnlineConf_Evaluate_FullMethodName    = "/onlineconf.OnlineConf/Evaluate"
+	OnlineConf_GetSnapshot_FullMethodName       = "/onlineconf.OnlineConf/GetSnapshot"
+	OnlineConf_ListKeys_FullMethodName          = "/onlineconf.OnlineConf/ListKeys"
+	OnlineConf_GetKey_FullMethodName            = "/onlineconf.OnlineConf/GetKey"
+	OnlineConf_CreateKey_FullMethodName         = "/onlineconf.OnlineConf/CreateKey"
+	OnlineConf_UpdateKey_FullMethodName         = "/onlineconf.OnlineConf/UpdateKey"
+	OnlineConf_DeleteKey_FullMethodName         = "/onlineconf.OnlineConf/DeleteKey"
+	OnlineConf_ListHistory_FullMethodName       = "/onlineconf.OnlineConf/ListHistory"
+	OnlineConf_Evaluate_FullMethodName          = "/onlineconf.OnlineConf/Evaluate"
+	OnlineConf_ListRolloutPlans_FullMethodName  = "/onlineconf.OnlineConf/ListRolloutPlans"
+	OnlineConf_GetRolloutPlan_FullMethodName    = "/onlineconf.OnlineConf/GetRolloutPlan"
+	OnlineConf_CreateRolloutPlan_FullMethodName = "/onlineconf.OnlineConf/CreateRolloutPlan"
+	OnlineConf_UpdateRolloutPlan_FullMethodName = "/onlineconf.OnlineConf/UpdateRolloutPlan"
+	OnlineConf_DeleteRolloutPlan_FullMethodName = "/onlineconf.OnlineConf/DeleteRolloutPlan"
+	OnlineConf_SetRolloutPlan_FullMethodName    = "/onlineconf.OnlineConf/SetRolloutPlan"
+	OnlineConf_GetRollout_FullMethodName        = "/onlineconf.OnlineConf/GetRollout"
+	OnlineConf_AdvanceRollout_FullMethodName    = "/onlineconf.OnlineConf/AdvanceRollout"
+	OnlineConf_ListSchedules_FullMethodName     = "/onlineconf.OnlineConf/ListSchedules"
+	OnlineConf_CreateSchedule_FullMethodName    = "/onlineconf.OnlineConf/CreateSchedule"
+	OnlineConf_DeleteSchedule_FullMethodName    = "/onlineconf.OnlineConf/DeleteSchedule"
 )
 
 // OnlineConfClient is the client API for OnlineConf service.
@@ -42,6 +53,17 @@ type OnlineConfClient interface {
 	DeleteKey(ctx context.Context, in *DeleteKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListHistory(ctx context.Context, in *ListHistoryRequest, opts ...grpc.CallOption) (*ListHistoryResponse, error)
 	Evaluate(ctx context.Context, in *EvaluateRequest, opts ...grpc.CallOption) (*EvaluateResponse, error)
+	ListRolloutPlans(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RolloutPlansResponse, error)
+	GetRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*RolloutPlan, error)
+	CreateRolloutPlan(ctx context.Context, in *RolloutPlanInput, opts ...grpc.CallOption) (*RolloutPlan, error)
+	UpdateRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*RolloutPlan, error)
+	DeleteRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetRolloutPlan(ctx context.Context, in *SetRolloutPlanRequest, opts ...grpc.CallOption) (*Key, error)
+	GetRollout(ctx context.Context, in *RolloutKeyRequest, opts ...grpc.CallOption) (*RolloutState, error)
+	AdvanceRollout(ctx context.Context, in *RolloutChangeRequest, opts ...grpc.CallOption) (*Key, error)
+	ListSchedules(ctx context.Context, in *RolloutKeyRequest, opts ...grpc.CallOption) (*SchedulesResponse, error)
+	CreateSchedule(ctx context.Context, in *CreateScheduleRequest, opts ...grpc.CallOption) (*Schedule, error)
+	DeleteSchedule(ctx context.Context, in *DeleteScheduleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type onlineConfClient struct {
@@ -132,6 +154,116 @@ func (c *onlineConfClient) Evaluate(ctx context.Context, in *EvaluateRequest, op
 	return out, nil
 }
 
+func (c *onlineConfClient) ListRolloutPlans(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RolloutPlansResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RolloutPlansResponse)
+	err := c.cc.Invoke(ctx, OnlineConf_ListRolloutPlans_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) GetRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*RolloutPlan, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RolloutPlan)
+	err := c.cc.Invoke(ctx, OnlineConf_GetRolloutPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) CreateRolloutPlan(ctx context.Context, in *RolloutPlanInput, opts ...grpc.CallOption) (*RolloutPlan, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RolloutPlan)
+	err := c.cc.Invoke(ctx, OnlineConf_CreateRolloutPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) UpdateRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*RolloutPlan, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RolloutPlan)
+	err := c.cc.Invoke(ctx, OnlineConf_UpdateRolloutPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) DeleteRolloutPlan(ctx context.Context, in *RolloutPlanRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, OnlineConf_DeleteRolloutPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) SetRolloutPlan(ctx context.Context, in *SetRolloutPlanRequest, opts ...grpc.CallOption) (*Key, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Key)
+	err := c.cc.Invoke(ctx, OnlineConf_SetRolloutPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) GetRollout(ctx context.Context, in *RolloutKeyRequest, opts ...grpc.CallOption) (*RolloutState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RolloutState)
+	err := c.cc.Invoke(ctx, OnlineConf_GetRollout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) AdvanceRollout(ctx context.Context, in *RolloutChangeRequest, opts ...grpc.CallOption) (*Key, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Key)
+	err := c.cc.Invoke(ctx, OnlineConf_AdvanceRollout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) ListSchedules(ctx context.Context, in *RolloutKeyRequest, opts ...grpc.CallOption) (*SchedulesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SchedulesResponse)
+	err := c.cc.Invoke(ctx, OnlineConf_ListSchedules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) CreateSchedule(ctx context.Context, in *CreateScheduleRequest, opts ...grpc.CallOption) (*Schedule, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Schedule)
+	err := c.cc.Invoke(ctx, OnlineConf_CreateSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *onlineConfClient) DeleteSchedule(ctx context.Context, in *DeleteScheduleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, OnlineConf_DeleteSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OnlineConfServer is the server API for OnlineConf service.
 // All implementations must embed UnimplementedOnlineConfServer
 // for forward compatibility.
@@ -144,6 +276,17 @@ type OnlineConfServer interface {
 	DeleteKey(context.Context, *DeleteKeyRequest) (*emptypb.Empty, error)
 	ListHistory(context.Context, *ListHistoryRequest) (*ListHistoryResponse, error)
 	Evaluate(context.Context, *EvaluateRequest) (*EvaluateResponse, error)
+	ListRolloutPlans(context.Context, *emptypb.Empty) (*RolloutPlansResponse, error)
+	GetRolloutPlan(context.Context, *RolloutPlanRequest) (*RolloutPlan, error)
+	CreateRolloutPlan(context.Context, *RolloutPlanInput) (*RolloutPlan, error)
+	UpdateRolloutPlan(context.Context, *RolloutPlanRequest) (*RolloutPlan, error)
+	DeleteRolloutPlan(context.Context, *RolloutPlanRequest) (*emptypb.Empty, error)
+	SetRolloutPlan(context.Context, *SetRolloutPlanRequest) (*Key, error)
+	GetRollout(context.Context, *RolloutKeyRequest) (*RolloutState, error)
+	AdvanceRollout(context.Context, *RolloutChangeRequest) (*Key, error)
+	ListSchedules(context.Context, *RolloutKeyRequest) (*SchedulesResponse, error)
+	CreateSchedule(context.Context, *CreateScheduleRequest) (*Schedule, error)
+	DeleteSchedule(context.Context, *DeleteScheduleRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedOnlineConfServer()
 }
 
@@ -177,6 +320,39 @@ func (UnimplementedOnlineConfServer) ListHistory(context.Context, *ListHistoryRe
 }
 func (UnimplementedOnlineConfServer) Evaluate(context.Context, *EvaluateRequest) (*EvaluateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Evaluate not implemented")
+}
+func (UnimplementedOnlineConfServer) ListRolloutPlans(context.Context, *emptypb.Empty) (*RolloutPlansResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRolloutPlans not implemented")
+}
+func (UnimplementedOnlineConfServer) GetRolloutPlan(context.Context, *RolloutPlanRequest) (*RolloutPlan, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRolloutPlan not implemented")
+}
+func (UnimplementedOnlineConfServer) CreateRolloutPlan(context.Context, *RolloutPlanInput) (*RolloutPlan, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateRolloutPlan not implemented")
+}
+func (UnimplementedOnlineConfServer) UpdateRolloutPlan(context.Context, *RolloutPlanRequest) (*RolloutPlan, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateRolloutPlan not implemented")
+}
+func (UnimplementedOnlineConfServer) DeleteRolloutPlan(context.Context, *RolloutPlanRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteRolloutPlan not implemented")
+}
+func (UnimplementedOnlineConfServer) SetRolloutPlan(context.Context, *SetRolloutPlanRequest) (*Key, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetRolloutPlan not implemented")
+}
+func (UnimplementedOnlineConfServer) GetRollout(context.Context, *RolloutKeyRequest) (*RolloutState, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRollout not implemented")
+}
+func (UnimplementedOnlineConfServer) AdvanceRollout(context.Context, *RolloutChangeRequest) (*Key, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdvanceRollout not implemented")
+}
+func (UnimplementedOnlineConfServer) ListSchedules(context.Context, *RolloutKeyRequest) (*SchedulesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSchedules not implemented")
+}
+func (UnimplementedOnlineConfServer) CreateSchedule(context.Context, *CreateScheduleRequest) (*Schedule, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateSchedule not implemented")
+}
+func (UnimplementedOnlineConfServer) DeleteSchedule(context.Context, *DeleteScheduleRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteSchedule not implemented")
 }
 func (UnimplementedOnlineConfServer) mustEmbedUnimplementedOnlineConfServer() {}
 func (UnimplementedOnlineConfServer) testEmbeddedByValue()                    {}
@@ -343,6 +519,204 @@ func _OnlineConf_Evaluate_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OnlineConf_ListRolloutPlans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).ListRolloutPlans(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_ListRolloutPlans_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).ListRolloutPlans(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_GetRolloutPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).GetRolloutPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_GetRolloutPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).GetRolloutPlan(ctx, req.(*RolloutPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_CreateRolloutPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutPlanInput)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).CreateRolloutPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_CreateRolloutPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).CreateRolloutPlan(ctx, req.(*RolloutPlanInput))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_UpdateRolloutPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).UpdateRolloutPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_UpdateRolloutPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).UpdateRolloutPlan(ctx, req.(*RolloutPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_DeleteRolloutPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).DeleteRolloutPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_DeleteRolloutPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).DeleteRolloutPlan(ctx, req.(*RolloutPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_SetRolloutPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetRolloutPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).SetRolloutPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_SetRolloutPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).SetRolloutPlan(ctx, req.(*SetRolloutPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_GetRollout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).GetRollout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_GetRollout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).GetRollout(ctx, req.(*RolloutKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_AdvanceRollout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).AdvanceRollout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_AdvanceRollout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).AdvanceRollout(ctx, req.(*RolloutChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_ListSchedules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RolloutKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).ListSchedules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_ListSchedules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).ListSchedules(ctx, req.(*RolloutKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_CreateSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).CreateSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_CreateSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).CreateSchedule(ctx, req.(*CreateScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OnlineConf_DeleteSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OnlineConfServer).DeleteSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OnlineConf_DeleteSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OnlineConfServer).DeleteSchedule(ctx, req.(*DeleteScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OnlineConf_ServiceDesc is the grpc.ServiceDesc for OnlineConf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -381,6 +755,50 @@ var OnlineConf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Evaluate",
 			Handler:    _OnlineConf_Evaluate_Handler,
+		},
+		{
+			MethodName: "ListRolloutPlans",
+			Handler:    _OnlineConf_ListRolloutPlans_Handler,
+		},
+		{
+			MethodName: "GetRolloutPlan",
+			Handler:    _OnlineConf_GetRolloutPlan_Handler,
+		},
+		{
+			MethodName: "CreateRolloutPlan",
+			Handler:    _OnlineConf_CreateRolloutPlan_Handler,
+		},
+		{
+			MethodName: "UpdateRolloutPlan",
+			Handler:    _OnlineConf_UpdateRolloutPlan_Handler,
+		},
+		{
+			MethodName: "DeleteRolloutPlan",
+			Handler:    _OnlineConf_DeleteRolloutPlan_Handler,
+		},
+		{
+			MethodName: "SetRolloutPlan",
+			Handler:    _OnlineConf_SetRolloutPlan_Handler,
+		},
+		{
+			MethodName: "GetRollout",
+			Handler:    _OnlineConf_GetRollout_Handler,
+		},
+		{
+			MethodName: "AdvanceRollout",
+			Handler:    _OnlineConf_AdvanceRollout_Handler,
+		},
+		{
+			MethodName: "ListSchedules",
+			Handler:    _OnlineConf_ListSchedules_Handler,
+		},
+		{
+			MethodName: "CreateSchedule",
+			Handler:    _OnlineConf_CreateSchedule_Handler,
+		},
+		{
+			MethodName: "DeleteSchedule",
+			Handler:    _OnlineConf_DeleteSchedule_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

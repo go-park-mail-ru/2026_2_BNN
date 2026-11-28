@@ -124,6 +124,7 @@ func scanKey(row pgx.Row) (models.OnlineConfKey, error) {
 		&key.ID, &key.Scope, &key.Key, &key.Kind, &key.Description, &key.IsPublic,
 		&valueType, &value, &enabled, &rolloutPercent, &key.Version,
 		&key.UpdatedBy.ID, &key.UpdatedBy.Login, &key.UpdatedAt, &included, &excluded,
+		&key.RolloutPlanID, &key.RolloutStep, &key.StepReadyAt,
 	)
 	if err != nil {
 		return models.OnlineConfKey{}, fmt.Errorf("scan onlineconf key: %w", err)
@@ -222,6 +223,9 @@ func (r *Repo) UpdateKey(ctx context.Context, key models.OnlineConfKey) (models.
 		}
 		if old.Kind != key.Kind {
 			return models.ErrValidation
+		}
+		if old.RolloutPlanID != nil && key.Flag != nil && old.Flag.RolloutPercent != key.Flag.RolloutPercent {
+			return models.ErrOnlineConfRolloutStepNotAllowed
 		}
 		tag, err := tx.Exec(ctx, updateKeyQuery,
 			key.Scope, key.Key, key.Description, key.IsPublic,

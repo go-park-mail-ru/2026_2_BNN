@@ -210,7 +210,10 @@ type Key struct {
 	//
 	//	*Key_Config
 	//	*Key_Flag
-	Settings      isKey_Settings `protobuf_oneof:"settings"`
+	Settings      isKey_Settings         `protobuf_oneof:"settings"`
+	RolloutPlanId *string                `protobuf:"bytes,12,opt,name=rollout_plan_id,json=rolloutPlanId,proto3,oneof" json:"rollout_plan_id,omitempty"`
+	RolloutStep   *int32                 `protobuf:"varint,13,opt,name=rollout_step,json=rolloutStep,proto3,oneof" json:"rollout_step,omitempty"`
+	StepReadyAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=step_ready_at,json=stepReadyAt,proto3" json:"step_ready_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -329,6 +332,27 @@ func (x *Key) GetFlag() *Flag {
 		if x, ok := x.Settings.(*Key_Flag); ok {
 			return x.Flag
 		}
+	}
+	return nil
+}
+
+func (x *Key) GetRolloutPlanId() string {
+	if x != nil && x.RolloutPlanId != nil {
+		return *x.RolloutPlanId
+	}
+	return ""
+}
+
+func (x *Key) GetRolloutStep() int32 {
+	if x != nil && x.RolloutStep != nil {
+		return *x.RolloutStep
+	}
+	return 0
+}
+
+func (x *Key) GetStepReadyAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StepReadyAt
 	}
 	return nil
 }
@@ -1309,6 +1333,842 @@ func (x *EvaluateResponse) GetRevision() int64 {
 	return 0
 }
 
+type RolloutPlan struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Steps         []int32                `protobuf:"varint,3,rep,packed,name=steps,proto3" json:"steps,omitempty"`
+	IntervalMin   int32                  `protobuf:"varint,4,opt,name=interval_min,json=intervalMin,proto3" json:"interval_min,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutPlan) Reset() {
+	*x = RolloutPlan{}
+	mi := &file_proto_onlineconf_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutPlan) ProtoMessage() {}
+
+func (x *RolloutPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutPlan.ProtoReflect.Descriptor instead.
+func (*RolloutPlan) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RolloutPlan) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RolloutPlan) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RolloutPlan) GetSteps() []int32 {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+func (x *RolloutPlan) GetIntervalMin() int32 {
+	if x != nil {
+		return x.IntervalMin
+	}
+	return 0
+}
+
+type RolloutPlanInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Steps         []int32                `protobuf:"varint,2,rep,packed,name=steps,proto3" json:"steps,omitempty"`
+	IntervalMin   int32                  `protobuf:"varint,3,opt,name=interval_min,json=intervalMin,proto3" json:"interval_min,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutPlanInput) Reset() {
+	*x = RolloutPlanInput{}
+	mi := &file_proto_onlineconf_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutPlanInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutPlanInput) ProtoMessage() {}
+
+func (x *RolloutPlanInput) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutPlanInput.ProtoReflect.Descriptor instead.
+func (*RolloutPlanInput) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RolloutPlanInput) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RolloutPlanInput) GetSteps() []int32 {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+func (x *RolloutPlanInput) GetIntervalMin() int32 {
+	if x != nil {
+		return x.IntervalMin
+	}
+	return 0
+}
+
+type RolloutPlansResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plans         []*RolloutPlan         `protobuf:"bytes,1,rep,name=plans,proto3" json:"plans,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutPlansResponse) Reset() {
+	*x = RolloutPlansResponse{}
+	mi := &file_proto_onlineconf_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutPlansResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutPlansResponse) ProtoMessage() {}
+
+func (x *RolloutPlansResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutPlansResponse.ProtoReflect.Descriptor instead.
+func (*RolloutPlansResponse) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RolloutPlansResponse) GetPlans() []*RolloutPlan {
+	if x != nil {
+		return x.Plans
+	}
+	return nil
+}
+
+type RolloutPlanRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Input         *RolloutPlanInput      `protobuf:"bytes,2,opt,name=input,proto3" json:"input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutPlanRequest) Reset() {
+	*x = RolloutPlanRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutPlanRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutPlanRequest) ProtoMessage() {}
+
+func (x *RolloutPlanRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutPlanRequest.ProtoReflect.Descriptor instead.
+func (*RolloutPlanRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RolloutPlanRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RolloutPlanRequest) GetInput() *RolloutPlanInput {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+type RolloutKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	KeyId         string                 `protobuf:"bytes,1,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutKeyRequest) Reset() {
+	*x = RolloutKeyRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutKeyRequest) ProtoMessage() {}
+
+func (x *RolloutKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutKeyRequest.ProtoReflect.Descriptor instead.
+func (*RolloutKeyRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RolloutKeyRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+type SetRolloutPlanRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	PlanId        *string                `protobuf:"bytes,3,opt,name=plan_id,json=planId,proto3,oneof" json:"plan_id,omitempty"`
+	Version       int32                  `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetRolloutPlanRequest) Reset() {
+	*x = SetRolloutPlanRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetRolloutPlanRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetRolloutPlanRequest) ProtoMessage() {}
+
+func (x *SetRolloutPlanRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetRolloutPlanRequest.ProtoReflect.Descriptor instead.
+func (*SetRolloutPlanRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *SetRolloutPlanRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SetRolloutPlanRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *SetRolloutPlanRequest) GetPlanId() string {
+	if x != nil && x.PlanId != nil {
+		return *x.PlanId
+	}
+	return ""
+}
+
+func (x *SetRolloutPlanRequest) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type RolloutChangeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Version       int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Rollback      bool                   `protobuf:"varint,4,opt,name=rollback,proto3" json:"rollback,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutChangeRequest) Reset() {
+	*x = RolloutChangeRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutChangeRequest) ProtoMessage() {}
+
+func (x *RolloutChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutChangeRequest.ProtoReflect.Descriptor instead.
+func (*RolloutChangeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RolloutChangeRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RolloutChangeRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *RolloutChangeRequest) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *RolloutChangeRequest) GetRollback() bool {
+	if x != nil {
+		return x.Rollback
+	}
+	return false
+}
+
+type RolloutState struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	KeyId          string                 `protobuf:"bytes,1,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Plan           *RolloutPlan           `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
+	Step           *int32                 `protobuf:"varint,3,opt,name=step,proto3,oneof" json:"step,omitempty"`
+	CurrentPercent int32                  `protobuf:"varint,4,opt,name=current_percent,json=currentPercent,proto3" json:"current_percent,omitempty"`
+	NextPercent    *int32                 `protobuf:"varint,5,opt,name=next_percent,json=nextPercent,proto3,oneof" json:"next_percent,omitempty"`
+	StepReadyAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=step_ready_at,json=stepReadyAt,proto3" json:"step_ready_at,omitempty"`
+	Status         string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	Version        int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RolloutState) Reset() {
+	*x = RolloutState{}
+	mi := &file_proto_onlineconf_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutState) ProtoMessage() {}
+
+func (x *RolloutState) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutState.ProtoReflect.Descriptor instead.
+func (*RolloutState) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RolloutState) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *RolloutState) GetPlan() *RolloutPlan {
+	if x != nil {
+		return x.Plan
+	}
+	return nil
+}
+
+func (x *RolloutState) GetStep() int32 {
+	if x != nil && x.Step != nil {
+		return *x.Step
+	}
+	return 0
+}
+
+func (x *RolloutState) GetCurrentPercent() int32 {
+	if x != nil {
+		return x.CurrentPercent
+	}
+	return 0
+}
+
+func (x *RolloutState) GetNextPercent() int32 {
+	if x != nil && x.NextPercent != nil {
+		return *x.NextPercent
+	}
+	return 0
+}
+
+func (x *RolloutState) GetStepReadyAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StepReadyAt
+	}
+	return nil
+}
+
+func (x *RolloutState) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *RolloutState) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type ScheduleInput struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RunAt          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=run_at,json=runAt,proto3" json:"run_at,omitempty"`
+	Enabled        *bool                  `protobuf:"varint,2,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	RolloutPercent *int32                 `protobuf:"varint,3,opt,name=rollout_percent,json=rolloutPercent,proto3,oneof" json:"rollout_percent,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ScheduleInput) Reset() {
+	*x = ScheduleInput{}
+	mi := &file_proto_onlineconf_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleInput) ProtoMessage() {}
+
+func (x *ScheduleInput) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleInput.ProtoReflect.Descriptor instead.
+func (*ScheduleInput) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ScheduleInput) GetRunAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RunAt
+	}
+	return nil
+}
+
+func (x *ScheduleInput) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *ScheduleInput) GetRolloutPercent() int32 {
+	if x != nil && x.RolloutPercent != nil {
+		return *x.RolloutPercent
+	}
+	return 0
+}
+
+type Schedule struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	KeyId          string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	RunAt          *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=run_at,json=runAt,proto3" json:"run_at,omitempty"`
+	Enabled        *bool                  `protobuf:"varint,4,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	RolloutPercent *int32                 `protobuf:"varint,5,opt,name=rollout_percent,json=rolloutPercent,proto3,oneof" json:"rollout_percent,omitempty"`
+	Done           bool                   `protobuf:"varint,6,opt,name=done,proto3" json:"done,omitempty"`
+	Failed         bool                   `protobuf:"varint,7,opt,name=failed,proto3" json:"failed,omitempty"`
+	Error          *string                `protobuf:"bytes,8,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	CreatedBy      string                 `protobuf:"bytes,9,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Schedule) Reset() {
+	*x = Schedule{}
+	mi := &file_proto_onlineconf_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Schedule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Schedule) ProtoMessage() {}
+
+func (x *Schedule) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Schedule.ProtoReflect.Descriptor instead.
+func (*Schedule) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *Schedule) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Schedule) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *Schedule) GetRunAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RunAt
+	}
+	return nil
+}
+
+func (x *Schedule) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *Schedule) GetRolloutPercent() int32 {
+	if x != nil && x.RolloutPercent != nil {
+		return *x.RolloutPercent
+	}
+	return 0
+}
+
+func (x *Schedule) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+func (x *Schedule) GetFailed() bool {
+	if x != nil {
+		return x.Failed
+	}
+	return false
+}
+
+func (x *Schedule) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
+func (x *Schedule) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *Schedule) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type SchedulesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Schedules     []*Schedule            `protobuf:"bytes,1,rep,name=schedules,proto3" json:"schedules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SchedulesResponse) Reset() {
+	*x = SchedulesResponse{}
+	mi := &file_proto_onlineconf_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SchedulesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SchedulesResponse) ProtoMessage() {}
+
+func (x *SchedulesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SchedulesResponse.ProtoReflect.Descriptor instead.
+func (*SchedulesResponse) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SchedulesResponse) GetSchedules() []*Schedule {
+	if x != nil {
+		return x.Schedules
+	}
+	return nil
+}
+
+type CreateScheduleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Input         *ScheduleInput         `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateScheduleRequest) Reset() {
+	*x = CreateScheduleRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateScheduleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateScheduleRequest) ProtoMessage() {}
+
+func (x *CreateScheduleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateScheduleRequest.ProtoReflect.Descriptor instead.
+func (*CreateScheduleRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *CreateScheduleRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CreateScheduleRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *CreateScheduleRequest) GetInput() *ScheduleInput {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+type DeleteScheduleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	KeyId         string                 `protobuf:"bytes,1,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	ScheduleId    string                 `protobuf:"bytes,2,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteScheduleRequest) Reset() {
+	*x = DeleteScheduleRequest{}
+	mi := &file_proto_onlineconf_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteScheduleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteScheduleRequest) ProtoMessage() {}
+
+func (x *DeleteScheduleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_onlineconf_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteScheduleRequest.ProtoReflect.Descriptor instead.
+func (*DeleteScheduleRequest) Descriptor() ([]byte, []int) {
+	return file_proto_onlineconf_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *DeleteScheduleRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *DeleteScheduleRequest) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
 var File_proto_onlineconf_proto protoreflect.FileDescriptor
 
 const file_proto_onlineconf_proto_rawDesc = "" +
@@ -1327,7 +2187,7 @@ const file_proto_onlineconf_proto_rawDesc = "" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12'\n" +
 	"\x0frollout_percent\x18\x02 \x01(\x05R\x0erolloutPercent\x128\n" +
 	"\rinclude_users\x18\x03 \x03(\v2\x13.onlineconf.UserRefR\fincludeUsers\x128\n" +
-	"\rexclude_users\x18\x04 \x03(\v2\x13.onlineconf.UserRefR\fexcludeUsers\"\xfb\x02\n" +
+	"\rexclude_users\x18\x04 \x03(\v2\x13.onlineconf.UserRefR\fexcludeUsers\"\xb5\x04\n" +
 	"\x03Key\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x10\n" +
@@ -1342,9 +2202,14 @@ const file_proto_onlineconf_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12,\n" +
 	"\x06config\x18\n" +
 	" \x01(\v2\x12.onlineconf.ConfigH\x00R\x06config\x12&\n" +
-	"\x04flag\x18\v \x01(\v2\x10.onlineconf.FlagH\x00R\x04flagB\n" +
+	"\x04flag\x18\v \x01(\v2\x10.onlineconf.FlagH\x00R\x04flag\x12+\n" +
+	"\x0frollout_plan_id\x18\f \x01(\tH\x01R\rrolloutPlanId\x88\x01\x01\x12&\n" +
+	"\frollout_step\x18\r \x01(\x05H\x02R\vrolloutStep\x88\x01\x01\x12>\n" +
+	"\rstep_ready_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\vstepReadyAtB\n" +
 	"\n" +
-	"\bsettings\"\xa2\x01\n" +
+	"\bsettingsB\x12\n" +
+	"\x10_rollout_plan_idB\x0f\n" +
+	"\r_rollout_step\"\xa2\x01\n" +
 	"\tFlagInput\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12'\n" +
 	"\x0frollout_percent\x18\x02 \x01(\x05R\x0erolloutPercent\x12(\n" +
@@ -1408,7 +2273,82 @@ const file_proto_onlineconf_proto_rawDesc = "" +
 	"\x10EvaluateResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\bR\x06result\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x1a\n" +
-	"\brevision\x18\x03 \x01(\x03R\brevision2\xab\x04\n" +
+	"\brevision\x18\x03 \x01(\x03R\brevision\"j\n" +
+	"\vRolloutPlan\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05steps\x18\x03 \x03(\x05R\x05steps\x12!\n" +
+	"\finterval_min\x18\x04 \x01(\x05R\vintervalMin\"_\n" +
+	"\x10RolloutPlanInput\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05steps\x18\x02 \x03(\x05R\x05steps\x12!\n" +
+	"\finterval_min\x18\x03 \x01(\x05R\vintervalMin\"E\n" +
+	"\x14RolloutPlansResponse\x12-\n" +
+	"\x05plans\x18\x01 \x03(\v2\x17.onlineconf.RolloutPlanR\x05plans\"X\n" +
+	"\x12RolloutPlanRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x122\n" +
+	"\x05input\x18\x02 \x01(\v2\x1c.onlineconf.RolloutPlanInputR\x05input\"*\n" +
+	"\x11RolloutKeyRequest\x12\x15\n" +
+	"\x06key_id\x18\x01 \x01(\tR\x05keyId\"\x8b\x01\n" +
+	"\x15SetRolloutPlanRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x1c\n" +
+	"\aplan_id\x18\x03 \x01(\tH\x00R\x06planId\x88\x01\x01\x12\x18\n" +
+	"\aversion\x18\x04 \x01(\x05R\aversionB\n" +
+	"\n" +
+	"\b_plan_id\"|\n" +
+	"\x14RolloutChangeRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x05R\aversion\x12\x1a\n" +
+	"\brollback\x18\x04 \x01(\bR\brollback\"\xc8\x02\n" +
+	"\fRolloutState\x12\x15\n" +
+	"\x06key_id\x18\x01 \x01(\tR\x05keyId\x12+\n" +
+	"\x04plan\x18\x02 \x01(\v2\x17.onlineconf.RolloutPlanR\x04plan\x12\x17\n" +
+	"\x04step\x18\x03 \x01(\x05H\x00R\x04step\x88\x01\x01\x12'\n" +
+	"\x0fcurrent_percent\x18\x04 \x01(\x05R\x0ecurrentPercent\x12&\n" +
+	"\fnext_percent\x18\x05 \x01(\x05H\x01R\vnextPercent\x88\x01\x01\x12>\n" +
+	"\rstep_ready_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vstepReadyAt\x12\x16\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12\x18\n" +
+	"\aversion\x18\b \x01(\x05R\aversionB\a\n" +
+	"\x05_stepB\x0f\n" +
+	"\r_next_percent\"\xaf\x01\n" +
+	"\rScheduleInput\x121\n" +
+	"\x06run_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05runAt\x12\x1d\n" +
+	"\aenabled\x18\x02 \x01(\bH\x00R\aenabled\x88\x01\x01\x12,\n" +
+	"\x0frollout_percent\x18\x03 \x01(\x05H\x01R\x0erolloutPercent\x88\x01\x01B\n" +
+	"\n" +
+	"\b_enabledB\x12\n" +
+	"\x10_rollout_percent\"\xfc\x02\n" +
+	"\bSchedule\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x121\n" +
+	"\x06run_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x05runAt\x12\x1d\n" +
+	"\aenabled\x18\x04 \x01(\bH\x00R\aenabled\x88\x01\x01\x12,\n" +
+	"\x0frollout_percent\x18\x05 \x01(\x05H\x01R\x0erolloutPercent\x88\x01\x01\x12\x12\n" +
+	"\x04done\x18\x06 \x01(\bR\x04done\x12\x16\n" +
+	"\x06failed\x18\a \x01(\bR\x06failed\x12\x19\n" +
+	"\x05error\x18\b \x01(\tH\x02R\x05error\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\t \x01(\tR\tcreatedBy\x129\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\n" +
+	"\n" +
+	"\b_enabledB\x12\n" +
+	"\x10_rollout_percentB\b\n" +
+	"\x06_error\"G\n" +
+	"\x11SchedulesResponse\x122\n" +
+	"\tschedules\x18\x01 \x03(\v2\x14.onlineconf.ScheduleR\tschedules\"x\n" +
+	"\x15CreateScheduleRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12/\n" +
+	"\x05input\x18\x03 \x01(\v2\x19.onlineconf.ScheduleInputR\x05input\"O\n" +
+	"\x15DeleteScheduleRequest\x12\x15\n" +
+	"\x06key_id\x18\x01 \x01(\tR\x05keyId\x12\x1f\n" +
+	"\vschedule_id\x18\x02 \x01(\tR\n" +
+	"scheduleId2\xe4\n" +
+	"\n" +
 	"\n" +
 	"OnlineConf\x12N\n" +
 	"\vGetSnapshot\x12\x1e.onlineconf.GetSnapshotRequest\x1a\x1f.onlineconf.GetSnapshotResponse\x12E\n" +
@@ -1418,7 +2358,19 @@ const file_proto_onlineconf_proto_rawDesc = "" +
 	"\tUpdateKey\x12\x1c.onlineconf.UpdateKeyRequest\x1a\x0f.onlineconf.Key\x12A\n" +
 	"\tDeleteKey\x12\x1c.onlineconf.DeleteKeyRequest\x1a\x16.google.protobuf.Empty\x12N\n" +
 	"\vListHistory\x12\x1e.onlineconf.ListHistoryRequest\x1a\x1f.onlineconf.ListHistoryResponse\x12E\n" +
-	"\bEvaluate\x12\x1b.onlineconf.EvaluateRequest\x1a\x1c.onlineconf.EvaluateResponseB3Z1bnn/internal/pkg/onlineconf/delivery/grpc/gen;genb\x06proto3"
+	"\bEvaluate\x12\x1b.onlineconf.EvaluateRequest\x1a\x1c.onlineconf.EvaluateResponse\x12L\n" +
+	"\x10ListRolloutPlans\x12\x16.google.protobuf.Empty\x1a .onlineconf.RolloutPlansResponse\x12I\n" +
+	"\x0eGetRolloutPlan\x12\x1e.onlineconf.RolloutPlanRequest\x1a\x17.onlineconf.RolloutPlan\x12J\n" +
+	"\x11CreateRolloutPlan\x12\x1c.onlineconf.RolloutPlanInput\x1a\x17.onlineconf.RolloutPlan\x12L\n" +
+	"\x11UpdateRolloutPlan\x12\x1e.onlineconf.RolloutPlanRequest\x1a\x17.onlineconf.RolloutPlan\x12K\n" +
+	"\x11DeleteRolloutPlan\x12\x1e.onlineconf.RolloutPlanRequest\x1a\x16.google.protobuf.Empty\x12D\n" +
+	"\x0eSetRolloutPlan\x12!.onlineconf.SetRolloutPlanRequest\x1a\x0f.onlineconf.Key\x12E\n" +
+	"\n" +
+	"GetRollout\x12\x1d.onlineconf.RolloutKeyRequest\x1a\x18.onlineconf.RolloutState\x12C\n" +
+	"\x0eAdvanceRollout\x12 .onlineconf.RolloutChangeRequest\x1a\x0f.onlineconf.Key\x12M\n" +
+	"\rListSchedules\x12\x1d.onlineconf.RolloutKeyRequest\x1a\x1d.onlineconf.SchedulesResponse\x12I\n" +
+	"\x0eCreateSchedule\x12!.onlineconf.CreateScheduleRequest\x1a\x14.onlineconf.Schedule\x12K\n" +
+	"\x0eDeleteSchedule\x12!.onlineconf.DeleteScheduleRequest\x1a\x16.google.protobuf.EmptyB3Z1bnn/internal/pkg/onlineconf/delivery/grpc/gen;genb\x06proto3"
 
 var (
 	file_proto_onlineconf_proto_rawDescOnce sync.Once
@@ -1432,7 +2384,7 @@ func file_proto_onlineconf_proto_rawDescGZIP() []byte {
 	return file_proto_onlineconf_proto_rawDescData
 }
 
-var file_proto_onlineconf_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_proto_onlineconf_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_proto_onlineconf_proto_goTypes = []any{
 	(*UserRef)(nil),               // 0: onlineconf.UserRef
 	(*Config)(nil),                // 1: onlineconf.Config
@@ -1454,49 +2406,94 @@ var file_proto_onlineconf_proto_goTypes = []any{
 	(*ListHistoryResponse)(nil),   // 17: onlineconf.ListHistoryResponse
 	(*EvaluateRequest)(nil),       // 18: onlineconf.EvaluateRequest
 	(*EvaluateResponse)(nil),      // 19: onlineconf.EvaluateResponse
-	(*timestamppb.Timestamp)(nil), // 20: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),         // 21: google.protobuf.Empty
+	(*RolloutPlan)(nil),           // 20: onlineconf.RolloutPlan
+	(*RolloutPlanInput)(nil),      // 21: onlineconf.RolloutPlanInput
+	(*RolloutPlansResponse)(nil),  // 22: onlineconf.RolloutPlansResponse
+	(*RolloutPlanRequest)(nil),    // 23: onlineconf.RolloutPlanRequest
+	(*RolloutKeyRequest)(nil),     // 24: onlineconf.RolloutKeyRequest
+	(*SetRolloutPlanRequest)(nil), // 25: onlineconf.SetRolloutPlanRequest
+	(*RolloutChangeRequest)(nil),  // 26: onlineconf.RolloutChangeRequest
+	(*RolloutState)(nil),          // 27: onlineconf.RolloutState
+	(*ScheduleInput)(nil),         // 28: onlineconf.ScheduleInput
+	(*Schedule)(nil),              // 29: onlineconf.Schedule
+	(*SchedulesResponse)(nil),     // 30: onlineconf.SchedulesResponse
+	(*CreateScheduleRequest)(nil), // 31: onlineconf.CreateScheduleRequest
+	(*DeleteScheduleRequest)(nil), // 32: onlineconf.DeleteScheduleRequest
+	(*timestamppb.Timestamp)(nil), // 33: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),         // 34: google.protobuf.Empty
 }
 var file_proto_onlineconf_proto_depIdxs = []int32{
 	0,  // 0: onlineconf.Flag.include_users:type_name -> onlineconf.UserRef
 	0,  // 1: onlineconf.Flag.exclude_users:type_name -> onlineconf.UserRef
 	0,  // 2: onlineconf.Key.updated_by:type_name -> onlineconf.UserRef
-	20, // 3: onlineconf.Key.updated_at:type_name -> google.protobuf.Timestamp
+	33, // 3: onlineconf.Key.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 4: onlineconf.Key.config:type_name -> onlineconf.Config
 	2,  // 5: onlineconf.Key.flag:type_name -> onlineconf.Flag
-	1,  // 6: onlineconf.KeyInput.config:type_name -> onlineconf.Config
-	4,  // 7: onlineconf.KeyInput.flag:type_name -> onlineconf.FlagInput
-	3,  // 8: onlineconf.Snapshot.keys:type_name -> onlineconf.Key
-	6,  // 9: onlineconf.GetSnapshotResponse.snapshot:type_name -> onlineconf.Snapshot
-	3,  // 10: onlineconf.ListKeysResponse.keys:type_name -> onlineconf.Key
-	5,  // 11: onlineconf.CreateKeyRequest.key:type_name -> onlineconf.KeyInput
-	5,  // 12: onlineconf.UpdateKeyRequest.key:type_name -> onlineconf.KeyInput
-	3,  // 13: onlineconf.HistoryEntry.old_value:type_name -> onlineconf.Key
-	3,  // 14: onlineconf.HistoryEntry.new_value:type_name -> onlineconf.Key
-	0,  // 15: onlineconf.HistoryEntry.user:type_name -> onlineconf.UserRef
-	20, // 16: onlineconf.HistoryEntry.created_at:type_name -> google.protobuf.Timestamp
-	15, // 17: onlineconf.ListHistoryResponse.entries:type_name -> onlineconf.HistoryEntry
-	7,  // 18: onlineconf.OnlineConf.GetSnapshot:input_type -> onlineconf.GetSnapshotRequest
-	9,  // 19: onlineconf.OnlineConf.ListKeys:input_type -> onlineconf.ListKeysRequest
-	11, // 20: onlineconf.OnlineConf.GetKey:input_type -> onlineconf.GetKeyRequest
-	12, // 21: onlineconf.OnlineConf.CreateKey:input_type -> onlineconf.CreateKeyRequest
-	13, // 22: onlineconf.OnlineConf.UpdateKey:input_type -> onlineconf.UpdateKeyRequest
-	14, // 23: onlineconf.OnlineConf.DeleteKey:input_type -> onlineconf.DeleteKeyRequest
-	16, // 24: onlineconf.OnlineConf.ListHistory:input_type -> onlineconf.ListHistoryRequest
-	18, // 25: onlineconf.OnlineConf.Evaluate:input_type -> onlineconf.EvaluateRequest
-	8,  // 26: onlineconf.OnlineConf.GetSnapshot:output_type -> onlineconf.GetSnapshotResponse
-	10, // 27: onlineconf.OnlineConf.ListKeys:output_type -> onlineconf.ListKeysResponse
-	3,  // 28: onlineconf.OnlineConf.GetKey:output_type -> onlineconf.Key
-	3,  // 29: onlineconf.OnlineConf.CreateKey:output_type -> onlineconf.Key
-	3,  // 30: onlineconf.OnlineConf.UpdateKey:output_type -> onlineconf.Key
-	21, // 31: onlineconf.OnlineConf.DeleteKey:output_type -> google.protobuf.Empty
-	17, // 32: onlineconf.OnlineConf.ListHistory:output_type -> onlineconf.ListHistoryResponse
-	19, // 33: onlineconf.OnlineConf.Evaluate:output_type -> onlineconf.EvaluateResponse
-	26, // [26:34] is the sub-list for method output_type
-	18, // [18:26] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	33, // 6: onlineconf.Key.step_ready_at:type_name -> google.protobuf.Timestamp
+	1,  // 7: onlineconf.KeyInput.config:type_name -> onlineconf.Config
+	4,  // 8: onlineconf.KeyInput.flag:type_name -> onlineconf.FlagInput
+	3,  // 9: onlineconf.Snapshot.keys:type_name -> onlineconf.Key
+	6,  // 10: onlineconf.GetSnapshotResponse.snapshot:type_name -> onlineconf.Snapshot
+	3,  // 11: onlineconf.ListKeysResponse.keys:type_name -> onlineconf.Key
+	5,  // 12: onlineconf.CreateKeyRequest.key:type_name -> onlineconf.KeyInput
+	5,  // 13: onlineconf.UpdateKeyRequest.key:type_name -> onlineconf.KeyInput
+	3,  // 14: onlineconf.HistoryEntry.old_value:type_name -> onlineconf.Key
+	3,  // 15: onlineconf.HistoryEntry.new_value:type_name -> onlineconf.Key
+	0,  // 16: onlineconf.HistoryEntry.user:type_name -> onlineconf.UserRef
+	33, // 17: onlineconf.HistoryEntry.created_at:type_name -> google.protobuf.Timestamp
+	15, // 18: onlineconf.ListHistoryResponse.entries:type_name -> onlineconf.HistoryEntry
+	20, // 19: onlineconf.RolloutPlansResponse.plans:type_name -> onlineconf.RolloutPlan
+	21, // 20: onlineconf.RolloutPlanRequest.input:type_name -> onlineconf.RolloutPlanInput
+	20, // 21: onlineconf.RolloutState.plan:type_name -> onlineconf.RolloutPlan
+	33, // 22: onlineconf.RolloutState.step_ready_at:type_name -> google.protobuf.Timestamp
+	33, // 23: onlineconf.ScheduleInput.run_at:type_name -> google.protobuf.Timestamp
+	33, // 24: onlineconf.Schedule.run_at:type_name -> google.protobuf.Timestamp
+	33, // 25: onlineconf.Schedule.created_at:type_name -> google.protobuf.Timestamp
+	29, // 26: onlineconf.SchedulesResponse.schedules:type_name -> onlineconf.Schedule
+	28, // 27: onlineconf.CreateScheduleRequest.input:type_name -> onlineconf.ScheduleInput
+	7,  // 28: onlineconf.OnlineConf.GetSnapshot:input_type -> onlineconf.GetSnapshotRequest
+	9,  // 29: onlineconf.OnlineConf.ListKeys:input_type -> onlineconf.ListKeysRequest
+	11, // 30: onlineconf.OnlineConf.GetKey:input_type -> onlineconf.GetKeyRequest
+	12, // 31: onlineconf.OnlineConf.CreateKey:input_type -> onlineconf.CreateKeyRequest
+	13, // 32: onlineconf.OnlineConf.UpdateKey:input_type -> onlineconf.UpdateKeyRequest
+	14, // 33: onlineconf.OnlineConf.DeleteKey:input_type -> onlineconf.DeleteKeyRequest
+	16, // 34: onlineconf.OnlineConf.ListHistory:input_type -> onlineconf.ListHistoryRequest
+	18, // 35: onlineconf.OnlineConf.Evaluate:input_type -> onlineconf.EvaluateRequest
+	34, // 36: onlineconf.OnlineConf.ListRolloutPlans:input_type -> google.protobuf.Empty
+	23, // 37: onlineconf.OnlineConf.GetRolloutPlan:input_type -> onlineconf.RolloutPlanRequest
+	21, // 38: onlineconf.OnlineConf.CreateRolloutPlan:input_type -> onlineconf.RolloutPlanInput
+	23, // 39: onlineconf.OnlineConf.UpdateRolloutPlan:input_type -> onlineconf.RolloutPlanRequest
+	23, // 40: onlineconf.OnlineConf.DeleteRolloutPlan:input_type -> onlineconf.RolloutPlanRequest
+	25, // 41: onlineconf.OnlineConf.SetRolloutPlan:input_type -> onlineconf.SetRolloutPlanRequest
+	24, // 42: onlineconf.OnlineConf.GetRollout:input_type -> onlineconf.RolloutKeyRequest
+	26, // 43: onlineconf.OnlineConf.AdvanceRollout:input_type -> onlineconf.RolloutChangeRequest
+	24, // 44: onlineconf.OnlineConf.ListSchedules:input_type -> onlineconf.RolloutKeyRequest
+	31, // 45: onlineconf.OnlineConf.CreateSchedule:input_type -> onlineconf.CreateScheduleRequest
+	32, // 46: onlineconf.OnlineConf.DeleteSchedule:input_type -> onlineconf.DeleteScheduleRequest
+	8,  // 47: onlineconf.OnlineConf.GetSnapshot:output_type -> onlineconf.GetSnapshotResponse
+	10, // 48: onlineconf.OnlineConf.ListKeys:output_type -> onlineconf.ListKeysResponse
+	3,  // 49: onlineconf.OnlineConf.GetKey:output_type -> onlineconf.Key
+	3,  // 50: onlineconf.OnlineConf.CreateKey:output_type -> onlineconf.Key
+	3,  // 51: onlineconf.OnlineConf.UpdateKey:output_type -> onlineconf.Key
+	34, // 52: onlineconf.OnlineConf.DeleteKey:output_type -> google.protobuf.Empty
+	17, // 53: onlineconf.OnlineConf.ListHistory:output_type -> onlineconf.ListHistoryResponse
+	19, // 54: onlineconf.OnlineConf.Evaluate:output_type -> onlineconf.EvaluateResponse
+	22, // 55: onlineconf.OnlineConf.ListRolloutPlans:output_type -> onlineconf.RolloutPlansResponse
+	20, // 56: onlineconf.OnlineConf.GetRolloutPlan:output_type -> onlineconf.RolloutPlan
+	20, // 57: onlineconf.OnlineConf.CreateRolloutPlan:output_type -> onlineconf.RolloutPlan
+	20, // 58: onlineconf.OnlineConf.UpdateRolloutPlan:output_type -> onlineconf.RolloutPlan
+	34, // 59: onlineconf.OnlineConf.DeleteRolloutPlan:output_type -> google.protobuf.Empty
+	3,  // 60: onlineconf.OnlineConf.SetRolloutPlan:output_type -> onlineconf.Key
+	27, // 61: onlineconf.OnlineConf.GetRollout:output_type -> onlineconf.RolloutState
+	3,  // 62: onlineconf.OnlineConf.AdvanceRollout:output_type -> onlineconf.Key
+	30, // 63: onlineconf.OnlineConf.ListSchedules:output_type -> onlineconf.SchedulesResponse
+	29, // 64: onlineconf.OnlineConf.CreateSchedule:output_type -> onlineconf.Schedule
+	34, // 65: onlineconf.OnlineConf.DeleteSchedule:output_type -> google.protobuf.Empty
+	47, // [47:66] is the sub-list for method output_type
+	28, // [28:47] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_proto_onlineconf_proto_init() }
@@ -1513,13 +2510,17 @@ func file_proto_onlineconf_proto_init() {
 		(*KeyInput_Flag)(nil),
 	}
 	file_proto_onlineconf_proto_msgTypes[7].OneofWrappers = []any{}
+	file_proto_onlineconf_proto_msgTypes[25].OneofWrappers = []any{}
+	file_proto_onlineconf_proto_msgTypes[27].OneofWrappers = []any{}
+	file_proto_onlineconf_proto_msgTypes[28].OneofWrappers = []any{}
+	file_proto_onlineconf_proto_msgTypes[29].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_onlineconf_proto_rawDesc), len(file_proto_onlineconf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

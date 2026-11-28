@@ -336,7 +336,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OnlineConfUser'
+                $ref: '#/components/schemas/OnlineConfSession'
         '401':
           description: Нет куки или она истекла
         '403':
@@ -1085,6 +1085,13 @@ components:
           type: integer
           format: int64
           example: 10485760
+
+    OnlineConfSession:
+      type: object
+      required: [login]
+      properties:
+        login:
+          type: string
 
     OnlineConfUser:
       type: object

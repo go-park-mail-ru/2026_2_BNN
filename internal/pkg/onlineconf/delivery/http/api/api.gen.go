@@ -150,6 +150,11 @@ type OnlineConfKind string
 // OnlineConfScope defines model for OnlineConfScope.
 type OnlineConfScope string
 
+// OnlineConfSession defines model for OnlineConfSession.
+type OnlineConfSession struct {
+	Login string `json:"login"`
+}
+
 // OnlineConfUpdateKeyInput defines model for OnlineConfUpdateKeyInput.
 type OnlineConfUpdateKeyInput struct {
 	Config      *OnlineConfConfig    `json:"config,omitempty"`
@@ -896,7 +901,7 @@ type GetOnlineConfSessionResponseObject interface {
 	VisitGetOnlineConfSessionResponse(w http.ResponseWriter) error
 }
 
-type GetOnlineConfSession200JSONResponse OnlineConfUser
+type GetOnlineConfSession200JSONResponse OnlineConfSession
 
 func (response GetOnlineConfSession200JSONResponse) VisitGetOnlineConfSessionResponse(w http.ResponseWriter) error {
 

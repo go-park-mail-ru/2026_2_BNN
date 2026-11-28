@@ -40,7 +40,7 @@ func (h *Handler) GetOnlineConfSession(ctx context.Context, req api.GetOnlineCon
 		return api.GetOnlineConfSession403JSONResponse{Code: onlineconf.CodeForbidden, Message: messageForbidden}, nil
 	}
 
-	return api.GetOnlineConfSession200JSONResponse(toAPIUser(admin)), nil
+	return api.GetOnlineConfSession200JSONResponse{Login: admin.Login}, nil
 }
 
 func (h *Handler) SearchOnlineConfUsers(ctx context.Context, req api.SearchOnlineConfUsersRequestObject) (api.SearchOnlineConfUsersResponseObject, error) {

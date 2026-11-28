@@ -381,6 +381,15 @@ type UpdateOnlineConfRolloutPlanJSONRequestBody = OnlineConfRolloutPlanInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListOnlineConfAdmins Список админов
+	// (GET /onlineconf/admin/admins)
+	ListOnlineConfAdmins(w http.ResponseWriter, r *http.Request)
+	// RevokeOnlineConfAdmin Забрать права админа
+	// (DELETE /onlineconf/admin/admins/{user_id})
+	RevokeOnlineConfAdmin(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
+	// GrantOnlineConfAdmin Выдать права админа
+	// (PUT /onlineconf/admin/admins/{user_id})
+	GrantOnlineConfAdmin(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
 	// ListOnlineConfKeys Каталог ключей
 	// (GET /onlineconf/admin/keys)
 	ListOnlineConfKeys(w http.ResponseWriter, r *http.Request, params ListOnlineConfKeysParams)
@@ -457,6 +466,72 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListOnlineConfAdmins operation middleware
+func (siw *ServerInterfaceWrapper) ListOnlineConfAdmins(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnlineConfAdmins(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeOnlineConfAdmin operation middleware
+func (siw *ServerInterfaceWrapper) RevokeOnlineConfAdmin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", mux.Vars(r)["user_id"], &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeOnlineConfAdmin(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GrantOnlineConfAdmin operation middleware
+func (siw *ServerInterfaceWrapper) GrantOnlineConfAdmin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", mux.Vars(r)["user_id"], &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GrantOnlineConfAdmin(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListOnlineConfKeys operation middleware
 func (siw *ServerInterfaceWrapper) ListOnlineConfKeys(w http.ResponseWriter, r *http.Request) {
@@ -1192,10 +1267,144 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/onlineconf/admin/keys/{id}/evaluate", wrapper.EvaluateOnlineConfKey).Methods(http.MethodPost)
 
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/admins", wrapper.ListOnlineConfAdmins).Methods(http.MethodGet)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/admins/{user_id}", wrapper.RevokeOnlineConfAdmin).Methods(http.MethodDelete)
+
+	r.HandleFunc(options.BaseURL+"/onlineconf/admin/admins/{user_id}", wrapper.GrantOnlineConfAdmin).Methods(http.MethodPut)
+
 	return r
 }
 
 type OnlineConfFailureJSONResponse OnlineConfError
+
+type ListOnlineConfAdminsRequestObject struct {
+}
+
+type ListOnlineConfAdminsResponseObject interface {
+	VisitListOnlineConfAdminsResponse(w http.ResponseWriter) error
+}
+
+type ListOnlineConfAdmins200JSONResponse []OnlineConfUser
+
+func (response ListOnlineConfAdmins200JSONResponse) VisitListOnlineConfAdminsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnlineConfAdmins401Response struct {
+}
+
+func (response ListOnlineConfAdmins401Response) VisitListOnlineConfAdminsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type ListOnlineConfAdminsdefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response ListOnlineConfAdminsdefaultJSONResponse) VisitListOnlineConfAdminsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeOnlineConfAdminRequestObject struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type RevokeOnlineConfAdminResponseObject interface {
+	VisitRevokeOnlineConfAdminResponse(w http.ResponseWriter) error
+}
+
+type RevokeOnlineConfAdmin204Response struct {
+}
+
+func (response RevokeOnlineConfAdmin204Response) VisitRevokeOnlineConfAdminResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeOnlineConfAdmin401Response struct {
+}
+
+func (response RevokeOnlineConfAdmin401Response) VisitRevokeOnlineConfAdminResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type RevokeOnlineConfAdmindefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response RevokeOnlineConfAdmindefaultJSONResponse) VisitRevokeOnlineConfAdminResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantOnlineConfAdminRequestObject struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type GrantOnlineConfAdminResponseObject interface {
+	VisitGrantOnlineConfAdminResponse(w http.ResponseWriter) error
+}
+
+type GrantOnlineConfAdmin204Response struct {
+}
+
+func (response GrantOnlineConfAdmin204Response) VisitGrantOnlineConfAdminResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GrantOnlineConfAdmin401Response struct {
+}
+
+func (response GrantOnlineConfAdmin401Response) VisitGrantOnlineConfAdminResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type GrantOnlineConfAdmindefaultJSONResponse struct {
+	Body       OnlineConfError
+	StatusCode int
+}
+
+func (response GrantOnlineConfAdmindefaultJSONResponse) VisitGrantOnlineConfAdminResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListOnlineConfKeysRequestObject struct {
 	Params ListOnlineConfKeysParams
@@ -2229,6 +2438,15 @@ func (response SearchOnlineConfUsers403JSONResponse) VisitSearchOnlineConfUsersR
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListOnlineConfAdmins Список админов
+	// (GET /onlineconf/admin/admins)
+	ListOnlineConfAdmins(ctx context.Context, request ListOnlineConfAdminsRequestObject) (ListOnlineConfAdminsResponseObject, error)
+	// RevokeOnlineConfAdmin Забрать права админа
+	// (DELETE /onlineconf/admin/admins/{user_id})
+	RevokeOnlineConfAdmin(ctx context.Context, request RevokeOnlineConfAdminRequestObject) (RevokeOnlineConfAdminResponseObject, error)
+	// GrantOnlineConfAdmin Выдать права админа
+	// (PUT /onlineconf/admin/admins/{user_id})
+	GrantOnlineConfAdmin(ctx context.Context, request GrantOnlineConfAdminRequestObject) (GrantOnlineConfAdminResponseObject, error)
 	// ListOnlineConfKeys Каталог ключей
 	// (GET /onlineconf/admin/keys)
 	ListOnlineConfKeys(ctx context.Context, request ListOnlineConfKeysRequestObject) (ListOnlineConfKeysResponseObject, error)
@@ -2334,6 +2552,82 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListOnlineConfAdmins operation middleware
+func (sh *strictHandler) ListOnlineConfAdmins(w http.ResponseWriter, r *http.Request) {
+	var request ListOnlineConfAdminsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOnlineConfAdmins(ctx, request.(ListOnlineConfAdminsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnlineConfAdmins")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnlineConfAdminsResponseObject); ok {
+		if err := validResponse.VisitListOnlineConfAdminsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeOnlineConfAdmin operation middleware
+func (sh *strictHandler) RevokeOnlineConfAdmin(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID) {
+	var request RevokeOnlineConfAdminRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeOnlineConfAdmin(ctx, request.(RevokeOnlineConfAdminRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeOnlineConfAdmin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeOnlineConfAdminResponseObject); ok {
+		if err := validResponse.VisitRevokeOnlineConfAdminResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GrantOnlineConfAdmin operation middleware
+func (sh *strictHandler) GrantOnlineConfAdmin(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID) {
+	var request GrantOnlineConfAdminRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GrantOnlineConfAdmin(ctx, request.(GrantOnlineConfAdminRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GrantOnlineConfAdmin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GrantOnlineConfAdminResponseObject); ok {
+		if err := validResponse.VisitGrantOnlineConfAdminResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListOnlineConfKeys operation middleware

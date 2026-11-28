@@ -7,12 +7,18 @@ import (
 	"unicode/utf8"
 
 	"bnn/internal/models"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 const searchUsersLimit = 10
 
 func (u *Usecase) ListAdmins(ctx context.Context) ([]models.User, error) {
 	return u.repo.ReadAdmins(ctx)
+}
+
+func (u *Usecase) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	return u.repo.SetAdmin(ctx, userID, isAdmin)
 }
 
 func (u *Usecase) SearchUsers(ctx context.Context, query string) ([]models.User, error) {

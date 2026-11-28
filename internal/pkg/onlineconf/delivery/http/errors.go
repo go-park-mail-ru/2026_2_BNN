@@ -65,6 +65,11 @@ func keyHTTPError(ctx context.Context, err error) (int, api.OnlineConfError) {
 			Code: codeNotFound, Message: "key not found",
 		}
 
+	case errors.Is(err, models.ErrUserNotFound):
+		return http.StatusNotFound, api.OnlineConfError{
+			Code: codeNotFound, Message: "user not found",
+		}
+
 	case errors.Is(err, models.ErrOnlineConfKeyExists):
 		return http.StatusConflict, api.OnlineConfError{
 			Code: codeKeyExists, Message: "key already exists in this scope",

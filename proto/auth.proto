@@ -43,6 +43,8 @@ service Auth {
   rpc ListAdmins(google.protobuf.Empty) returns (UsersResponse);
 
   rpc SearchUsers(SearchUsersRequest) returns (UsersResponse);
+
+  rpc SetAdmin(SetAdminRequest) returns (google.protobuf.Empty);
 }
 
 message User {
@@ -145,4 +147,9 @@ message UsersResponse {
 
 message SearchUsersRequest {
   string query = 1;
+}
+
+message SetAdminRequest {
+  string user_id = 1;
+  bool is_admin = 2;
 }

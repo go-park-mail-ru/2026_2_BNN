@@ -410,6 +410,36 @@ func TestHandler(t *testing.T) {
 			code: codes.InvalidArgument,
 		},
 		{
+			name: "set admin ok",
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().SetAdmin(gomock.Any(), userID, true).Return(nil)
+			},
+			call: func(h *Handler) error {
+				_, err := h.SetAdmin(ctx, &gen.SetAdminRequest{UserId: userID.String(), IsAdmin: true})
+				return err
+			},
+		},
+		{
+			name: "set admin user not found",
+			prepare: func(uc *mocks.MockUsecase) {
+				uc.EXPECT().SetAdmin(gomock.Any(), userID, false).Return(models.ErrUserNotFound)
+			},
+			call: func(h *Handler) error {
+				_, err := h.SetAdmin(ctx, &gen.SetAdminRequest{UserId: userID.String(), IsAdmin: false})
+				return err
+			},
+			code: codes.NotFound,
+		},
+		{
+			name:    "set admin bad id",
+			prepare: func(uc *mocks.MockUsecase) {},
+			call: func(h *Handler) error {
+				_, err := h.SetAdmin(ctx, &gen.SetAdminRequest{UserId: "bad"})
+				return err
+			},
+			code: codes.InvalidArgument,
+		},
+		{
 			name: "user exists internal",
 			prepare: func(uc *mocks.MockUsecase) {
 				uc.EXPECT().GetUser(gomock.Any(), userID).Return(models.User{}, assert.AnError)

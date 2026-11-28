@@ -82,6 +82,26 @@ func TestAuthRepo(t *testing.T) {
 		assert.NoError(t, mockDB.ExpectationsWereMet())
 	})
 
+	t.Run("SetAdmin", func(t *testing.T) {
+		mockDB.ExpectExec(`UPDATE users SET is_admin`).
+			WithArgs(true, userID).
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		err := repo.SetAdmin(context.Background(), userID, true)
+		assert.NoError(t, err)
+		assert.NoError(t, mockDB.ExpectationsWereMet())
+	})
+
+	t.Run("SetAdmin user not found", func(t *testing.T) {
+		mockDB.ExpectExec(`UPDATE users SET is_admin`).
+			WithArgs(false, userID).
+			WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+		err := repo.SetAdmin(context.Background(), userID, false)
+		assert.ErrorIs(t, err, models.ErrUserNotFound)
+		assert.NoError(t, mockDB.ExpectationsWereMet())
+	})
+
 	t.Run("UpdateAvatar", func(t *testing.T) {
 		user := models.User{ID: userID, Avatar: "/new.png", UpdatedAt: now}
 		mockDB.ExpectExec(`UPDATE users SET avatar`).

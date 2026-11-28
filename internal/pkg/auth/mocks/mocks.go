@@ -235,6 +235,20 @@ func (mr *MockUsecaseMockRecorder) SearchUsers(ctx, query any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsers", reflect.TypeOf((*MockUsecase)(nil).SearchUsers), ctx, query)
 }
 
+// SetAdmin mocks base method.
+func (m *MockUsecase) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetAdmin", ctx, userID, isAdmin)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetAdmin indicates an expected call of SetAdmin.
+func (mr *MockUsecaseMockRecorder) SetAdmin(ctx, userID, isAdmin any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAdmin", reflect.TypeOf((*MockUsecase)(nil).SetAdmin), ctx, userID, isAdmin)
+}
+
 // SignIn mocks base method.
 func (m *MockUsecase) SignIn(ctx context.Context, login, password string) (models.User, models.AuthTokens, error) {
 	m.ctrl.T.Helper()
@@ -511,6 +525,20 @@ func (m *MockRepo) Set2FAStatus(ctx context.Context, userID uuid.UUID, enabled b
 func (mr *MockRepoMockRecorder) Set2FAStatus(ctx, userID, enabled any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set2FAStatus", reflect.TypeOf((*MockRepo)(nil).Set2FAStatus), ctx, userID, enabled)
+}
+
+// SetAdmin mocks base method.
+func (m *MockRepo) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetAdmin", ctx, userID, isAdmin)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetAdmin indicates an expected call of SetAdmin.
+func (mr *MockRepoMockRecorder) SetAdmin(ctx, userID, isAdmin any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAdmin", reflect.TypeOf((*MockRepo)(nil).SetAdmin), ctx, userID, isAdmin)
 }
 
 // UpdateAvatar mocks base method.

@@ -189,3 +189,11 @@ func (c *Client) SearchUsers(ctx context.Context, query string) ([]models.User, 
 
 	return convert.UsersFromProto(resp.GetUsers())
 }
+
+func (c *Client) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	_, err := c.client.SetAdmin(ctx, &gen.SetAdminRequest{UserId: userID.String(), IsAdmin: isAdmin})
+	if err != nil {
+		return grpcerr.FromStatus(err)
+	}
+	return nil
+}

@@ -64,6 +64,9 @@ var readAdminsQuery string
 //go:embed queries/search_users.sql
 var searchUsersQuery string
 
+//go:embed queries/update_user_admin.sql
+var updateUserAdminQuery string
+
 type Repo struct {
 	db database.DB
 }
@@ -270,6 +273,17 @@ func (r *Repo) ReadAdmins(ctx context.Context) ([]models.User, error) {
 
 func (r *Repo) SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error) {
 	return r.readShortUsers(ctx, searchUsersQuery, query, limit)
+}
+
+func (r *Repo) SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error {
+	tag, err := r.db.Exec(ctx, updateUserAdminQuery, isAdmin, userID)
+	if err != nil {
+		return fmt.Errorf("update user admin: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrUserNotFound
+	}
+	return nil
 }
 
 func (r *Repo) readShortUsers(ctx context.Context, query string, args ...any) ([]models.User, error) {

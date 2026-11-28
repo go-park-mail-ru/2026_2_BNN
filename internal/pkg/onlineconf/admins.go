@@ -3,6 +3,7 @@ package onlineconf
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"sync/atomic"
 
 	"bnn/internal/models"
@@ -21,7 +22,7 @@ func NewAdminCache(source AdminSource) *AdminCache {
 }
 
 func (c *AdminCache) Run(ctx context.Context) {
-	runEvery(ctx, refreshInterval, c.refresh)
+	runEvery(ctx, refreshInterval, c.Refresh)
 }
 
 func (c *AdminCache) Get(userID uuid.UUID) (models.User, bool) {
@@ -34,7 +35,20 @@ func (c *AdminCache) Get(userID uuid.UUID) (models.User, bool) {
 	return user, ok
 }
 
-func (c *AdminCache) refresh(ctx context.Context) {
+// List отдаёт админов по алфавиту логинов.
+func (c *AdminCache) List() []models.User {
+	admins := c.admins.Load()
+	if admins == nil {
+		return []models.User{}
+	}
+
+	users := lo.Values(*admins)
+	sort.Slice(users, func(i, j int) bool { return users[i].Login < users[j].Login })
+	return users
+}
+
+// Refresh перечитывает админов из auth; вызывается по таймеру и сразу после выдачи или снятия прав.
+func (c *AdminCache) Refresh(ctx context.Context) {
 	users, err := c.source.ListAdmins(ctx)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to refresh admins", "error", err)

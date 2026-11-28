@@ -27,6 +27,7 @@ type Usecase interface {
 	VerifyTwoFactor(ctx context.Context, twoFactorToken, code string) (models.User, models.AuthTokens, error)
 	ListAdmins(ctx context.Context) ([]models.User, error)
 	SearchUsers(ctx context.Context, query string) ([]models.User, error)
+	SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error
 	GetUserByLogin(ctx context.Context, login string) (uuid.UUID, error)
 }
 
@@ -50,6 +51,7 @@ type Repo interface {
 	ReadUserByEmail(ctx context.Context, email string) (models.User, error)
 	ReadAdmins(ctx context.Context) ([]models.User, error)
 	SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error)
+	SetAdmin(ctx context.Context, userID uuid.UUID, isAdmin bool) error
 }
 
 type Storage interface {

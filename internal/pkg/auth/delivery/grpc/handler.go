@@ -222,6 +222,19 @@ func (h *Handler) SearchUsers(ctx context.Context, in *gen.SearchUsersRequest) (
 	return toUsersResponse(users), nil
 }
 
+func (h *Handler) SetAdmin(ctx context.Context, in *gen.SetAdminRequest) (*emptypb.Empty, error) {
+	userID, err := grpcconv.ParseUUID(in.GetUserId())
+	if err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	if err := h.uc.SetAdmin(ctx, userID, in.GetIsAdmin()); err != nil {
+		return nil, grpcerr.ToStatus(err)
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
 func toUsersResponse(users []models.User) *gen.UsersResponse {
 	return &gen.UsersResponse{
 		Users: lo.Map(users, func(u models.User, _ int) *gen.User { return convert.UserToProto(u) }),

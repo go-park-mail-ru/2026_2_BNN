@@ -914,6 +914,63 @@ paths:
         default:
           $ref: '#/components/responses/OnlineConfFailure'
 
+  /onlineconf/admin/admins:
+    get:
+      tags: [onlineconf]
+      operationId: ListOnlineConfAdmins
+      summary: Список админов
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Админы по алфавиту логинов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnlineConfUser'
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
+  /onlineconf/admin/admins/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [onlineconf]
+      operationId: GrantOnlineConfAdmin
+      summary: Выдать права админа
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Права выданы
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+    delete:
+      tags: [onlineconf]
+      operationId: RevokeOnlineConfAdmin
+      summary: Забрать права админа
+      description: Забрать права у самого себя нельзя — 400.
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Права сняты
+        '401':
+          description: Нет действующей сессии
+        default:
+          $ref: '#/components/responses/OnlineConfFailure'
+
   /notes/all:
     get:
       tags: [notes]

@@ -4,19 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"sync/atomic"
-	"time"
 
 	"bnn/internal/models"
 
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 )
-
-const adminsRefreshInterval = 15 * time.Second
-
-type AdminSource interface {
-	ListAdmins(ctx context.Context) ([]models.User, error)
-}
 
 type AdminCache struct {
 	source AdminSource
@@ -28,19 +21,7 @@ func NewAdminCache(source AdminSource) *AdminCache {
 }
 
 func (c *AdminCache) Run(ctx context.Context) {
-	c.refresh(ctx)
-
-	ticker := time.NewTicker(adminsRefreshInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			c.refresh(ctx)
-		}
-	}
+	runEvery(ctx, refreshInterval, c.refresh)
 }
 
 func (c *AdminCache) Get(userID uuid.UUID) (models.User, bool) {

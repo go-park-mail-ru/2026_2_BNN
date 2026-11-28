@@ -130,12 +130,12 @@ func scanKey(row pgx.Row) (models.OnlineConfKey, error) {
 	}
 
 	switch key.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		if valueType == nil || !json.Valid(value) {
 			return models.OnlineConfKey{}, fmt.Errorf("invalid stored onlineconf config %s", key.ID)
 		}
 		key.Config = &models.OnlineConfConfig{ValueType: *valueType, Value: value}
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		if enabled == nil || rolloutPercent == nil {
 			return models.OnlineConfKey{}, fmt.Errorf("invalid stored onlineconf flag %s", key.ID)
 		}
@@ -165,12 +165,12 @@ type keyValues struct {
 
 func valuesForKey(key models.OnlineConfKey) (keyValues, error) {
 	switch key.Kind {
-	case models.OnlineConfKindConfig:
+	case onlineconf.KindConfig:
 		if key.Config == nil || key.Flag != nil || !json.Valid(key.Config.Value) {
 			return keyValues{}, models.ErrValidation
 		}
 		return keyValues{valueType: key.Config.ValueType, value: []byte(key.Config.Value)}, nil
-	case models.OnlineConfKindFlag:
+	case onlineconf.KindFlag:
 		if key.Flag == nil || key.Config != nil {
 			return keyValues{}, models.ErrValidation
 		}
